@@ -1,0 +1,6 @@
+# Ignore commonly used build dirs
+build
+out
+res
+debug
+
