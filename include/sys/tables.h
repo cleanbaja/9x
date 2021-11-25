@@ -30,5 +30,27 @@ extern void asm_load_gdt(struct table_ptr* g);
 
 // IDT Definitions ================================================== 
 
+struct __attribute__((packed)) idt_entry {
+  uint16_t offset_low;
+  uint16_t selector;
+  uint8_t ist;
+  uint8_t flags;
+  uint16_t offset_mid;
+  uint32_t offset_hi;
+  uint32_t reserved;
+};
+
+typedef struct __attribute__((packed)) cpu_ctx {
+	uint64_t r15, r14, r13, r12, r11, r10, r9;
+	uint64_t r8, rbp, rdi, rsi, rdx, rcx, rbx;
+	uint64_t rax, int_no, ec, rip, cs, rflags;
+	uint64_t rsp, ss;
+} ctx_t;
+
+void init_idt();
+void percpu_flush_idt();
+
+void dump_regs(ctx_t* context);
+
 #endif // SYS_TABLES_H
 

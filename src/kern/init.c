@@ -38,7 +38,8 @@ void kern_entry(struct stivale2_struct* bootinfo) {
   
   // Load GDT/IDT
   init_gdt();
+  init_idt();
 
-  for (;;) { __asm__ volatile ("hlt"); }
+  PANIC(NULL, "End of kernel reached!\n\n");
 }
 

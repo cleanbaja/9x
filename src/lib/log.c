@@ -810,6 +810,17 @@ static void _debug_write(const char* str)
 }
 
 char msg_buf[512], main_buf[512];
+void raw_log(char* fmt, ...)
+{
+  va_list va;
+  va_start(va, fmt);
+
+  _vsnprintf(_out_buffer, msg_buf, 512, fmt, va);
+  va_end(va);
+
+  _debug_write(msg_buf);
+  memset64(msg_buf, 0, 512);
+}
 
 void log(char* fmt, ...)
 {

@@ -1,5 +1,6 @@
 KERNEL_SOURCES = kern/init.c   \
 								 sys/gdt.c     \
+								 sys/idt.c     \
 								 lib/builtin.c \
 								 lib/log.c
 
