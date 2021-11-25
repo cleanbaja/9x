@@ -48,6 +48,9 @@ $(BUILD_ROOT)/9x.iso: $(BUILD_ROOT)/src/9x.elf $(BUILD_ROOT)/limine/limine-insta
 	$(BUILD_ROOT)/limine/limine-install $@
 	rm -rf isoroot
 
+# Simplify the process of running make to build the iso
+iso: $(BUILD_ROOT)/9x.iso
+
 #  Various util commands ============================================================
 
 .PHONY: run clean
