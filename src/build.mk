@@ -1,4 +1,5 @@
 KERNEL_SOURCES = kern/init.c   \
+								 kern/vm.c     \
 								 sys/gdt.c     \
 								 sys/idt.c     \
 								 lib/builtin.c \
@@ -10,7 +11,16 @@ KERNEL_ASM = lib/font.asm \
 KERNEL_OBJECTS  = $(addprefix $(BUILD_ROOT)/,$(patsubst %.c, %.o, $(KERNEL_SOURCES))) 
 KERNEL_OBJECTS  += $(addprefix $(BUILD_ROOT)/,$(patsubst %.asm, %.o, $(KERNEL_ASM)))
 
-KCFLAGS = -ffreestanding \
+KCFLAGS = -ffreestanding       \
+					-fno-stack-protector \
+					-fno-pic             \
+					-mno-80387           \
+					-mno-mmx             \
+					-mno-3dnow           \
+					-mno-sse             \
+					-mno-sse2            \
+					-mno-red-zone        \
+					-mcmodel=kernel	     \
 					-I include
 
 $(BUILD_ROOT)/%.o: src/%.c

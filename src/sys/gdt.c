@@ -1,6 +1,5 @@
 #include <sys/tables.h>
-
-extern void asm_load_gdt(struct table_ptr* g);
+#include <internal/asm.h>
 
 static struct gdt main_gdt = {0};
 

@@ -1,8 +1,8 @@
 #include <sys/tables.h>
 #include <lib/log.h>
+#include <internal/asm.h>
 
 static struct idt_entry entries[256] = {0};
-extern void* asm_dispatch_table[256];
 
 static struct idt_entry idt_make_entry(void* handler, uint8_t ist) {
   uint64_t address = (uint64_t)handler;
@@ -30,7 +30,7 @@ void percpu_flush_idt() {
   table_pointer.base = (uint64_t)entries;
   table_pointer.limit = sizeof(entries) - 1;
 
-  __asm__ volatile ("lidt %0" :: "m" (table_pointer));
+  asm_load_idt(table_pointer);
 }
 
 /*
