@@ -19,6 +19,8 @@ static char* mem_to_str(int mem_type) {
       return "kernel+mods"; break;
     case STIVALE2_MMAP_FRAMEBUFFER:
       return "framebuffer"; break;
+    default:
+      return "???"; break;
   }
 }
 
@@ -27,7 +29,11 @@ void vm_init(struct stivale2_struct_tag_memmap* mm_tag) {
   log("Dumping memory map (entries: %d):", mm_tag->entries);
   for(int i = 0; i < mm_tag->entries; i++) {
     struct stivale2_mmap_entry entry = mm_tag->memmap[i];
-    log("    (0x%x-0x%x) -> %s", entry.base, entry.base + entry.length, mem_to_str(entry.type));
+    log("    (0x%08x-0x%08x) -> %s", entry.base, entry.base + entry.length, mem_to_str(entry.type));
   }
+
+  // Then init the phys/virt subsystems
+  vm_init_phys(mm_tag);
+  // vm_init_virt();
 }
 

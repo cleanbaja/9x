@@ -1,8 +1,9 @@
-KERNEL_SOURCES = kern/init.c   \
-								 kern/vm.c     \
-								 sys/gdt.c     \
-								 sys/idt.c     \
-								 lib/builtin.c \
+KERNEL_SOURCES = kern/init.c    \
+								 kern/vm.c      \
+								 kern/vm_phys.c \
+								 sys/gdt.c      \
+								 sys/idt.c      \
+								 lib/builtin.c  \
 								 lib/log.c
 
 KERNEL_ASM = lib/font.asm \

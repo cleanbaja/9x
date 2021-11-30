@@ -4,3 +4,6 @@ out
 res
 debug
 
+# Ignore clang intellisense
+.clang
+
