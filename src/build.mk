@@ -1,13 +1,14 @@
 KERNEL_SOURCES = kern/init.c    \
-								 kern/vm.c      \
-								 kern/vm_phys.c \
-								 sys/gdt.c      \
-								 sys/idt.c      \
-								 lib/builtin.c  \
-								 lib/log.c
+		 kern/vm.c      \
+		 kern/vm_phys.c \
+                 sys/gdt.c      \
+		 sys/idt.c      \
+		 lib/builtin.c  \
+		 lib/strace.c   \
+		 lib/log.c
 
 KERNEL_ASM = lib/font.asm \
-						 sys/helpers.asm
+	     sys/helpers.asm
 
 KERNEL_OBJECTS  = $(addprefix $(BUILD_ROOT)/,$(patsubst %.c, %.o, $(KERNEL_SOURCES))) 
 KERNEL_OBJECTS  += $(addprefix $(BUILD_ROOT)/,$(patsubst %.asm, %.o, $(KERNEL_ASM)))
@@ -21,6 +22,7 @@ KCFLAGS = -ffreestanding       \
 					-mno-sse             \
 					-mno-sse2            \
 					-mno-red-zone        \
+					-fno-omit-frame-pointer \
 					-mcmodel=kernel	     \
 					-I include
 

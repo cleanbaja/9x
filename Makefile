@@ -37,9 +37,10 @@ $(BUILD_ROOT)/limine/limine-install: $(BUILD_ROOT)/limine
 	make -C $(BUILD_ROOT)/limine
 
 $(BUILD_ROOT)/9x.iso: $(BUILD_ROOT)/src/9x.elf $(BUILD_ROOT)/limine/limine-install
-	mkdir -p $(BUILD_ROOT)/isoroot/boot
+	mkdir -p $(BUILD_ROOT)/isoroot/boot/kernel
 	cp $(BUILD_ROOT)/limine/limine-cd.bin $(BUILD_ROOT)/limine/limine-eltorito-efi.bin $(BUILD_ROOT)/isoroot/boot
-	cp $(BUILD_ROOT)/limine/limine.sys share/limine.cfg $(BUILD_ROOT)/src/9x.elf $(BUILD_ROOT)/isoroot/boot 
+	cp $(BUILD_ROOT)/limine/limine.sys share/limine.cfg $(BUILD_ROOT)/isoroot/boot
+	cp $(BUILD_ROOT)/src/9x.elf $(BUILD_ROOT)/isoroot/boot/kernel
 	xorriso -as mkisofs -b boot/limine-cd.bin \
 		-no-emul-boot -boot-load-size 4 -boot-info-table \
 		--efi-boot boot/limine-eltorito-efi.bin \
@@ -48,7 +49,6 @@ $(BUILD_ROOT)/9x.iso: $(BUILD_ROOT)/src/9x.elf $(BUILD_ROOT)/limine/limine-insta
 	$(BUILD_ROOT)/limine/limine-install $@
 	rm -rf isoroot
 
-# Simplify the process of running make to build the iso
 iso: $(BUILD_ROOT)/9x.iso
 
 #  Various util commands ============================================================

@@ -10,7 +10,7 @@ void vm_init(struct stivale2_struct_tag_memmap* mm_tag);
 // Physical memory defs ==============================
 void vm_init_phys(struct stivale2_struct_tag_memmap* mmap);
 void* vm_phys_alloc(uint64_t pages);
-void vm_phys_free(void* start);
+void vm_phys_free(void* start, uint64_t pages);
 
 #endif // VM_H
 

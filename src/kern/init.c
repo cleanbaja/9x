@@ -52,7 +52,9 @@ static void* stivale2_find_tag(uint64_t id) {
 }
 
 void kern_entry(struct stivale2_struct* bootinfo) {
-	bootags = bootinfo;
+  // Save bootinfo and zero rbp (for stacktracing)
+  bootags = bootinfo;
+  __asm__ volatile ("xor %rbp, %rbp");
 
   // Say hello!
   log("9x (x86_64) (v0.1.0) - A project by Yusuf M (cleanbaja)");
