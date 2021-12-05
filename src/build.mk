@@ -13,18 +13,18 @@ KERNEL_ASM = lib/font.asm \
 KERNEL_OBJECTS  = $(addprefix $(BUILD_ROOT)/,$(patsubst %.c, %.o, $(KERNEL_SOURCES))) 
 KERNEL_OBJECTS  += $(addprefix $(BUILD_ROOT)/,$(patsubst %.asm, %.o, $(KERNEL_ASM)))
 
-KCFLAGS = -ffreestanding       \
-					-fno-stack-protector \
-					-fno-pic             \
-					-mno-80387           \
-					-mno-mmx             \
-					-mno-3dnow           \
-					-mno-sse             \
-					-mno-sse2            \
-					-mno-red-zone        \
-					-fno-omit-frame-pointer \
-					-mcmodel=kernel	     \
-					-I include
+KCFLAGS = -ffreestanding           \
+	  -fno-stack-protector     \
+	  -fno-pic                 \
+	  -mno-80387               \
+	  -mno-mmx                 \
+	  -mno-3dnow               \
+	  -mno-sse                 \
+	  -mno-sse2                \
+	  -mno-red-zone            \
+	  -fno-omit-frame-pointer  \
+	  -mcmodel=kernel	   \
+	  -I include
 
 $(BUILD_ROOT)/%.o: src/%.c
 	mkdir -p $(@D)
@@ -40,4 +40,8 @@ $(BUILD_ROOT)/src/9x.elf: $(KERNEL_OBJECTS)
 	mkdir -p $(@D)
 	echo LD $@
 	$(LD) $(LDFLAGS) $(KERNEL_OBJECTS) -T share/kernel.ld -o $@
+	./share/symbols.sh $(BUILD_ROOT)/src $@
+	$(CC) $(KCFLAGS) $(CFLAGS) -c -o $(BUILD_ROOT)/src/ksym.o $(BUILD_ROOT)/src/ksym.gen.c
+	$(LD) $(LDFLAGS) $(KERNEL_OBJECTS) $(BUILD_ROOT)/src/ksym.o -T share/kernel.ld -o $@
+
 
