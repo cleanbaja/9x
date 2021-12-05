@@ -11,9 +11,9 @@ great performace and security, while making the codebase simple and easy to read
 ==== Building ====
 Building 9x is really simple, all you need is git, xorriso, GCC/Clang (i've never tried building 9x with clang personally),
 GNU make, and QEMU (Optional, you can run it on real hardware if needed). Once all these tools are installed, you can simply
-run the following commands to build the kernel and bundle it into a image (currently only the ISO format is supported).
+run the following commands to build the kernel and bundle it into a image (only the ISO format is currently supported).
 
-Build & Run in QEMU
+Build & Run in QEMU (linux kvm required)
 ```
 $ make run
 ```
@@ -23,7 +23,7 @@ Build kernel and generate ISO (build/9x.iso)
 make iso
 ```
 
-NOTE: By default, `make` build the kernel binary only.
+NOTE: By default, `make` builds the kernel binary only.
 
 
 Copyright (C) 2021 cleanbaja, All Rights Reserved.

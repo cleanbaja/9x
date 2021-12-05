@@ -4,11 +4,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// 'ntoa' conversion buffer size, this must be big enough to hold one converted
-// numeric number including padded zeros (dynamically created on stack)
-// default: 32 byte
-#define PRINTF_NTOA_BUFFER_SIZE    64U
+/*
+ *  printf-family of functions ported to 9x
+ *  Created by Marco Paland
+ *  https://github.com/mpaland/printf
+ *  
+ *  License: MIT
+ */
 
+// Customise printf to out liking (no floating point math in kernel)
+#define PRINTF_NTOA_BUFFER_SIZE    64U
 #define PRINTF_SUPPORT_LONG_LONG
 #define PRINTF_SUPPORT_PTRDIFF_T
 
@@ -47,7 +52,6 @@ static inline void _out_buffer(char character, void* buffer, size_t idx, size_t 
     ((char*)buffer)[idx] = character;
   }
 }
-
 
 // internal null output
 static inline void _out_null(char character, void* buffer, size_t idx, size_t maxlen)
@@ -440,17 +444,13 @@ static int _vsnprintf(out_fct_type out, char* buffer, const size_t maxlen, const
       case 'p' : {
         width = sizeof(void*) * 2U;
         flags |= FLAGS_ZEROPAD | FLAGS_UPPERCASE;
-#if defined(PRINTF_SUPPORT_LONG_LONG)
         const bool is_ll = sizeof(uintptr_t) == sizeof(long long);
         if (is_ll) {
           idx = _ntoa_long_long(out, buffer, idx, maxlen, (uintptr_t)va_arg(va, void*), false, 16U, precision, width, flags);
         }
         else {
-#endif
           idx = _ntoa_long(out, buffer, idx, maxlen, (unsigned long)((uintptr_t)va_arg(va, void*)), false, 16U, precision, width, flags);
-#if defined(PRINTF_SUPPORT_LONG_LONG)
         }
-#endif
         format++;
         break;
       }
