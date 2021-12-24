@@ -9,6 +9,7 @@
 
 void log(char* fmt, ...);
 void raw_log(char* fmt, ...);
+int snprintf(char* buffer, size_t count, const char* format, ...);
 int vsnprintf(char* buffer, size_t count, const char* format, va_list va);
 
 static inline uintptr_t ctx_to_base(ctx_t* context) {
@@ -30,8 +31,6 @@ void strace_load(uint64_t ptr);
   }                                            \
   for(;;) { __asm__ volatile ("hlt"); }        \
 })
-
-// 3F,D,A,G,C,I,E
 
 #endif // LIB_LOG_H
 

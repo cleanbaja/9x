@@ -1,6 +1,7 @@
 KERNEL_SOURCES = kern/init.c    \
 		 kern/vm.c      \
 		 kern/vm_phys.c \
+		 kern/vm_virt.c \
                  sys/gdt.c      \
 		 sys/idt.c      \
 		 lib/builtin.c  \

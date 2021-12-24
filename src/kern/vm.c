@@ -34,6 +34,6 @@ void vm_init(struct stivale2_struct_tag_memmap* mm_tag) {
 
   // Then init the phys/virt subsystems
   vm_init_phys(mm_tag);
-  // vm_init_virt();
+  vm_init_virt();
 }
 
