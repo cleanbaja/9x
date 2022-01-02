@@ -56,8 +56,8 @@ iso: $(BUILD_ROOT)/9x.iso
 .PHONY: run clean
 run: $(BUILD_ROOT)/9x.iso
 	printf "\n"
-	qemu-system-x86_64 --enable-kvm -cdrom $(BUILD_ROOT)/9x.iso -m 2G -M q35 -debugcon stdio
+	qemu-system-x86_64 --no-shutdown --no-reboot --enable-kvm -cpu max -cdrom $(BUILD_ROOT)/9x.iso -m 2G -M q35,smm=off -debugcon stdio
 
 clean:
 	rm -rf $(BUILD_ROOT)
-	
+

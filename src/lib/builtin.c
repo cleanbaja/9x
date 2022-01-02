@@ -13,7 +13,8 @@ void memset(void* ptr, uint64_t val, int len)
 {
   uint8_t* real_ptr = (uint8_t*)ptr;
 
-  for(int i = 0; i < (len / 8); i++) {
+  for(int i = 0; i < len; i++) {
     real_ptr[i] = val;
   }
 }
+

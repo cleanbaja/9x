@@ -25,7 +25,8 @@ KCFLAGS = -ffreestanding           \
 	  -mno-red-zone            \
 	  -fno-omit-frame-pointer  \
 	  -mcmodel=kernel	   \
-	  -I include
+	  -I include               \
+	  -g
 
 $(BUILD_ROOT)/%.o: src/%.c
 	mkdir -p $(@D)

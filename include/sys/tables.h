@@ -26,8 +26,6 @@ struct __attribute__((packed)) gdt {
 void init_gdt();
 void percpu_flush_gdt();
 
-extern void asm_load_gdt(struct table_ptr* g);
-
 // IDT Definitions ================================================== 
 
 struct __attribute__((packed)) idt_entry {

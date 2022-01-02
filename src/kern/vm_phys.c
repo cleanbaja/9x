@@ -7,36 +7,9 @@
 #define MEMSTATS_FREE 1
 #define MEMSTATS_LIMIT 2
 
-static uint64_t page_cache[32] = {0}; // A array of free 4KB pages
 static uint64_t memstats[3] = {0};
 static uint8_t *bitmap;
 static uint64_t last_index = 0;
-
-static void cache_add(uint64_t addr) {
-  for (int i = 0; i < 32; i++) {
-    if (page_cache[i] == 0) {
-      page_cache[i] = addr;
-      return;
-    }
-  }
-
-  // The cache is full, return
-  return;
-}
-
-static uint64_t cache_get() {
-  uint64_t ret_addr = -1;
-  for (int i = 0; i < 32; i++) {
-    if (page_cache[i] != 0) {
-      ret_addr = page_cache[i];
-      page_cache[i] = 0;
-      goto exit;
-    }
-  }
-
-exit:
-  return ret_addr;
-}
 
 static int vm_zone_used(uintptr_t start, uint64_t pages) {
   int is_used = 0;
@@ -126,12 +99,6 @@ void vm_init_phys(struct stivale2_struct_tag_memmap *mmap) {
 }
 
 void *vm_phys_alloc(uint64_t pages) {
-  if (pages == 1) {
-	uint64_t ret_addr;
-	if ((ret_addr = cache_get()) != -1)
-	  return (void*)ret_addr;
-  }
-
   for (uint64_t i = last_index; i < memstats[MEMSTATS_LIMIT]; i += 4096) {
     if (vm_phys_reserve(i, pages))
       return (void*)i;
@@ -147,10 +114,6 @@ void *vm_phys_alloc(uint64_t pages) {
 }
 
 void vm_phys_free(void *start, uint64_t pages) {
-  if (pages == 1) {
-    cache_add((uint64_t)start);
-  }
-
   for (uint64_t i = (uint64_t)start; i < ((uint64_t)start) + (pages * 4096);
        i += 4096) {
     bitmap[i / (4096 * 8)] &= ~(1 << ((i / 4096) % 8));

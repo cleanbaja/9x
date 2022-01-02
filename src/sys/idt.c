@@ -61,13 +61,50 @@ static char *exc_table[] = {
 };
 
 void dump_regs(ctx_t* context) {
-	raw_log("Exception #%d (%s)\n", context->int_no, exc_table[context->int_no]);
-	raw_log("    Error Code: 0x%x, RIP: 0x%x, RSP: 0x%x\n", context->ec, context->rip, context->rsp);
-  raw_log("    RAX: 0x%x, RBX: 0x%x, RCX: 0x%x, RDX: 0x%x\n", context->rax, context->rbx, context->rcx, context->rbx);
-  raw_log("    RSI: 0x%x, RDI: 0x%x, RSP: 0x%x, RBP: 0x%x\n", context->rsi, context->rdi, context->rsp, context->rbp);
-  raw_log("    R8: 0x%x, R9: 0x%x, R10: 0x%x, R11: 0x%x\n", context->r8, context->r9, context->r10, context->r11);
-  raw_log("    R12: 0x%x, R12: 0x%x, R13: 0x%x, R14: 0x%x\n", context->r12, context->r13, context->r13, context->r14);
-  raw_log("    R15: 0x%x, CS: 0x%x, SS: 0x%x\n\n", context->r15, context->cs, context->ss);
+  raw_log("Exception #%d (%s)\n", context->int_no, exc_table[context->int_no]);
+  raw_log("    Error Code: 0x%08lx, RIP: 0x%08lx, RSP: 0x%08lx\n", context->ec, context->rip, context->rsp);
+  raw_log("    RAX: 0x%08lx, RBX: 0x%08lx, RCX: 0x%08lx, RDX: 0x%08lx\n", context->rax, context->rbx, context->rcx, context->rbx);
+  raw_log("    RSI: 0x%08lx, RDI: 0x%08lx, RSP: 0x%08lx, RBP: 0x%08lx\n", context->rsi, context->rdi, context->rsp, context->rbp);
+  raw_log("    R8:  0x%08lx, R9:  0x%08lx, R10: 0x%08lx, R11: 0x%08lx\n", context->r8, context->r9, context->r10, context->r11);
+  raw_log("    R12: 0x%08lx, R12: 0x%08lx, R13: 0x%08lx, R14: 0x%08lx\n", context->r12, context->r13, context->r13, context->r14);
+  raw_log("    R15: 0x%08lx, CS:  0x%08lx, SS:  0x%08lx\n\n", context->r15, context->cs, context->ss);
+
+  if (context->int_no == 14) {
+    // Print extra information in the case of a page fault
+    uint64_t cr2_val = asm_read_cr2();
+    raw_log("Linear Address: 0x%lx\nConditions:\n", cr2_val);
+
+    // See Intel x86 SDM Volume 3a Chapter 4.7
+    uint64_t error_code = context->ec;
+    if (((error_code) & (1 << (0))))
+        raw_log("    - Page level protection violation\n");
+    else
+        raw_log("    - Non-present page\n");
+
+    if (((error_code) & (1 << (1))))
+        raw_log("    - Write\n");
+    else
+        raw_log("    - Read\n");
+
+    if (((error_code) & (1 << (2))))
+        raw_log("    - User access\n");
+    else
+        raw_log("    - Supervisor access\n");
+
+    if (((error_code) & (1 << (3))))
+        raw_log("    - Reserved bit set\n");
+
+    if (((error_code) & (1 << (4))))
+        raw_log("    - Instruction fetch\n");
+
+    if (((error_code) & (1 << (5))))
+        raw_log("    - Protection key violation\n");
+
+    if (((error_code) & (1 << (15))))
+        raw_log("    - SGX violation\n");
+    
+    raw_log("\n");
+  }
 }
 
 void sys_dispatch_isr(ctx_t* context) {
