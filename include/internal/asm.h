@@ -4,40 +4,54 @@
 #include <stdint.h>
 
 // General asm routines
-#define asm_halt() ({           \
-    __asm__ volatile ("cli");   \
-    for (;;) {                  \
-      __asm__ volatile ("hlt"); \
-    }                           \
-})
+#define asm_halt()                                                             \
+  ({                                                                           \
+    __asm__ volatile("cli");                                                   \
+    for (;;) {                                                                 \
+      __asm__ volatile("hlt");                                                 \
+    }                                                                          \
+  })
 
-#define asm_invlpg(k) ({            \
-    __asm__ volatile("invlpg (%0)"  \
-		    :               \
-		    :"r"(k)         \
-		    : "memory");    \
-})
+#define asm_invlpg(k)                                                          \
+  ({ __asm__ volatile("invlpg (%0)" : : "r"(k) : "memory"); })
+
+#define INVL_ADDR 0
+#define INVL_PCID 1
+
+static inline void
+asm_invpcid(uint64_t mode, int pcid, uintptr_t addr)
+{
+  struct
+  {
+    uint64_t pcid;
+    uintptr_t address;
+  } invl_des;
+
+  invl_des.pcid = pcid;
+  invl_des.address = addr;
+
+  __asm__ volatile("invpcid %1, %0" : : "r"(mode), "m"(invl_des) : "memory");
+}
 
 // GDT/IDT asm routines
 extern void* asm_dispatch_table[256];
-extern void asm_load_gdt(struct table_ptr* g);
-#define asm_load_idt(ptr) __asm__ volatile ("lidt %0" :: "m" (ptr))
+extern void
+asm_load_gdt(void* g);
+#define asm_load_idt(ptr) __asm__ volatile("lidt %0" ::"m"(ptr))
 
-// CR0-4 asm routines
-#define ASM_MAKE_CRN(N)                                \
-    static inline uint64_t asm_read_cr##N(void)        \
-    {                                                  \
-        uint64_t value = 0;                            \
-        __asm__ volatile("mov %%cr" #N ", %0"          \
-                     : "=r"(value));                   \
-        return value;                                  \
-    }                                                  \
-                                                       \
-    static inline void asm_write_cr##N(uint64_t value) \
-    {                                                  \
-        __asm__ volatile("mov %0, %%cr" #N             \
-                     ::"a"(value));                    \
-    }
+// CR0-4 & MSR asm routines
+#define ASM_MAKE_CRN(N)                                                        \
+  static inline uint64_t asm_read_cr##N(void)                                  \
+  {                                                                            \
+    uint64_t value = 0;                                                        \
+    __asm__ volatile("mov %%cr" #N ", %0" : "=r"(value));                      \
+    return value;                                                              \
+  }                                                                            \
+                                                                               \
+  static inline void asm_write_cr##N(uint64_t value)                           \
+  {                                                                            \
+    __asm__ volatile("mov %0, %%cr" #N ::"a"(value));                          \
+  }
 
 ASM_MAKE_CRN(0)
 ASM_MAKE_CRN(1)
@@ -45,41 +59,41 @@ ASM_MAKE_CRN(2)
 ASM_MAKE_CRN(3)
 ASM_MAKE_CRN(4)
 
-#define IA32_EFER            0xC0000080
-#define IA32_KERNEL_GS_BASE  0xC0000102
+#define IA32_EFER 0xC0000080
+#define IA32_KERNEL_GS_BASE 0xC0000102
 
-static inline uint64_t asm_rdmsr(uint32_t msr)
+static inline uint64_t
+asm_rdmsr(uint32_t msr)
 {
-    uint32_t msrlow;
-    uint32_t msrhigh;
+  uint32_t msrlow;
+  uint32_t msrhigh;
 
-    __asm__ volatile("mov %[msr], %%ecx;"
-                 "rdmsr;"
-                 "mov %%eax, %[msrlow];"
-                 "mov %%edx, %[msrhigh];"
-                 : [msrlow] "=g"(msrlow), [msrhigh] "=g"(msrhigh)
-                 : [msr] "g"(msr)
-                 : "eax", "ecx", "edx");
+  __asm__ volatile("mov %[msr], %%ecx;"
+                   "rdmsr;"
+                   "mov %%eax, %[msrlow];"
+                   "mov %%edx, %[msrhigh];"
+                   : [msrlow] "=g"(msrlow), [msrhigh] "=g"(msrhigh)
+                   : [msr] "g"(msr)
+                   : "eax", "ecx", "edx");
 
-    uint64_t msrval = ((uint64_t)msrhigh << 32) | msrlow;
-    return msrval;
+  uint64_t msrval = ((uint64_t)msrhigh << 32) | msrlow;
+  return msrval;
 }
 
-static inline void asm_wrmsr(uint32_t msr, uint64_t val)
+static inline void
+asm_wrmsr(uint32_t msr, uint64_t val)
 {
-    uint32_t msrlow = val & UINT32_MAX;
-    uint32_t msrhigh = (val >> 32) & UINT32_MAX;
+  uint32_t msrlow = val & UINT32_MAX;
+  uint32_t msrhigh = (val >> 32) & UINT32_MAX;
 
-    __asm__ volatile("mov %[msr], %%ecx;"
-                 "mov %[msrlow], %%eax;"
-                 "mov %[msrhigh], %%edx;"
-                 "wrmsr;"
-                 :
-                 : [msr] "g"(msr), [msrlow] "g"(msrlow), [msrhigh] "g"(msrhigh)
-                 : "eax", "ecx", "edx");
+  __asm__ volatile(
+    "mov %[msr], %%ecx;"
+    "mov %[msrlow], %%eax;"
+    "mov %[msrhigh], %%edx;"
+    "wrmsr;"
+    :
+    : [msr] "g"(msr), [msrlow] "g"(msrlow), [msrhigh] "g"(msrhigh)
+    : "eax", "ecx", "edx");
 }
-
-
 
 #endif // INTERNAL_ASM_H
-

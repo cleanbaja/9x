@@ -7,11 +7,13 @@
 #define MEMSTATS_FREE 1
 #define MEMSTATS_LIMIT 2
 
-static uint64_t memstats[3] = {0};
-static uint8_t *bitmap;
+static uint64_t memstats[3] = { 0 };
+static uint8_t* bitmap;
 static uint64_t last_index = 0;
 
-static int vm_zone_used(uintptr_t start, uint64_t pages) {
+static int
+vm_zone_used(uintptr_t start, uint64_t pages)
+{
   int is_used = 0;
 
   for (uint64_t i = start; i < start + (pages * 4096); i += 4096) {
@@ -23,7 +25,9 @@ static int vm_zone_used(uintptr_t start, uint64_t pages) {
   return is_used;
 }
 
-static int vm_phys_reserve(uintptr_t start, uint64_t pages) {
+static int
+vm_phys_reserve(uintptr_t start, uint64_t pages)
+{
   if (vm_zone_used(start, pages))
     return 0;
 
@@ -35,7 +39,9 @@ static int vm_phys_reserve(uintptr_t start, uint64_t pages) {
   return 1;
 }
 
-void vm_init_phys(struct stivale2_struct_tag_memmap *mmap) {
+void
+vm_init_phys(struct stivale2_struct_tag_memmap* mmap)
+{
   uint64_t total_mem = 0;
 
   for (size_t i = 0; i < mmap->entries; i++) {
@@ -62,7 +68,8 @@ void vm_init_phys(struct stivale2_struct_tag_memmap *mmap) {
 
   uint64_t bitmap_size = memstats[MEMSTATS_LIMIT] / (4096 * 8);
 
-  log("phys: Total memory -> %u MB (max=0x%x)", total_mem / (1024 * 1024),
+  log("phys: Total memory -> %u MB (max=0x%x)",
+      total_mem / (1024 * 1024),
       memstats[MEMSTATS_LIMIT]);
   log("phys: Using a bitmap %u KB in size", bitmap_size / 1024);
 
@@ -73,7 +80,7 @@ void vm_init_phys(struct stivale2_struct_tag_memmap *mmap) {
       continue;
 
     if (entry.length >= bitmap_size) {
-      bitmap = (void *)(entry.base + VM_MEM_OFFSET);
+      bitmap = (void*)(entry.base + VM_MEM_OFFSET);
 
       // Initialise entire bitmap to 1 (non-free)
       memset(bitmap, 0xff, bitmap_size);
@@ -91,14 +98,16 @@ void vm_init_phys(struct stivale2_struct_tag_memmap *mmap) {
     if (entry.type != STIVALE2_MMAP_USABLE)
       continue;
 
-    vm_phys_free((void *)entry.base, entry.length / 4096);
+    vm_phys_free((void*)entry.base, entry.length / 4096);
   }
 
   // Guard the bitmap itself
   vm_phys_reserve((uint64_t)bitmap - VM_MEM_OFFSET, (bitmap_size / 4096) + 1);
 }
 
-void *vm_phys_alloc(uint64_t pages) {
+void*
+vm_phys_alloc(uint64_t pages)
+{
   for (uint64_t i = last_index; i < memstats[MEMSTATS_LIMIT]; i += 4096) {
     if (vm_phys_reserve(i, pages))
       return (void*)i;
@@ -113,10 +122,11 @@ void *vm_phys_alloc(uint64_t pages) {
   return NULL;
 }
 
-void vm_phys_free(void *start, uint64_t pages) {
+void
+vm_phys_free(void* start, uint64_t pages)
+{
   for (uint64_t i = (uint64_t)start; i < ((uint64_t)start) + (pages * 4096);
        i += 4096) {
     bitmap[i / (4096 * 8)] &= ~(1 << ((i / 4096) % 8));
   }
 }
-

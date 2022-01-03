@@ -2,15 +2,19 @@
 
 #define BACKTRACE_MAX 20
 
-struct kernel_symbol {
+struct kernel_symbol
+{
   uint64_t base;
-  char *name;
+  char* name;
 };
 
 __attribute__((weak)) struct kernel_symbol ksym_table[] = {
-    {.base = UINT64_MAX, .name = ""}};
+  { .base = UINT64_MAX, .name = "" }
+};
 
-static int strace_table_present() {
+static int
+strace_table_present()
+{
   if (ksym_table[0].base == UINT64_MAX) {
     return 0;
   } else {
@@ -18,7 +22,9 @@ static int strace_table_present() {
   }
 }
 
-static char *addr_to_name(uintptr_t addr, uint64_t *offset) {
+static char*
+addr_to_name(uintptr_t addr, uint64_t* offset)
+{
   if (!strace_table_present()) {
     return NULL;
   }
@@ -33,7 +39,9 @@ static char *addr_to_name(uintptr_t addr, uint64_t *offset) {
   return NULL;
 }
 
-void strace_unwind(uintptr_t *base) {
+void
+strace_unwind(uintptr_t* base)
+{
   if (base == 0) {
     // base = (uintptr_t)__builtin_frame_address(0);
     __asm__ volatile("movq %%rbp, %0" : "=g"(base)::"memory");
@@ -48,7 +56,7 @@ void strace_unwind(uintptr_t *base) {
       break;
 
     uintptr_t offset;
-    char *name = addr_to_name(ret_addr, &offset);
+    char* name = addr_to_name(ret_addr, &offset);
 
     if (name)
       raw_log("  * 0x%lx <%s+0x%lx>\n", ret_addr, name, offset);
@@ -58,6 +66,6 @@ void strace_unwind(uintptr_t *base) {
     if (!old_bp)
       break;
 
-    base = (void *)old_bp;
+    base = (void*)old_bp;
   }
 }
