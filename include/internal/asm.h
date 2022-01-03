@@ -1,6 +1,7 @@
 #ifndef INTERNAL_ASM_H
 #define INTERNAL_ASM_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 // General asm routines
@@ -95,5 +96,13 @@ asm_wrmsr(uint32_t msr, uint64_t val)
     : [msr] "g"(msr), [msrlow] "g"(msrlow), [msrhigh] "g"(msrhigh)
     : "eax", "ecx", "edx");
 }
+
+// Locking asm functions
+extern void
+asm_spinlock_acquire(
+  int* lock); // Uses 'pause' between checks (better for locks held shorter)
+extern void
+asm_sleeplock_acquire(int* lock); // Uses 'monitor/mwait' between checks (better
+                                  // for locks held longer)
 
 #endif // INTERNAL_ASM_H

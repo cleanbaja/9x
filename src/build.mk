@@ -4,12 +4,14 @@ KERNEL_SOURCES = kern/init.c    \
 		 kern/vm_virt.c \
                  sys/gdt.c      \
 		 sys/idt.c      \
+		 sys/cpu.c      \
 		 lib/builtin.c  \
 		 lib/strace.c   \
 		 lib/log.c
 
-KERNEL_ASM = lib/font.asm \
-	     sys/helpers.asm
+KERNEL_ASM = lib/font.asm     \
+	     sys/helpers.asm  \
+	     sys/spinlock.asm 
 
 KERNEL_OBJECTS  = $(addprefix $(BUILD_ROOT)/,$(patsubst %.c, %.o, $(KERNEL_SOURCES))) 
 KERNEL_OBJECTS  += $(addprefix $(BUILD_ROOT)/,$(patsubst %.asm, %.o, $(KERNEL_ASM)))
