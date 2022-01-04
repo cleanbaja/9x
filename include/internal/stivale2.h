@@ -381,4 +381,7 @@ struct stivale2_struct_vmap
 
 #undef _stivale2_split64
 
+void*
+stivale2_find_tag(uint64_t id);
+
 #endif

@@ -39,13 +39,17 @@ void
 vm_init(struct stivale2_struct_tag_memmap* mm_tag)
 {
   // Dump all memmap entries
-  log("Dumping memory map (entries: %d):", mm_tag->entries);
-  for (int i = 0; i < mm_tag->entries; i++) {
-    struct stivale2_mmap_entry entry = mm_tag->memmap[i];
-    log("    (0x%08x-0x%08x) -> %s",
-        entry.base,
-        entry.base + entry.length,
-        mem_to_str(entry.type));
+  if (mm_tag->entries > 20) {
+    log("vm/phys: a total of %d entries in memmap", mm_tag->entries);
+  } else {
+    log("Dumping memory map (entries: %d):", mm_tag->entries);
+    for (int i = 0; i < mm_tag->entries; i++) {
+      struct stivale2_mmap_entry entry = mm_tag->memmap[i];
+      log("    (0x%08x-0x%08x) -> %s",
+          entry.base,
+          entry.base + entry.length,
+          mem_to_str(entry.type));
+    }
   }
 
   // Then init the phys/virt subsystems

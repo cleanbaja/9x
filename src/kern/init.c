@@ -1,4 +1,5 @@
 #include <internal/stivale2.h>
+#include <lib/console.h>
 #include <lib/log.h>
 #include <sys/tables.h>
 #include <vm.h>
@@ -30,7 +31,7 @@ __attribute__((section(".stivale2hdr"),
 
 static struct stivale2_struct* bootags;
 
-static void*
+void*
 stivale2_find_tag(uint64_t id)
 {
   struct stivale2_tag* current_tag = (struct stivale2_tag*)bootags->tags;
@@ -56,6 +57,7 @@ kern_entry(struct stivale2_struct* bootinfo)
   __asm__ volatile("xor %rbp, %rbp");
 
   // Say hello!
+  console_init();
   log("9x (x86_64) (v0.1.0) - A project by Yusuf M (cleanbaja)");
   log("Bootloader: %s (%s)",
       bootinfo->bootloader_brand,

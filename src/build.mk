@@ -6,6 +6,7 @@ KERNEL_SOURCES = kern/init.c    \
 		 sys/idt.c      \
 		 sys/cpu.c      \
 		 lib/builtin.c  \
+		 lib/console.c  \
 		 lib/strace.c   \
 		 lib/log.c
 

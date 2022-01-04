@@ -1,6 +1,7 @@
 #include <lib/builtin.h>
 #include <lib/log.h>
 
+#include <lib/console.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -677,6 +678,7 @@ raw_log(char* fmt, ...)
   va_end(va);
 
   _debug_write(msg_buf);
+  console_write(msg_buf);
   memset64(msg_buf, 0, 512);
 }
 
@@ -691,6 +693,7 @@ log(char* fmt, ...)
   va_end(va);
 
   _debug_write(main_buf);
+  console_write(main_buf);
 
   // Clear both buffers
   memset64(msg_buf, 0, 512);

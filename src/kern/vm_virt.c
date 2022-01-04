@@ -102,7 +102,7 @@ flags_to_pte(uintptr_t phys, int flags)
   if (flags & VM_PERM_WRITE) {
     raw_page |= (1 << 1);
   }
-  // Dosen't work for some reason???
+
   if (!(flags & VM_PERM_EXEC)) {
     raw_page |= (1ull << 63);
   }
@@ -115,7 +115,6 @@ flags_to_pte(uintptr_t phys, int flags)
     raw_page |= (1 << 8);
   }
 
-  // log("creating 0x%lx (good: 0x%lx)", raw_page | phys | 1, phys | 0b11);
   return raw_page | phys | (1 << 0); // Present plus address
 }
 
@@ -240,6 +239,9 @@ vm_init_virt()
   // Enable all supported features
   enable_feature_map();
 
+  // FIXME: PCID currently dosen't work, so disable it, regardless of presence
+  mmu_features &= ~(1 << 4);
+
   // Setup the kernel pagemap
   kernel_space.pcid = 1;
   kernel_space.active = false;
@@ -254,7 +256,8 @@ vm_init_virt()
     vm_virt_map(&kernel_space,
                 p,
                 VM_KERN_OFFSET + p,
-                VM_PERM_READ | VM_PERM_WRITE | VM_PERM_EXEC | VM_PAGE_GLOBAL);
+                VM_PERM_READ | VM_PERM_WRITE | VM_PERM_EXEC |
+                  (MMU_CHECK(MM_FEAT_GLOBL) ? VM_PAGE_GLOBAL : 1));
   }
 
   vm_load_space(&kernel_space);
