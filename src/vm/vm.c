@@ -1,5 +1,5 @@
 #include <lib/log.h>
-#include <vm.h>
+#include <9x/vm.h>
 
 static char*
 mem_to_str(int mem_type)

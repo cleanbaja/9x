@@ -2,7 +2,7 @@
 #include <internal/cpuid.h>
 #include <lib/builtin.h>
 #include <lib/log.h>
-#include <vm.h>
+#include <9x/vm.h>
 
 uint64_t mmu_features = 0;
 vm_space_t kernel_space;
@@ -202,7 +202,7 @@ vm_virt_unmap(vm_space_t* spc, uintptr_t virt)
   level1[level1_index] &= ~(1 << 0);
 }
 
-static void
+void
 vm_load_space(vm_space_t* spc)
 {
   uint64_t cr3_val = spc->pml4;
@@ -214,8 +214,15 @@ vm_load_space(vm_space_t* spc)
       cr3_val |= spc->pcid;
   }
 
-  asm_write_cr3(cr3_val);
+  asm_write_cr3(spc->pml4);
   spc->active = true;
+}
+
+void
+percpu_init_vm()
+{
+  enable_feature_map();
+  vm_load_space(&kernel_space);
 }
 
 void
@@ -235,12 +242,11 @@ vm_init_virt()
            MMU_CHECK(MM_FEAT_PCID) ? "PCID" : "-PCID",
            MMU_CHECK(MM_FEAT_1GB) ? "1GB" : "-1GB");
   log(buf);
-
+  
+  // FIXME: PCID currently dosen't work, so disable it, regardless of presence
+  
   // Enable all supported features
   enable_feature_map();
-
-  // FIXME: PCID currently dosen't work, so disable it, regardless of presence
-  mmu_features &= ~(1 << 4);
 
   // Setup the kernel pagemap
   kernel_space.pcid = 1;

@@ -1,7 +1,7 @@
 #include <lib/builtin.h>
 #include <lib/log.h>
 #include <stddef.h>
-#include <vm.h>
+#include <9x/vm.h>
 
 #define MEMSTATS_USED 0
 #define MEMSTATS_FREE 1

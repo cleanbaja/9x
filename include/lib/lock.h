@@ -2,26 +2,14 @@
 #define LIB_LOCK_H
 
 #include <internal/asm.h>
+#include <sys/cpu.h>
 
-#define ATOMIC_READ(VAR)                                                       \
-  ({                                                                           \
-    typeof(VAR) ret = 0;                                                       \
-    __asm__ volatile("lock xadd %1, %0" : "+r"(ret), "+m"(VAR) : : "memory");  \
-    ret;                                                                       \
-  })
+#define ATOMIC_READ(j) __atomic_load_n(j, __ATOMIC_SEQ_CST)
+#define ATOMIC_WRITE(ptr, j) __atomic_store_n(ptr, j, __ATOMIC_SEQ_CST)
+#define ATOMIC_INC(i) __sync_add_and_fetch((i), 1)
 
-#define ATOMIC_WRITE(VAR, VAL)                                                 \
-  ({                                                                           \
-    typeof(VAR) ret = VAL;                                                     \
-    asm volatile("lock xchg %1, %0" : "+r"(ret), "+m"(VAR) : : "memory");      \
-    ret;                                                                       \
-  })
-
-#define LOCK_RELEASE(k) ATOMIC_WRITE(&k, 0)
-#define CREATE_LOCK(name) volatile uint64_t name = 0;
-
+#define CREATE_LOCK(name) volatile int name = 0;
 #define SPINLOCK_ACQUIRE(k) ({ asm_spinlock_acquire(&k); })
-
 #define SLEEPLOCK_ACQUIRE(k)                                                   \
   ({                                                                           \
     if (cpu_features & (1 << 0)) {                                             \
@@ -30,7 +18,6 @@
       asm_spinlock_acquire(&k);                                                \
     }                                                                          \
   })
-
-extern uint64_t cpu_features;
+#define LOCK_RELEASE(k) __atomic_clear(&k, __ATOMIC_SEQ_CST)
 
 #endif // LIB_LOCK_H

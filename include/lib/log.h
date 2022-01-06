@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "sys/tables.h"
+#include "lock.h"
 
 void
 log(char* fmt, ...);
@@ -28,8 +29,13 @@ strace_unwind();
 void
 strace_load(uint64_t ptr);
 
+extern int in_panic;
+
 #define PANIC(ctx, m, ...)                                                     \
   ({                                                                           \
+    if (in_panic == 1) {                                                       \
+      for(;;) { __asm__ volatile("hlt"); }                                     \
+    } else { in_panic = 1; }                                                   \
     raw_log("\nKERNEL PANIC on CPU #0\n");                                     \
     if (m) {                                                                   \
       raw_log(m, ##__VA_ARGS__);                                               \

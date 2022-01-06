@@ -2,7 +2,8 @@
 #include <lib/console.h>
 #include <lib/log.h>
 #include <sys/tables.h>
-#include <vm.h>
+#include <9x/vm.h>
+#include <sys/cpu.h>
 
 #include <stdint.h>
 
@@ -69,6 +70,9 @@ kern_entry(struct stivale2_struct* bootinfo)
 
   // Initialize the memory subsystem
   vm_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID));
+
+  // Initialize other CPUs
+  cpu_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_SMP_ID));
 
   PANIC(NULL, "End of kernel reached!\n\n");
 }

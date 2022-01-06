@@ -1,14 +1,15 @@
 KERNEL_SOURCES = kern/init.c    \
-		 kern/vm.c      \
-		 kern/vm_phys.c \
-		 kern/vm_virt.c \
                  sys/gdt.c      \
 		 sys/idt.c      \
 		 sys/cpu.c      \
 		 lib/builtin.c  \
 		 lib/console.c  \
 		 lib/strace.c   \
-		 lib/log.c
+		 lib/log.c      \
+		 vm/vm.c        \
+		 vm/virt.c      \
+		 vm/phys.c      \
+		 vm/alloc.c   
 
 KERNEL_ASM = lib/font.asm     \
 	     sys/helpers.asm  \

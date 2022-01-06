@@ -97,12 +97,15 @@ asm_wrmsr(uint32_t msr, uint64_t val)
     : "eax", "ecx", "edx");
 }
 
-// Locking asm functions
+// Locking asm functions...
+
+// Uses 'pause' between checks (better for locks held shorter)
 extern void
 asm_spinlock_acquire(
-  int* lock); // Uses 'pause' between checks (better for locks held shorter)
+  volatile int* lock);
+
+// Uses 'monitor/mwait' between checks (better for locks held longer)
 extern void
-asm_sleeplock_acquire(int* lock); // Uses 'monitor/mwait' between checks (better
-                                  // for locks held longer)
+asm_sleeplock_acquire(volatile int* lock);
 
 #endif // INTERNAL_ASM_H
