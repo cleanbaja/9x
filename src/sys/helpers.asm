@@ -123,12 +123,15 @@ INTR_CREATE_ERR   30
 INTR_CREATE       31
 
 %assign i 32
-%rep 224
+%rep 223
 
 INTR_CREATE i
 %assign i i+1
 
 %endrep
+
+__intr_255:
+  ret
 
 
 section .data

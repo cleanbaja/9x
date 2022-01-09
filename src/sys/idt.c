@@ -1,8 +1,16 @@
 #include <internal/asm.h>
 #include <lib/log.h>
+#include <sys/apic.h>
 #include <sys/tables.h>
 
 static struct idt_entry entries[256] = { 0 };
+static struct handler handlers[256] = { 0 };
+
+void
+idt_set_handler(struct handler h, int vector)
+{
+  handlers[vector] = h;
+}
 
 static struct idt_entry
 idt_make_entry(void* handler, uint8_t ist)
@@ -138,5 +146,13 @@ sys_dispatch_isr(ctx_t* context)
 {
   if (context->int_no < 32) {
     PANIC(context, NULL);
+  }
+
+  if (handlers[context->int_no].func) {
+    handlers[context->int_no].func(context);
+  }
+
+  if (handlers[context->int_no].is_irq) {
+    apic_eoi();
   }
 }

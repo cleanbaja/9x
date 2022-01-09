@@ -123,7 +123,7 @@ void* liballoc_alloc(int pages) {
 
 int liballoc_free(void* addr, int pages) {
     vm_phys_free((void*)((uintptr_t)addr - heap_base), pages);
-    vm_virt_unmap(&kernel_space, addr);
+    vm_virt_unmap(&kernel_space, (uintptr_t)addr);
     return 0;
 }
 

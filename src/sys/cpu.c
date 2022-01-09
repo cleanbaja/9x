@@ -1,13 +1,23 @@
+#include <9x/vm.h>
 #include <internal/cpuid.h>
-#include <sys/tables.h>
 #include <lib/lock.h>
 #include <lib/log.h>
-#include <9x/vm.h>
+#include <sys/apic.h>
 #include <sys/cpu.h>
+#include <sys/tables.h>
 
 uint64_t cpu_features = 0; 
 static volatile int active_cpus = 1;
 static CREATE_LOCK(smp_lock);
+
+static void
+ipi_halt()
+{
+  log("cpu: Halt IPI recived!");
+  for (;;) {
+    asm_halt();
+  }
+}
 
 static void ap_entry(struct stivale2_smp_info* info) {
   // FIXME: Add locks to the various functions below, so that we don't have to use a lock here
@@ -15,13 +25,16 @@ static void ap_entry(struct stivale2_smp_info* info) {
     percpu_flush_gdt();
     percpu_flush_idt();
     percpu_init_vm();
-  LOCK_RELEASE(smp_lock);
 
-  if (CPU_CHECK(CPU_FEAT_FSGSBASE)) {
-    asm_write_cr4(asm_read_cr4() | (1 << 16)); 
+    activate_apic();
+    LOCK_RELEASE(smp_lock);
+
+    if (CPU_CHECK(CPU_FEAT_FSGSBASE)) {
+      asm_write_cr4(asm_read_cr4() | (1 << 16)); 
   }
-  
+  __asm__ volatile("sti");
   ATOMIC_INC(&active_cpus);
+
   for (;;) { asm_halt(); }
 }
 
@@ -52,5 +65,12 @@ void cpu_init(struct stivale2_struct_tag_smp *smp_tag) {
 
   while (ATOMIC_READ(&active_cpus) != smp_tag->cpu_count);
   log("smp: %d CPUs initialized!", active_cpus);
+
+  // Set the handler for Halt IPIs
+  struct handler hnd = { .is_irq = true, .func = ipi_halt };
+  idt_set_handler(hnd, IPI_HALT);
+
+  activate_apic();
+  send_ipi(IPI_HALT, 0x1, IPI_SPECIFIC);
 }
 

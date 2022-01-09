@@ -1,6 +1,7 @@
 #ifndef SYS_TABLES_H
 #define SYS_TABLES_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 struct __attribute__((packed)) table_ptr
@@ -51,11 +52,21 @@ typedef struct __attribute__((packed)) cpu_ctx
   uint64_t rsp, ss;
 } ctx_t;
 
+typedef void (*HandlerFunc)(ctx_t*);
+
+struct handler
+{
+  HandlerFunc func;
+  bool is_irq;
+};
+
 void
 init_idt();
 void
 percpu_flush_idt();
 
+void
+idt_set_handler(struct handler h, int vector);
 void
 dump_regs(ctx_t* context);
 
