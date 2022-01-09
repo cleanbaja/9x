@@ -14,9 +14,6 @@ static uintptr_t xapic_base = 0x0;
 static void
 apic_write(uint32_t reg, uint64_t val)
 {
-  if (reg == LAPIC_ICR0)
-    log("apic: Loading 0x%lx", val);
-
   if (use_x2apic) {
     asm_wrmsr(IA32_x2APIC_BASE + (reg >> 4), val);
   } else {
@@ -51,7 +48,10 @@ generate_flags(enum ipi_mode md)
         (1 << 18) | (1 << 19) | (1 << 14); // One time only, All excluding self
       break;
     case IPI_SPECIFIC:
-      to_return |= (1 << 10); // One time only, Use CPU num in destination field
+      to_return |= (1 << 14);              // One time only, Use CPU num in destination field
+      break;
+    case IPI_EVERYONE:
+      to_return |= (1 << 19) | (1 << 14);  // One time only, Send to all including self
       break;
     default:
       log("apic: Unknown IPI mode %d", md);

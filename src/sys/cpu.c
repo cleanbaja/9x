@@ -13,7 +13,6 @@ static CREATE_LOCK(smp_lock);
 static void
 ipi_halt()
 {
-  log("cpu: Halt IPI recived!");
   for (;;) {
     asm_halt();
   }
@@ -27,15 +26,16 @@ static void ap_entry(struct stivale2_smp_info* info) {
     percpu_init_vm();
 
     activate_apic();
-    LOCK_RELEASE(smp_lock);
+  LOCK_RELEASE(smp_lock);
 
-    if (CPU_CHECK(CPU_FEAT_FSGSBASE)) {
+  if (CPU_CHECK(CPU_FEAT_FSGSBASE)) {
       asm_write_cr4(asm_read_cr4() | (1 << 16)); 
   }
+
   __asm__ volatile("sti");
   ATOMIC_INC(&active_cpus);
 
-  for (;;) { asm_halt(); }
+  for (;;) { __asm__ volatile("pause"); }
 }
 
 void cpu_init(struct stivale2_struct_tag_smp *smp_tag) {
@@ -71,6 +71,5 @@ void cpu_init(struct stivale2_struct_tag_smp *smp_tag) {
   idt_set_handler(hnd, IPI_HALT);
 
   activate_apic();
-  send_ipi(IPI_HALT, 0x1, IPI_SPECIFIC);
 }
 

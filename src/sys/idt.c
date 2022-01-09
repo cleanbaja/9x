@@ -141,7 +141,7 @@ dump_regs(ctx_t* context)
   }
 }
 
-void
+ctx_t*
 sys_dispatch_isr(ctx_t* context)
 {
   if (context->int_no < 32) {
@@ -155,4 +155,7 @@ sys_dispatch_isr(ctx_t* context)
   if (handlers[context->int_no].is_irq) {
     apic_eoi();
   }
+
+  return context;
 }
+

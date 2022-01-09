@@ -2,8 +2,9 @@
 #include <lib/console.h>
 #include <lib/log.h>
 #include <sys/tables.h>
-#include <9x/vm.h>
+#include <sys/apic.h>
 #include <sys/cpu.h>
+#include <9x/vm.h>
 
 #include <stdint.h>
 
@@ -74,5 +75,8 @@ kern_entry(struct stivale2_struct* bootinfo)
   // Initialize other CPUs
   cpu_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_SMP_ID));
 
-  PANIC(NULL, "End of kernel reached!\n\n");
+  // Chill for now...
+  log("init: Startup complete, halting all cores!");
+  send_ipi(IPI_HALT, 0, IPI_EVERYONE);
 }
+

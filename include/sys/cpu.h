@@ -11,7 +11,7 @@ extern uint64_t cpu_features;
 #define CPU_FEAT_FSGSBASE (1 << 1)
 #define CPU_CHECK(k) (cpu_features & k)
 
-#define IPI_HALT 230
+#define IPI_HALT 254
 
 // Every CPU has this struct, and a pointer to it is located in the GS register
 typedef struct {
