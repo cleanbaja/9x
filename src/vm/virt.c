@@ -90,29 +90,43 @@ next_level(uint64_t* prev_level, uint64_t index, bool create)
 }
 
 static uint64_t
-flags_to_pte(uintptr_t phys, int flags)
+flags_to_pte(uintptr_t phys, int flags, bool huge_page)
 {
   uint64_t raw_page = 0;
 
   if (!(flags & VM_PERM_READ)) {
-    log("vm/virt (WARN): Non-Readable mappings not supported (flags: 0x%x)",
+    log("vm/virt: (WARN) Non-Readable mappings not supported (flags: 0x%x)",
         flags);
   }
-
   if (flags & VM_PERM_WRITE) {
     raw_page |= (1 << 1);
   }
-
   if (!(flags & VM_PERM_EXEC)) {
     raw_page |= (1ull << 63);
   }
-
   if (flags & VM_PERM_USER) {
     raw_page |= (1 << 2);
   }
 
   if ((flags & VM_PAGE_GLOBAL) && MMU_CHECK(MM_FEAT_GLOBL)) {
     raw_page |= (1 << 8);
+  }
+
+  // Check for cache type
+  switch (flags & VM_CACHE_MASK) {
+    case VM_CACHE_FLAG_UNCACHED:
+      raw_page |= ~(1 << huge_page ? 12 : 7) | (1 << 4) | (1 << 3);
+      break;
+    case VM_CACHE_FLAG_WRITE_COMBINING:
+      raw_page |= (1 << huge_page ? 12 : 7) | (1 << 4) | (1 << 3);
+      break;
+    case VM_CACHE_FLAG_WRITE_PROTECT:
+      raw_page |= (1 << huge_page ? 12 : 7) | (1 << 4) | ~(1 << 3);
+      break;
+
+    // TODO: Write Through
+    default:
+      break; // Use the default memory type (Write Back), which is already optimized 
   }
 
   return raw_page | phys | (1 << 0); // Present plus address
@@ -146,7 +160,7 @@ vm_virt_map(vm_space_t* spc, uintptr_t phys, uintptr_t virt, int flags)
   level1 = next_level(level2, pml2_index, true);
 
   // Finally, fill in the proper page
-  level1[pml1_index] = flags_to_pte(phys, flags);
+  level1[pml1_index] = flags_to_pte(phys, flags, false);
 
   if (spc->active)
     vm_invl((void*)spc, virt);
@@ -221,8 +235,21 @@ vm_load_space(vm_space_t* spc)
 void
 percpu_init_vm()
 {
+  // Enable all supported VM features
   enable_feature_map();
+
+  // Load the kernel VM space
   vm_load_space(&kernel_space);
+  
+  // Load the PAT with our custom value, which changes 2 registers.
+  //   PA6 => Formerly UC-, now Write Protect
+  //   PA7 => Formerly UC, now Write Combining
+  // 
+  // NOTE: The rest remain at the default, see AMD Programmers Manual Volume 2, Section 7.8.2
+  asm_wrmsr(0x277, 0x105040600070406);
+
+  // Clear the entire CPU tlb
+  __asm__ volatile ("wbinvd" ::: "memory");
 }
 
 void
@@ -243,11 +270,6 @@ vm_init_virt()
            MMU_CHECK(MM_FEAT_1GB) ? "1GB" : "-1GB");
   log(buf);
   
-  // FIXME: PCID currently dosen't work, so disable it, regardless of presence
-  
-  // Enable all supported features
-  enable_feature_map();
-
   // Setup the kernel pagemap
   kernel_space.pcid = 1;
   kernel_space.active = false;
@@ -265,6 +287,18 @@ vm_init_virt()
                 VM_PERM_READ | VM_PERM_WRITE | VM_PERM_EXEC |
                   (MMU_CHECK(MM_FEAT_GLOBL) ? VM_PAGE_GLOBAL : 1));
   }
-
-  vm_load_space(&kernel_space);
+  
+  // Actually bootstrap the VM
+  percpu_init_vm();
+ 
+  // Finally, remap the frambuffer as write combining for improved speed
+  struct stivale2_struct_tag_framebuffer* f = (struct stivale2_struct_tag_framebuffer*)stivale2_find_tag(STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
+  for (uintptr_t p = f->framebuffer_addr; p < f->framebuffer_addr + (f->framebuffer_pitch * f->framebuffer_height); p += 0x1000) {
+    vm_virt_map(&kernel_space,
+                p,
+                VM_MEM_OFFSET + p,
+                VM_PERM_READ | VM_PERM_WRITE | VM_CACHE_FLAG_WRITE_COMBINING |
+                  (MMU_CHECK(MM_FEAT_GLOBL) ? VM_PAGE_GLOBAL : 1));
+  }
 }
+

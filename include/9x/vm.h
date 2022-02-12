@@ -38,12 +38,21 @@ extern uint64_t mmu_features;
 
 typedef enum
 {
+  // Permission flags
   VM_PERM_READ   = (1 << 3),
   VM_PERM_WRITE  = (1 << 4),
   VM_PERM_EXEC   = (1 << 5),
+
+  // Page attribute flafs
   VM_PERM_USER   = (1 << 6),
   VM_PAGE_GLOBAL = (1 << 7),
-  VM_PAGE_HUGE   = (1 << 8)
+  VM_PAGE_HUGE   = (1 << 8),
+
+  // Cache flags
+  VM_CACHE_MASK                  = (4 << 15),
+  VM_CACHE_FLAG_UNCACHED         = (1 << 15),
+  VM_CACHE_FLAG_WRITE_COMBINING  = (2 << 15),
+  VM_CACHE_FLAG_WRITE_PROTECT    = (3 << 15),
 } vm_flags_t;
 
 typedef struct
@@ -79,7 +88,6 @@ extern vm_space_t kernel_space;
 
 void* PREFIX(malloc)(size_t);	
 void* PREFIX(realloc)(void *, size_t);	
-void* PREFIX(calloc)(size_t, size_t);		
 void  PREFIX(free)(void *);
 
 #endif // VM_H

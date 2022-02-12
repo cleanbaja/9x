@@ -67,6 +67,8 @@ percpu_flush_idt();
 
 void
 idt_set_handler(struct handler h, int vector);
+int
+idt_allocate_vector();
 void
 dump_regs(ctx_t* context);
 

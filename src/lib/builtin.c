@@ -30,3 +30,4 @@ memcpy(void* dest, void* src, int len)
     dest_ptr[i] = src_ptr[i];
   }
 }
+

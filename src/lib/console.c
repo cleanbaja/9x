@@ -9,6 +9,8 @@
 
 extern unsigned char font_data;
 
+// HACK: For better contrast, set the background to 0xB84C00
+
 void
 console_init()
 {
@@ -18,21 +20,21 @@ console_init()
     STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
 
   // Setup ssfn
-  ssfn_src = (ssfn_font_t*)&font_data; /* the bitmap font to use */
+  ssfn_src = (ssfn_font_t*)&font_data;     /* the bitmap font to use */
   ssfn_dst.ptr =
-    (uint8_t*)fb_tag->framebuffer_addr; /* address of the linear frame buffer */
+    (uint8_t*)fb_tag->framebuffer_addr;    /* address of the linear frame buffer */
   ssfn_dst.w = fb_tag->framebuffer_width;  /* width */
   ssfn_dst.h = fb_tag->framebuffer_height; /* height */
   ssfn_dst.p = fb_tag->framebuffer_pitch;  /* bytes per line */
   ssfn_dst.x = 0;                          /* pen position (x-axis) */
   ssfn_dst.y = 16;                         /* pen position (y-axis) */
-  ssfn_dst.fg = 0xFFFFFF;                  /* foreground color */
-  ssfn_dst.bg = 0xB84C00;                  /* background color */
+  ssfn_dst.fg = 0xD8DEE9;                  /* foreground color */
+  ssfn_dst.bg = 0x2E3440;                  /* background color */
 
   // Set the background color
   uint32_t* p = (uint32_t*)fb_tag->framebuffer_addr;
   for (int i = 0; i < ssfn_dst.h * ssfn_dst.p; i++) {
-    p[i] = 0xB84C00;
+    p[i] = 0x2E3440;
   }
 }
 

@@ -10,7 +10,7 @@ KERNEL_SOURCES = kern/init.c    \
 		 vm/vm.c        \
 		 vm/virt.c      \
 		 vm/phys.c      \
-		 vm/alloc.c   
+		 vm/new_alloc.c   
 
 KERNEL_ASM = lib/font.asm     \
 	     sys/helpers.asm  \

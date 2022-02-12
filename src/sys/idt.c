@@ -5,11 +5,22 @@
 
 static struct idt_entry entries[256] = { 0 };
 static struct handler handlers[256] = { 0 };
+static int last_vector = 64; // Start a bit high, so we don't overlap with the IO-APIC
 
 void
 idt_set_handler(struct handler h, int vector)
 {
   handlers[vector] = h;
+}
+
+int
+idt_allocate_vector()
+{
+  if (last_vector >= 253) {
+    PANIC(NULL, "Out of CPU Interrupt Vectors");
+  }
+
+  return last_vector++;
 }
 
 static struct idt_entry

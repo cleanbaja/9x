@@ -8,6 +8,8 @@
 
 void
 activate_apic();
+void
+apic_eoi();
 
 enum ipi_mode
 {

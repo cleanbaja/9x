@@ -36,7 +36,7 @@ $(BUILD_ROOT)/limine:
 $(BUILD_ROOT)/limine/limine-install: $(BUILD_ROOT)/limine
 	make -C $(BUILD_ROOT)/limine
 
-$(BUILD_ROOT)/9x.iso: $(BUILD_ROOT)/src/9x.elf $(BUILD_ROOT)/limine/limine-install
+$(BUILD_ROOT)/test_image.iso: $(BUILD_ROOT)/src/9x.elf $(BUILD_ROOT)/limine/limine-install
 	mkdir -p $(BUILD_ROOT)/isoroot/boot/kernel
 	cp $(BUILD_ROOT)/limine/limine-cd.bin $(BUILD_ROOT)/limine/limine-eltorito-efi.bin $(BUILD_ROOT)/isoroot/boot
 	cp $(BUILD_ROOT)/limine/limine.sys share/limine.cfg $(BUILD_ROOT)/isoroot/boot
@@ -49,14 +49,14 @@ $(BUILD_ROOT)/9x.iso: $(BUILD_ROOT)/src/9x.elf $(BUILD_ROOT)/limine/limine-insta
 	$(BUILD_ROOT)/limine/limine-install $@
 	rm -rf isoroot
 
-iso: $(BUILD_ROOT)/9x.iso
+iso: $(BUILD_ROOT)/test_image.iso
 
 #  Various util commands ============================================================
 
 .PHONY: run clean
-run: $(BUILD_ROOT)/9x.iso
+run: $(BUILD_ROOT)/test_image.iso
 	printf "\n"
-	qemu-system-x86_64 -smp 2 --enable-kvm -cpu max,+x2apic -cdrom $(BUILD_ROOT)/9x.iso -m 2G -M q35 -debugcon stdio
+	qemu-system-x86_64 -smp 2 --enable-kvm -cpu max -cdrom $(BUILD_ROOT)/test_image.iso -m 2G -M q35 -debugcon stdio
 
 clean:
 	rm -rf $(BUILD_ROOT)

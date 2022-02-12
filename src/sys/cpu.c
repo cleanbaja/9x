@@ -52,6 +52,12 @@ void cpu_init(struct stivale2_struct_tag_smp *smp_tag) {
     asm_write_cr4(asm_read_cr4() | (1 << 16)); // Enable it
   }
 
+  // Set the handler for Halt IPIs
+  struct handler hnd = { .is_irq = true, .func = ipi_halt };
+  idt_set_handler(hnd, IPI_HALT);
+
+  activate_apic();
+  
   // Detect and init all other CPUs
   for (int i = 0; i < smp_tag->cpu_count; i++) {
     struct stivale2_smp_info* sp = &smp_tag->smp_info[i];
@@ -66,10 +72,6 @@ void cpu_init(struct stivale2_struct_tag_smp *smp_tag) {
   while (ATOMIC_READ(&active_cpus) != smp_tag->cpu_count);
   log("smp: %d CPUs initialized!", active_cpus);
 
-  // Set the handler for Halt IPIs
-  struct handler hnd = { .is_irq = true, .func = ipi_halt };
-  idt_set_handler(hnd, IPI_HALT);
-
-  activate_apic();
+  
 }
 
