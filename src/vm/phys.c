@@ -109,13 +109,17 @@ void*
 vm_phys_alloc(uint64_t pages)
 {
   for (uint64_t i = last_index; i < memstats[MEMSTATS_LIMIT]; i += 4096) {
-    if (vm_phys_reserve(i, pages))
+    if (vm_phys_reserve(i, pages)) {
+      memset64(i + VM_MEM_OFFSET, 0, pages * 4096);
       return (void*)i;
+    }
   }
 
   for (uint64_t i = 0; i < last_index; i += 4096) {
-    if (vm_phys_reserve(i, pages))
+    if (vm_phys_reserve(i, pages)) {
+      memset64(i + VM_MEM_OFFSET, 0, pages * 4096);
       return (void*)i;
+    }
   }
 
   PANIC(NULL, "Physical OOM (Out Of Memory)");

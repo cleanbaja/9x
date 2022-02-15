@@ -32,10 +32,10 @@ static void ap_entry(struct stivale2_smp_info* info) {
       asm_write_cr4(asm_read_cr4() | (1 << 16)); 
   }
 
-  __asm__ volatile("sti");
+  __asm__ volatile("cli");
   ATOMIC_INC(&active_cpus);
 
-  for (;;) { __asm__ volatile("pause"); }
+  for (;;) { __asm__ volatile("hlt"); }
 }
 
 void cpu_init(struct stivale2_struct_tag_smp *smp_tag) {

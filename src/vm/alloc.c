@@ -17,7 +17,7 @@ void* kmalloc(size_t size) {
 
 void kfree(void* addr) {
     struct metadata* d = (struct metadata*)((uint8_t*)addr - 4096);
-    vm_phys_free(d - VM_MEM_OFFSET, d->numpages + 1);
+    vm_phys_free((void*)((uintptr_t)d - VM_MEM_OFFSET), d->numpages + 1);
 }
 
 void* krealloc(void* addr, size_t newsize) {

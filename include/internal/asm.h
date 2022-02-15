@@ -109,4 +109,35 @@ asm_spinlock_acquire(
 extern void
 asm_sleeplock_acquire(volatile int* lock);
 
+// ASM Port I/O
+static inline uint8_t asm_inb(uint16_t port) {
+    uint8_t ret;
+    __asm__ volatile("in %1, %0" : "=a"(ret) : "Nd"(port));
+    return ret;
+}
+
+static inline uint16_t asm_inw(uint16_t port) {
+    uint16_t ret;
+    __asm__ volatile("in %1, %0" : "=a"(ret) : "Nd"(port));
+    return ret;
+}
+
+static inline uint32_t asm_ind(uint16_t port) {
+    uint32_t ret;
+    __asm__ volatile("in %1, %0" : "=a"(ret) : "Nd"(port));
+    return ret;
+}
+
+static inline void asm_outb(uint16_t port, uint8_t data) {
+    __asm__ volatile("out %0, %1" :: "a"(data), "Nd"(port));
+}
+
+static inline void asm_outw(uint16_t port, uint16_t data) {
+    __asm__ volatile("out %0, %1" :: "a"(data), "Nd"(port));
+}
+
+static inline void asm_outd(uint16_t port, uint32_t data) {
+    __asm__ volatile("out %0, %1" :: "a"(data), "Nd"(port));
+}
+
 #endif // INTERNAL_ASM_H

@@ -12,7 +12,7 @@ ifneq ($(V), 1)
 .SILENT:
 endif
 
-CFLAGS = -std=c11
+CFLAGS = -std=gnu11
 LDFLAGS = -nostdlib
 
 ifeq ($(OPT), Release)
@@ -21,9 +21,10 @@ else
 CFLAGS += -Og -g
 endif
 
-# Building the kernel ================================================================ 
+# Building the kernel/libs ========================================================== 
 
 include src/build.mk
+include third_party/lai/build.mk
 
 # Build the kernel by default
 all: $(BUILD_ROOT)/src/9x.elf
