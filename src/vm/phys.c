@@ -8,7 +8,7 @@
 #define MEMSTATS_LIMIT 2
 
 static uint64_t memstats[3] = { 0 };
-static uint8_t* bitmap;
+static uint8_t* bitmap = NULL;
 static uint64_t last_index = 0;
 
 static int
@@ -110,14 +110,14 @@ vm_phys_alloc(uint64_t pages)
 {
   for (uint64_t i = last_index; i < memstats[MEMSTATS_LIMIT]; i += 4096) {
     if (vm_phys_reserve(i, pages)) {
-      memset64(i + VM_MEM_OFFSET, 0, pages * 4096);
+      memset64((void*)((uintptr_t)i + VM_MEM_OFFSET), 0, pages * 4096);
       return (void*)i;
     }
   }
 
   for (uint64_t i = 0; i < last_index; i += 4096) {
     if (vm_phys_reserve(i, pages)) {
-      memset64(i + VM_MEM_OFFSET, 0, pages * 4096);
+      memset64((void*)((uintptr_t)i + VM_MEM_OFFSET), 0, pages * 4096);
       return (void*)i;
     }
   }

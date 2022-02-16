@@ -10,6 +10,7 @@ KERNEL_SOURCES = kern/init.c      \
 		 lib/strace.c     \
 		 lib/log.c        \
 		 lib/vec.c        \
+		 lib/ubsan.c      \
 		 vm/vm.c          \
 		 vm/virt.c        \
 		 vm/phys.c        \

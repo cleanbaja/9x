@@ -5,26 +5,19 @@
 #include <lai/core.h>
 
 void *laihost_malloc(size_t size) {
-    if (size == 0)
-        return (void *)0x8000000000000000;
-    
     return kmalloc(size);
 }
 
-void *laihost_realloc(void *base, size_t newsize, size_t oldsize) {
-    if (newsize == 0) {
-        laihost_free(base, oldsize);
-        return (void *)0x8000000000000000;
-    }
-    
-    return krealloc(base, newsize);
+void*
+laihost_realloc(void* p, size_t size, size_t unused)
+{
+  return krealloc(p, size);
 }
 
-void laihost_free(void *base, size_t size) {
-    if (size == 0)
-	return;
-
-    kfree(base);
+void
+laihost_free(void* p, size_t unused)
+{
+  return kfree(p);
 }
 
 void laihost_log(int level, const char *msg) {
@@ -55,7 +48,7 @@ void *laihost_scan(const char *signature, size_t index) {
 
         return dsdt;
     } else {
-        return acpi_query(signature, index);
+      return acpi_query(signature, index);
     }
 }
 

@@ -8,7 +8,7 @@
 #ifndef VEC_H
 #define VEC_H
 
-#include <lib/builtin.h>
+// #include <lib/builtin.h>
 
 #define VEC_VERSION "0.2.1"
 

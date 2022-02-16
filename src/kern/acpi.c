@@ -1,6 +1,5 @@
 #include <9x/acpi.h>
 #include <9x/vm.h>
-#include <lib/builtin.h>
 #include <lib/log.h>
 #include <stdbool.h>
 
@@ -34,37 +33,47 @@ acpi_init(struct stivale2_struct_tag_rsdp* rk)
 
   log("acpi: dumping tables... (revision: %u)", xsdp->revision);
   log("    %s %s %s  %s", "Signature", "Rev", "OEMID", "Address");
-  for (size_t i = 0; i < rsdt->header.length - sizeof(acpi_header_t); i++) {
-      uintptr_t entry;
-      if (xsdt_found)
-          entry = (uintptr_t)(((uint64_t*)rsdt->tables)[i]);
-      else
-          entry = (uintptr_t)(((uint32_t*)rsdt->tables)[i]);
+  int length = xsdt_found ? xsdt->header.length : rsdt->header.length;
+  for (size_t i = 0; i < length - sizeof(acpi_header_t); i++) {
+    uintptr_t entry;
+    if (xsdt_found)
+      entry = (uintptr_t)(((uint64_t*)xsdt->tables)[i]);
+    else
+      entry = (uintptr_t)(rsdt->tables[i]);
 
-      if (!entry)
-             continue;
+    if (!entry)
+      continue;
 
-      acpi_header_t* h = (acpi_header_t*)(entry + VM_MEM_OFFSET);
+    acpi_header_t* h = (acpi_header_t*)(entry + VM_MEM_OFFSET);
 
-      log("    %c%c%c%c      %d   %c%c%c%c%c%c 0x%lx",
-          h->signature[0], h->signature[1], h->signature[2], h->signature[3],
-          h->revision,
-          h->oem[0], h->oem[1], h->oem[2], h->oem[3], h->oem[4], h->oem[5] ?
-  h->oem[5] : ' ', (uint64_t)entry
-      );
+    if (!h->oem || !h->signature)
+      continue;
+
+    log("    %c%c%c%c      %d   %c%c%c%c%c%c 0x%lx",
+        h->signature[0],
+        h->signature[1],
+        h->signature[2],
+        h->signature[3],
+        h->revision,
+        h->oem[0],
+        h->oem[1],
+        h->oem[2],
+        h->oem[3],
+        h->oem[4],
+        h->oem[5] ? h->oem[5] : ' ',
+        (uint64_t)entry);
   }
 
-  
   // Set ACPI Revision and parse the MADT
-  lai_set_acpi_revision(xsdp->revision);
+  // lai_set_acpi_revision(xsdp->revision);
   madt_init();
- 
-  // Setup Embedded Controllers (if they exist) 
-  setup_ec();
+
+  // Setup Embedded Controllers (if they exist)
+  // setup_ec();
 
   // Init the ACPI OSL
   lai_create_namespace();
-  lai_enable_acpi(1);
+  // lai_enable_acpi(1);
 }
 
 void*

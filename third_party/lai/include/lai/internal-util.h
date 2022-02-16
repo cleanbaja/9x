@@ -16,12 +16,10 @@ size_t lai_strlen(const char *);
 
 // Even in freestanding environments, GCC requires memcpy(), memmove(), memset()
 // and memcmp() to be present. Thus, we just use them directly.
-void  memset(void* ptr, uint64_t val, int len);
-void  memcpy(void* dest, const void* src, int len);
-int   memcmp(const void* ptr1, const void* ptr2, int len);
-void* memmove(void *dest, const void *src, size_t n);
- 
-
+void* memcpy(void*, const void*, size_t);
+void* memmove(void*, const void*, size_t);
+void* memset(void*, int, size_t);
+int memcmp(const void*, const void*, size_t);
 
 //---------------------------------------------------------------------------------------
 // Debugging and logging functions.
