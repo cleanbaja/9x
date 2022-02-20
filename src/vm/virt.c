@@ -64,6 +64,7 @@ enable_feature_map()
   // Enable CR4.SMAP and CR4.PCIDE (both of which are not required, see below)
   // Furthermore, both are not required since PCID is somehow not
   // supported on my AMD Ryzen 5500U (2021), which I find completly ABSURD.
+  // PS: AMD, if you're reading this, you guys need to step-up your game.
   if (MMU_CHECK(MM_FEAT_SMAP)) {
     asm_write_cr4(asm_read_cr4() | (1 << 21));
   }
@@ -82,7 +83,6 @@ next_level(uint64_t* prev_level, uint64_t index, bool create)
       return NULL;
 
     prev_level[index] = (uint64_t)vm_phys_alloc(1);
-    memset((void*)prev_level[index] + VM_MEM_OFFSET, 0, 0x1000);
     prev_level[index] |= 0b111;
   }
 
@@ -107,7 +107,6 @@ flags_to_pte(uintptr_t phys, int flags, bool huge_page)
   if (flags & VM_PERM_USER) {
     raw_page |= (1 << 2);
   }
-
   if ((flags & VM_PAGE_GLOBAL) && MMU_CHECK(MM_FEAT_GLOBL)) {
     raw_page |= (1 << 8);
   }
@@ -240,12 +239,13 @@ percpu_init_vm()
 
   // Load the kernel VM space
   vm_load_space(&kernel_space);
-  
+
   // Load the PAT with our custom value, which changes 2 registers.
   //   PA6 => Formerly UC-, now Write Protect
   //   PA7 => Formerly UC, now Write Combining
-  // 
-  // NOTE: The rest remain at the default, see AMD Programmers Manual Volume 2, Section 7.8.2
+  //
+  // NOTE: The rest remain at the default, see AMD Programmer's Manual Volume 2,
+  // Section 7.8.2
   asm_wrmsr(0x277, 0x105040600070406);
 
   // Clear the entire CPU tlb
@@ -274,7 +274,6 @@ vm_init_virt()
   kernel_space.pcid = 1;
   kernel_space.active = false;
   kernel_space.pml4 = (uintptr_t)vm_phys_alloc(1);
-  memset((void*)kernel_space.pml4 + VM_MEM_OFFSET, 0, 4096);
 
   for (uintptr_t p = 0; p < 0x100000000; p += 0x1000) {
     vm_virt_map(
@@ -290,8 +289,9 @@ vm_init_virt()
   
   // Actually bootstrap the VM
   percpu_init_vm();
- 
-  // Finally, remap the frambuffer as write combining for improved speed
+
+  // Finally, remap the frambuffer as write combining for improved speed and
+  // unmap the first page (to catch bugs)
   struct stivale2_struct_tag_framebuffer* f = (struct stivale2_struct_tag_framebuffer*)stivale2_find_tag(STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
   for (uintptr_t p = f->framebuffer_addr; p < f->framebuffer_addr + (f->framebuffer_pitch * f->framebuffer_height); p += 0x1000) {
     vm_virt_map(&kernel_space,
@@ -300,5 +300,6 @@ vm_init_virt()
                 VM_PERM_READ | VM_PERM_WRITE | VM_CACHE_FLAG_WRITE_COMBINING |
                   (MMU_CHECK(MM_FEAT_GLOBL) ? VM_PAGE_GLOBAL : 1));
   }
+  vm_virt_unmap(&kernel_space, 0xFFFF800000000000);
 }
 

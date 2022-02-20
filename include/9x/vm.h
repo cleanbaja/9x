@@ -15,6 +15,16 @@ vm_init(struct stivale2_struct_tag_memmap* mm_tag);
 //   Physical memory defs 
 // =======================
 
+// Helpfult Macros/Constants
+#define DIV_ROUNDUP(A, B)                                                      \
+  ({                                                                           \
+    typeof(A) _a_ = A;                                                         \
+    typeof(B) _b_ = B;                                                         \
+    (_a_ + (_b_ - 1)) / _b_;                                                   \
+  })
+#define VM_PAGE_SIZE 4096
+
+// The actual functions
 void
 vm_init_phys(struct stivale2_struct_tag_memmap* mmap);
 void*

@@ -11,6 +11,15 @@ activate_apic();
 void
 apic_eoi();
 
+void
+apic_redirect_gsi(uint8_t lapic_id,
+                  uint8_t vec,
+                  uint32_t gsi,
+                  uint16_t flags,
+                  bool status);
+void
+apic_redirect_irq(uint8_t lapic_id, uint8_t vec, uint8_t irq, bool masked);
+
 enum ipi_mode
 {
   IPI_SELF = 0x10,

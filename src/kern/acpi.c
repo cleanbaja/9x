@@ -2,11 +2,14 @@
 #include <9x/vm.h>
 #include <lib/log.h>
 #include <stdbool.h>
+#include <sys/apic.h>
+#include <sys/tables.h>
 
 #include <lai/core.h>
 #include <lai/drivers/ec.h>
 
 static bool xsdt_found;
+static bool in_shutdown;
 static struct acpi_rsdt_t* rsdt;
 static struct acpi_xsdt_t* xsdt;
 
@@ -17,6 +20,8 @@ vec_nmi_t    madt_nmis;
 
 void madt_init();
 void setup_ec();
+void
+setup_sci();
 
 void
 acpi_init(struct stivale2_struct_tag_rsdp* rk)
@@ -65,15 +70,16 @@ acpi_init(struct stivale2_struct_tag_rsdp* rk)
   }
 
   // Set ACPI Revision and parse the MADT
-  // lai_set_acpi_revision(xsdp->revision);
+  lai_set_acpi_revision(xsdp->revision);
   madt_init();
-
-  // Setup Embedded Controllers (if they exist)
-  // setup_ec();
 
   // Init the ACPI OSL
   lai_create_namespace();
-  // lai_enable_acpi(1);
+  lai_enable_acpi(1);
+
+  // Setup Embedded Controllers (if they exist) and SCI events
+  setup_ec();
+  setup_sci();
 }
 
 void*
@@ -106,8 +112,8 @@ acpi_query(const char* signature, int index)
     }
   }
 
-  log("acpi: \"%s\" not found", signature);
-  return (void*)0;
+  // log("acpi: \"%s\" not found", signature);
+  return NULL;
 }
 
 void madt_init() {
@@ -144,31 +150,77 @@ void madt_init() {
   log("acpi: Detected %u ISOs, %u I/O APICs, and %u NMIs", madt_isos.length, madt_ioapics.length, madt_nmis.length);
 }
 
+void
+setup_ec(void)
+{
+  LAI_CLEANUP_STATE lai_state_t state;
+  lai_init_state(&state);
 
-void setup_ec(void){
-    LAI_CLEANUP_STATE lai_state_t state;
-    lai_init_state(&state);
+  LAI_CLEANUP_VAR lai_variable_t pnp_id = LAI_VAR_INITIALIZER;
+  lai_eisaid(&pnp_id, ACPI_EC_PNP_ID);
 
-    LAI_CLEANUP_VAR lai_variable_t pnp_id = LAI_VAR_INITIALIZER;
-    lai_eisaid(&pnp_id, ACPI_EC_PNP_ID);
+  struct lai_ns_iterator it = LAI_NS_ITERATOR_INITIALIZER;
+  lai_nsnode_t* node;
+  while ((node = lai_ns_iterate(&it))) {
+    if (lai_check_device_pnp_id(node, &pnp_id, &state)) // This is not an EC
+      continue;
 
-    struct lai_ns_iterator it = LAI_NS_ITERATOR_INITIALIZER;
-    lai_nsnode_t *node;
-    while((node = lai_ns_iterate(&it))){
-        if(lai_check_device_pnp_id(node, &pnp_id, &state)) // This is not an EC
-            continue;
+    // Found one
+    log("acpi: Found Embedded Controller!");
+    struct lai_ec_driver* driver = kmalloc(sizeof(struct lai_ec_driver));
+    lai_init_ec(node, driver);
 
-        // Found one
-        log("acpi: Found Embedded Controller!");
-	struct lai_ec_driver *driver = kmalloc(sizeof(struct lai_ec_driver));
-        lai_init_ec(node, driver);   
-
-        struct lai_ns_child_iterator child_it = LAI_NS_CHILD_ITERATOR_INITIALIZER(node);
-        lai_nsnode_t *child_node;
-        while((child_node = lai_ns_child_iterate(&child_it))){
-            if(lai_ns_get_node_type(child_node) == LAI_NODETYPE_OPREGION)
-                lai_ns_override_opregion(child_node, &lai_ec_opregion_override, driver);
-        }
+    struct lai_ns_child_iterator child_it =
+      LAI_NS_CHILD_ITERATOR_INITIALIZER(node);
+    lai_nsnode_t* child_node;
+    while ((child_node = lai_ns_child_iterate(&child_it))) {
+      if (lai_ns_get_node_type(child_node) == LAI_NODETYPE_OPREGION)
+        lai_ns_override_opregion(child_node, &lai_ec_opregion_override, driver);
     }
+  }
 }
 
+static void
+sci_handler(struct cpu_ctx* context)
+{
+  (void)context;
+
+  uint16_t ev = lai_get_sci_event();
+
+  const char* ev_name = "?";
+  if (ev & ACPI_POWER_BUTTON)
+    ev_name = "power button";
+  if (ev & ACPI_SLEEP_BUTTON)
+    ev_name = "sleep button";
+  if (ev & ACPI_WAKE)
+    ev_name = "sleep wake up";
+
+  log("acpi: a SCI event has occured: 0x%x (%s)", ev, ev_name);
+
+  if (ev & ACPI_POWER_BUTTON && !in_shutdown) {
+    in_shutdown = true;
+    raw_log("\n\nCLICK POWER BUTTON ONE MORE TIME TO SHUT DOWN!\n\n");
+  } else if (ev & ACPI_POWER_BUTTON && in_shutdown) {
+    lai_enter_sleep(5); // Good Night!
+  }
+}
+
+void
+setup_sci(void)
+{
+  acpi_fadt_t* fadt = acpi_query("FACP", 0);
+  acpi_madt_t* madt = acpi_query("APIC", 0);
+  int slot = idt_allocate_vector();
+  if (madt->flags & 1) {
+    apic_redirect_irq(0, slot, fadt->sci_irq, false);
+  } else {
+    apic_redirect_gsi(0, slot, fadt->sci_irq, 0, false);
+  }
+
+  // Register the handler
+  struct handler hnd = { .is_irq = true, .func = sci_handler };
+  idt_set_handler(hnd, slot);
+
+  // Enable Interrupts
+  __asm__ volatile("sti");
+}

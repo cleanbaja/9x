@@ -9,7 +9,7 @@ void *laihost_malloc(size_t size) {
 }
 
 void*
-laihost_realloc(void* p, size_t size, size_t unused)
+laihost_realloc(void* p, size_t size, size_t old_size)
 {
   return krealloc(p, size);
 }
@@ -21,17 +21,11 @@ laihost_free(void* p, size_t unused)
 }
 
 void laihost_log(int level, const char *msg) {
-    switch (level) {
-      case LAI_DEBUG_LOG:
-        log("lai: (DEBUG) %s", msg);
-	break;
-      case LAI_WARN_LOG:
-	log("lai: (WARN) %s", msg);
-	break;
-      default:
-	log("lai: %s", msg);
-	break;
-    }
+  if (level == LAI_WARN_LOG) {
+    log("WARNING: (lai) %s", msg);
+  } else {
+    log("lai: %s", msg);
+  }
 }
 
 void *laihost_scan(const char *signature, size_t index) {
@@ -44,8 +38,8 @@ void *laihost_scan(const char *signature, size_t index) {
         // Scan for the FADT
         acpi_fadt_t *fadt = (acpi_fadt_t *)acpi_query("FACP", 0);
         void *dsdt = (char *)(size_t)fadt->dsdt + VM_MEM_OFFSET;
-        log("acpi: Address of DSDT is 0x%lx", dsdt);
 
+        log("acpi: Address of DSDT is 0x%lx", dsdt);
         return dsdt;
     } else {
       return acpi_query(signature, index);

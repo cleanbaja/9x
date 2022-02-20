@@ -73,25 +73,15 @@ kern_entry(struct stivale2_struct* bootinfo)
   // Initialize other CPUs
   cpu_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_SMP_ID));
 
-/*
-  char* cha = kmalloc(2048);
-  for (int i = 0; i < 200; i++) {
-    *cha = 'c';
-    if (*cha != 'c') log("init: kmalloc FAIL!");
-    *cha = 0;
-
-    for (int i = 0; i < 2048; i++) { if (cha[i] != 0) {log("init: kmalloc FAIL -> %c", cha[i]);} }
-
-    kfree(cha);
-    cha = kmalloc(2048);
-  }
-*/
-
   // Initialize ACPI
   acpi_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_RSDP_ID));
 
   // Chill for now...
   log("init: Startup complete, halting all cores!");
-  send_ipi(IPI_HALT, 0, IPI_EVERYONE);
+  send_ipi(IPI_HALT, 0, IPI_OTHERS);
+
+  for (;;) {
+    __asm__ volatile("sti; hlt");
+  }
 }
 

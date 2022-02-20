@@ -1,43 +1,21 @@
+#include <9x/vm.h>
 #include <lib/builtin.h>
+#include <lib/lock.h>
 #include <lib/log.h>
 #include <stddef.h>
-#include <9x/vm.h>
 
 #define MEMSTATS_USED 0
 #define MEMSTATS_FREE 1
 #define MEMSTATS_LIMIT 2
 
+#define BIT_SET(__bit) (bitmap[(__bit) / 8] |= (1 << ((__bit) % 8)))
+#define BIT_CLEAR(__bit) (bitmap[(__bit) / 8] &= ~(1 << ((__bit) % 8)))
+#define BIT_TEST(__bit) ((bitmap[(__bit) / 8] >> ((__bit) % 8)) & 1)
+
 static uint64_t memstats[3] = { 0 };
 static uint8_t* bitmap = NULL;
 static uint64_t last_index = 0;
-
-static int
-vm_zone_used(uintptr_t start, uint64_t pages)
-{
-  int is_used = 0;
-
-  for (uint64_t i = start; i < start + (pages * 4096); i += 4096) {
-    is_used = bitmap[i / (4096 * 8)] & (1 << ((i / 4096) % 8));
-    if (!is_used)
-      break;
-  }
-
-  return is_used;
-}
-
-static int
-vm_phys_reserve(uintptr_t start, uint64_t pages)
-{
-  if (vm_zone_used(start, pages))
-    return 0;
-
-  for (uint64_t i = (uint64_t)start; i < ((uint64_t)start) + (pages * 4096);
-       i += 4096) {
-    bitmap[i / (4096 * 8)] |= 1 << ((i / 4096) % 8);
-  }
-
-  return 1;
-}
+static CREATE_LOCK(pmm_lock);
 
 void
 vm_init_phys(struct stivale2_struct_tag_memmap* mmap)
@@ -66,7 +44,8 @@ vm_init_phys(struct stivale2_struct_tag_memmap* mmap)
     }
   }
 
-  uint64_t bitmap_size = memstats[MEMSTATS_LIMIT] / (4096 * 8);
+  uint64_t bitmap_size =
+    DIV_ROUNDUP(memstats[MEMSTATS_LIMIT], VM_PAGE_SIZE) / 8;
 
   log("phys: Total memory -> %u MB (max=0x%x)",
       total_mem / (1024 * 1024),
@@ -83,7 +62,7 @@ vm_init_phys(struct stivale2_struct_tag_memmap* mmap)
       bitmap = (void*)(entry.base + VM_MEM_OFFSET);
 
       // Initialise entire bitmap to 1 (non-free)
-      memset(bitmap, 0xff, bitmap_size);
+      memset(bitmap, 0xFF, bitmap_size);
 
       entry.length -= bitmap_size;
       entry.base += bitmap_size;
@@ -98,39 +77,62 @@ vm_init_phys(struct stivale2_struct_tag_memmap* mmap)
     if (entry.type != STIVALE2_MMAP_USABLE)
       continue;
 
-    vm_phys_free((void*)entry.base, entry.length / 4096);
+    for (uintptr_t j = 0; j < entry.length; j += VM_PAGE_SIZE)
+      BIT_CLEAR((entry.base + j) / VM_PAGE_SIZE);
   }
 
-  // Guard the bitmap itself
-  vm_phys_reserve((uint64_t)bitmap - VM_MEM_OFFSET, (bitmap_size / 4096) + 1);
+  // Activate the page frame allocator by making a quick allocation
+  void* warmup_ptr = vm_phys_alloc(10);
+  vm_phys_free(warmup_ptr, 10);
 }
 
-void*
-vm_phys_alloc(uint64_t pages)
+static void*
+inner_alloc(size_t count, size_t limit)
 {
-  for (uint64_t i = last_index; i < memstats[MEMSTATS_LIMIT]; i += 4096) {
-    if (vm_phys_reserve(i, pages)) {
-      memset64((void*)((uintptr_t)i + VM_MEM_OFFSET), 0, pages * 4096);
-      return (void*)i;
+  size_t p = 0;
+
+  while (last_index < limit) {
+    if (!BIT_TEST(last_index++)) {
+      if (++p == count) {
+        size_t page = last_index - count;
+        for (size_t i = page; i < last_index; i++) {
+          BIT_SET(i);
+        }
+        return (void*)(page * VM_PAGE_SIZE);
+      }
+    } else {
+      p = 0;
     }
   }
 
-  for (uint64_t i = 0; i < last_index; i += 4096) {
-    if (vm_phys_reserve(i, pages)) {
-      memset64((void*)((uintptr_t)i + VM_MEM_OFFSET), 0, pages * 4096);
-      return (void*)i;
-    }
-  }
-
-  PANIC(NULL, "Physical OOM (Out Of Memory)");
   return NULL;
 }
 
-void
-vm_phys_free(void* start, uint64_t pages)
+void*
+vm_phys_alloc(size_t pages)
 {
-  for (uint64_t i = (uint64_t)start; i < ((uint64_t)start) + (pages * 4096);
-       i += 4096) {
-    bitmap[i / (4096 * 8)] &= ~(1 << ((i / 4096) % 8));
+  SPINLOCK_ACQUIRE(pmm_lock);
+
+  size_t l = last_index;
+  void* ret = inner_alloc(pages, memstats[MEMSTATS_LIMIT] / VM_PAGE_SIZE);
+  if (ret == NULL) {
+    last_index = 0;
+    ret = inner_alloc(pages, l);
   }
+  LOCK_RELEASE(pmm_lock);
+
+  memset64(ret + VM_MEM_OFFSET, 0, pages * 4096);
+  return ret;
+}
+
+void
+vm_phys_free(void* ptr, size_t count)
+{
+  SPINLOCK_ACQUIRE(pmm_lock);
+
+  size_t page = (size_t)ptr / VM_PAGE_SIZE;
+  for (size_t i = page; i < page + count; i++)
+    BIT_CLEAR(i);
+
+  LOCK_RELEASE(pmm_lock);
 }
