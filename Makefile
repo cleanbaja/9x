@@ -16,9 +16,9 @@ CFLAGS = -std=gnu11
 LDFLAGS = -nostdlib
 
 ifeq ($(OPT), Release)
-CFLAGS += -O2
+CFLAGS += -O2 -fsanitize=undefined
 else
-CFLAGS += -Og -g
+CFLAGS += -O0 -g 
 endif
 
 # Building the kernel/libs ========================================================== 
@@ -48,7 +48,7 @@ $(BUILD_ROOT)/test_image.iso: $(BUILD_ROOT)/src/9x.elf $(BUILD_ROOT)/limine/limi
 		-efi-boot-part --efi-boot-image --protective-msdos-label \
 		$(BUILD_ROOT)/isoroot -o $@
 	$(BUILD_ROOT)/limine/limine-install $@
-	rm -rf isoroot
+	rm -rf $(BUILD_ROOT)/isoroot
 
 iso: $(BUILD_ROOT)/test_image.iso
 

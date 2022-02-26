@@ -5,11 +5,11 @@
 
 #define SSFN_CONSOLEBITMAP_TRUECOLOR /* use the special renderer for 32 bit    \
                                         truecolor packed pixels */
+#define SSFN_CONSOLEBITMAP_CONTROL   /* let the renderer manage the cursor */ 
 #include <internal/ssfn.h>
 
-extern unsigned char font_data;
 
-// HACK: For better contrast, set the background to 0xB84C00
+extern unsigned char font_data;
 
 void
 console_init()
@@ -32,6 +32,7 @@ console_init()
   ssfn_dst.bg = 0x2E3440;                  /* background color */
 
   // Set the background color
+  // HACK: For better contrast, set the background to 0xB84C00
   uint32_t* p = (uint32_t*)fb_tag->framebuffer_addr;
   for (int i = 0; i < ssfn_dst.h * ssfn_dst.p; i++) {
     p[i] = 0x2E3440;
@@ -46,3 +47,4 @@ console_write(char* str)
     str++;
   }
 }
+

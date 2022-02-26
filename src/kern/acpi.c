@@ -7,6 +7,8 @@
 
 #include <lai/core.h>
 #include <lai/drivers/ec.h>
+#include <lai/helpers/pm.h>
+#include <lai/helpers/sci.h>
 
 static bool xsdt_found;
 static bool in_shutdown;
@@ -17,70 +19,6 @@ vec_lapic_t  madt_lapics;
 vec_ioapic_t madt_ioapics;
 vec_iso_t    madt_isos;
 vec_nmi_t    madt_nmis;
-
-void madt_init();
-void setup_ec();
-void
-setup_sci();
-
-void
-acpi_init(struct stivale2_struct_tag_rsdp* rk)
-{
-  acpi_xsdp_t* xsdp = (acpi_xsdp_t*)rk->rsdp;
-
-  if (xsdp->revision >= 2 && xsdp->xsdt) {
-    xsdt_found = true;
-    xsdt = (acpi_xsdt_t*)((uintptr_t)xsdp->xsdt + VM_MEM_OFFSET);
-  } else {
-    xsdt_found = false;
-    rsdt = (acpi_rsdt_t*)((uintptr_t)xsdp->rsdt + VM_MEM_OFFSET);
-  }
-
-  log("acpi: dumping tables... (revision: %u)", xsdp->revision);
-  log("    %s %s %s  %s", "Signature", "Rev", "OEMID", "Address");
-  int length = xsdt_found ? xsdt->header.length : rsdt->header.length;
-  for (size_t i = 0; i < length - sizeof(acpi_header_t); i++) {
-    uintptr_t entry;
-    if (xsdt_found)
-      entry = (uintptr_t)(((uint64_t*)xsdt->tables)[i]);
-    else
-      entry = (uintptr_t)(rsdt->tables[i]);
-
-    if (!entry)
-      continue;
-
-    acpi_header_t* h = (acpi_header_t*)(entry + VM_MEM_OFFSET);
-
-    if (!h->oem || !h->signature)
-      continue;
-
-    log("    %c%c%c%c      %d   %c%c%c%c%c%c 0x%lx",
-        h->signature[0],
-        h->signature[1],
-        h->signature[2],
-        h->signature[3],
-        h->revision,
-        h->oem[0],
-        h->oem[1],
-        h->oem[2],
-        h->oem[3],
-        h->oem[4],
-        h->oem[5] ? h->oem[5] : ' ',
-        (uint64_t)entry);
-  }
-
-  // Set ACPI Revision and parse the MADT
-  lai_set_acpi_revision(xsdp->revision);
-  madt_init();
-
-  // Init the ACPI OSL
-  lai_create_namespace();
-  lai_enable_acpi(1);
-
-  // Setup Embedded Controllers (if they exist) and SCI events
-  setup_ec();
-  setup_sci();
-}
 
 void*
 acpi_query(const char* signature, int index)
@@ -224,3 +162,78 @@ setup_sci(void)
   // Enable Interrupts
   __asm__ volatile("sti");
 }
+
+void
+acpi_init(struct stivale2_struct_tag_rsdp* rk)
+{
+  acpi_xsdp_t* xsdp = (acpi_xsdp_t*)rk->rsdp;
+
+  if (xsdp->revision >= 2 && xsdp->xsdt) {
+    xsdt_found = true;
+    xsdt = (acpi_xsdt_t*)((uintptr_t)xsdp->xsdt + VM_MEM_OFFSET);
+  } else {
+    xsdt_found = false;
+    rsdt = (acpi_rsdt_t*)((uintptr_t)xsdp->rsdt + VM_MEM_OFFSET);
+  }
+
+  log("acpi: dumping tables... (revision: %u)", xsdp->revision);
+  log("    %s %s %s  %s", "Signature", "Rev", "OEMID", "Address");
+  
+  acpi_header_t* h = NULL; 
+  if (xsdt_found) {
+    for (size_t i = 0; i < (xsdt->header.length - sizeof(acpi_header_t)) / 8;
+         i++) {
+      h = (acpi_header_t*)((size_t)xsdt->tables[i] + VM_MEM_OFFSET);
+      if ((uintptr_t)h == VM_MEM_OFFSET)
+	  continue;
+
+      log("    %c%c%c%c      %d   %c%c%c%c%c%c 0x%lx",
+        h->signature[0],
+        h->signature[1],
+        h->signature[2],
+        h->signature[3],
+        h->revision,
+        h->oem[0],
+        h->oem[1],
+        h->oem[2],
+        h->oem[3],
+        h->oem[4],
+        h->oem[5] ? h->oem[5] : ' ',
+        (uint64_t)h);
+    }
+  } else {
+    for (size_t i = 0; i < (rsdt->header.length - sizeof(acpi_header_t)) / 4;
+         i++) {
+      h = (acpi_header_t*)((size_t)rsdt->tables[i] + VM_MEM_OFFSET);
+      if ((uintptr_t)h == VM_MEM_OFFSET)
+	  continue;
+
+      log("    %c%c%c%c      %d   %c%c%c%c%c%c 0x%lx",
+        h->signature[0],
+        h->signature[1],
+        h->signature[2],
+        h->signature[3],
+        h->revision,
+        h->oem[0],
+        h->oem[1],
+        h->oem[2],
+        h->oem[3],
+        h->oem[4],
+        h->oem[5] ? h->oem[5] : ' ',
+        (uint64_t)h);
+    }
+  }
+
+  // Set ACPI Revision and parse the MADT
+  lai_set_acpi_revision(xsdp->revision);
+  madt_init();
+
+  // Init the ACPI OSL
+  lai_create_namespace();
+  lai_enable_acpi(1);
+
+  // Setup Embedded Controllers (if they exist) and SCI events
+  setup_ec();
+  setup_sci();
+}
+

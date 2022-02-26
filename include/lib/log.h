@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include "sys/tables.h"
+#include "sys/cpu.h"
 #include "lock.h"
 
 void
@@ -36,7 +37,8 @@ extern int in_panic;
     if (in_panic == 1) {                                                       \
       for(;;) { __asm__ volatile("hlt"); }                                     \
     } else { in_panic = 1; }                                                   \
-    raw_log("\nKERNEL PANIC on CPU #0\n");                                     \
+    raw_log("\nKERNEL PANIC on CPU #%d\n",                                     \
+	   (read_percpu() == NULL) ? 0 : per_cpu(cpu_num));                    \
     if (m) {                                                                   \
       raw_log(m, ##__VA_ARGS__);                                               \
     }                                                                          \

@@ -53,7 +53,7 @@ typedef enum
   VM_PERM_WRITE  = (1 << 4),
   VM_PERM_EXEC   = (1 << 5),
 
-  // Page attribute flafs
+  // Page attribute flags
   VM_PERM_USER   = (1 << 6),
   VM_PAGE_GLOBAL = (1 << 7),
   VM_PAGE_HUGE   = (1 << 8),

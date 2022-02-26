@@ -35,8 +35,7 @@ KCFLAGS = -ffreestanding             \
 	  -fno-omit-frame-pointer    \
 	  -mcmodel=kernel	     \
 	  -I include                 \
-	  -I third_party/lai/include \
-	  -g
+	  -I third_party/lai/include
 
 $(BUILD_ROOT)/%.o: src/%.c
 	mkdir -p $(@D)
@@ -48,7 +47,7 @@ $(BUILD_ROOT)/%.o: src/%.asm
 	echo ASM $<
 	nasm -f elf64 -o $@ $<
 
-$(BUILD_ROOT)/src/9x.elf: $(KERNEL_OBJECTS) $(BUILD_ROOT)/lai/liblai.a
+$(BUILD_ROOT)/src/9x.elf: $(BUILD_ROOT)/lai/liblai.a $(KERNEL_OBJECTS)
 	mkdir -p $(@D)
 	echo LD $@
 	$(LD) $(LDFLAGS) $(KERNEL_OBJECTS) $(BUILD_ROOT)/lai/liblai.a -T share/kernel.ld -o $@

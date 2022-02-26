@@ -15,7 +15,7 @@
 static uint64_t memstats[3] = { 0 };
 static uint8_t* bitmap = NULL;
 static uint64_t last_index = 0;
-static CREATE_LOCK(pmm_lock);
+static CREATE_SPINLOCK(pmm_lock);
 
 void
 vm_init_phys(struct stivale2_struct_tag_memmap* mmap)
@@ -111,7 +111,7 @@ inner_alloc(size_t count, size_t limit)
 void*
 vm_phys_alloc(size_t pages)
 {
-  SPINLOCK_ACQUIRE(pmm_lock);
+  spinlock_acquire(&pmm_lock);
 
   size_t l = last_index;
   void* ret = inner_alloc(pages, memstats[MEMSTATS_LIMIT] / VM_PAGE_SIZE);
@@ -119,20 +119,22 @@ vm_phys_alloc(size_t pages)
     last_index = 0;
     ret = inner_alloc(pages, l);
   }
-  LOCK_RELEASE(pmm_lock);
+  spinlock_release(&pmm_lock);
 
-  memset64(ret + VM_MEM_OFFSET, 0, pages * 4096);
+  if (ret != NULL)
+  	memset64((void*)((uintptr_t)ret + VM_MEM_OFFSET), 0, pages * 4096);
+  
   return ret;
 }
 
 void
 vm_phys_free(void* ptr, size_t count)
 {
-  SPINLOCK_ACQUIRE(pmm_lock);
+  spinlock_acquire(&pmm_lock);
 
   size_t page = (size_t)ptr / VM_PAGE_SIZE;
   for (size_t i = page; i < page + count; i++)
     BIT_CLEAR(i);
 
-  LOCK_RELEASE(pmm_lock);
+  spinlock_release(&pmm_lock);
 }

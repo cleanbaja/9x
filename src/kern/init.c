@@ -49,6 +49,24 @@ stivale2_find_tag(uint64_t id)
   }
 }
 
+static void
+early_init()
+{
+  // Zero out the CPU-local storage (so PANIC dosen't get confused)
+  write_percpu(NULL);
+
+  // Start the console and say hello!
+  console_init();
+  log("9x (x86_64) (v0.1.0) - A project by Yusuf M (cleanbaja)");
+  log("Bootloader: %s (%s)",
+      bootags->bootloader_brand,
+      bootags->bootloader_version);
+
+  // Finally, load GDT/IDT so that we're in a basic enviorment
+  init_gdt();
+  init_idt();
+}
+
 void
 kern_entry(struct stivale2_struct* bootinfo)
 {
@@ -56,16 +74,8 @@ kern_entry(struct stivale2_struct* bootinfo)
   bootags = bootinfo;
   __asm__ volatile("xor %rbp, %rbp");
 
-  // Say hello!
-  console_init();
-  log("9x (x86_64) (v0.1.0) - A project by Yusuf M (cleanbaja)");
-  log("Bootloader: %s (%s)",
-      bootinfo->bootloader_brand,
-      bootinfo->bootloader_version);
-
-  // Load GDT/IDT
-  init_gdt();
-  init_idt();
+  // Initialize the core parts of the kernel
+  early_init();
 
   // Initialize the memory subsystem
   vm_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID));

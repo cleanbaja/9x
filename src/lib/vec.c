@@ -6,8 +6,8 @@
  */
 
 #include <9x/vm.h>
+#include <lib/builtin.h>
 #include <lib/vec.h>
-
 
 int vec_expand_(char **data, int *length, int *capacity, int memsz) {
   if (*length + 1 > *capacity) {

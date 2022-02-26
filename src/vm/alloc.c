@@ -111,12 +111,12 @@ static long long l_possibleOverruns = 0; ///< Number of possible overruns
 
 // ***********   HELPER FUNCTIONS  *******************************
 
-static CREATE_LOCK(alloc_lock);
+static CREATE_SPINLOCK(alloc_lock);
 
 int
 liballoc_lock()
 {
-  SPINLOCK_ACQUIRE(alloc_lock);
+  spinlock_acquire(&alloc_lock);
 
   return 0;
 }
@@ -124,7 +124,7 @@ liballoc_lock()
 int
 liballoc_unlock()
 {
-  LOCK_RELEASE(alloc_lock);
+  spinlock_release(&alloc_lock);
 
   return 0;
 }
