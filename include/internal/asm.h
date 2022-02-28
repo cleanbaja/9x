@@ -109,6 +109,15 @@ asm_spinlock_acquire(
 extern void
 asm_sleeplock_acquire(volatile int* lock);
 
+// Reading of the TSC
+static inline uint64_t asm_rdtsc() {
+    uint32_t edx, eax;
+    asm volatile ("rdtsc"
+                  : "=a" (eax), "=d" (edx));
+    return ((uint64_t)edx << 32) | eax;
+}
+
+
 // ASM Port I/O
 static inline uint8_t asm_inb(uint16_t port) {
     uint8_t ret;

@@ -2,8 +2,11 @@
 build
 out
 res
-debug
+dbg
 
-# Ignore clang intellisense
+# clang intellisense
 .clang
+
+# xbstrap leftovers
+*.xbstrap
 

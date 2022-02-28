@@ -3,6 +3,7 @@
 #include <sys/tables.h>
 #include <sys/apic.h>
 #include <sys/cpu.h>
+#include <sys/timer.h>
 #include <9x/vm.h>
 #include <9x/acpi.h>
 
@@ -57,7 +58,7 @@ early_init()
 
   // Start the console and say hello!
   console_init();
-  log("9x (x86_64) (v0.1.0) - A project by Yusuf M (cleanbaja)");
+  log("9x (x86_64) (v0.2.1) - A project by Yusuf M (cleanbaja)");
   log("Bootloader: %s (%s)",
       bootags->bootloader_brand,
       bootags->bootloader_version);
@@ -80,11 +81,11 @@ kern_entry(struct stivale2_struct* bootinfo)
   // Initialize the memory subsystem
   vm_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID));
 
-  // Initialize other CPUs
-  cpu_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_SMP_ID));
-
   // Initialize ACPI
   acpi_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_RSDP_ID));
+
+  // Initialize other CPUs
+  cpu_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_SMP_ID));
 
   // Chill for now...
   log("init: Startup complete, halting all cores!");

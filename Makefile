@@ -16,7 +16,7 @@ CFLAGS = -std=gnu11
 LDFLAGS = -nostdlib
 
 ifeq ($(OPT), Release)
-CFLAGS += -O2 -fsanitize=undefined
+CFLAGS += -O2
 else
 CFLAGS += -O0 -g 
 endif

@@ -1,5 +1,6 @@
 #include <internal/asm.h>
 #include <internal/cpuid.h>
+#include <internal/stivale2.h>
 #include <lib/builtin.h>
 #include <lib/log.h>
 #include <9x/vm.h>
@@ -221,15 +222,18 @@ vm_load_space(vm_space_t* spc)
   uint64_t cr3_val = spc->pml4;
 
   if (MMU_CHECK(MM_FEAT_PCID)) {
-    if (spc->pcid >= 4096)
+    if (spc->pcid >= 4096) {
       PANIC(NULL, "PCID Overflow detected!");
-    else
+    } else {
       cr3_val |= spc->pcid;
+    }
   }
 
   asm_write_cr3(spc->pml4);
   spc->active = true;
 }
+
+struct stivale2_struct_tag_framebuffer* d;
 
 void
 percpu_init_vm()
@@ -275,31 +279,33 @@ vm_init_virt()
   kernel_space.active = false;
   kernel_space.pml4 = (uintptr_t)vm_phys_alloc(1);
 
-  for (uintptr_t p = 0; p < 0x100000000; p += 0x1000) {
-    vm_virt_map(
-      &kernel_space, p, VM_MEM_OFFSET + p, VM_PERM_READ | VM_PERM_WRITE);
+  // Map some memory...
+  for (uintptr_t p = 0; p < 0x100000000; p += 4096) {
+      vm_virt_map(&kernel_space, p, VM_MEM_OFFSET + p, VM_PERM_READ | VM_PERM_WRITE);
   }
-  for (uintptr_t p = 0; p < 0x80000000; p += 0x1000) {
-    vm_virt_map(&kernel_space,
-                p,
-                VM_KERN_OFFSET + p,
-                VM_PERM_READ | VM_PERM_WRITE | VM_PERM_EXEC |
-                  (MMU_CHECK(MM_FEAT_GLOBL) ? VM_PAGE_GLOBAL : 1));
+  for (uintptr_t p = 0; p < 0x80000000; p += 4096) {
+      vm_virt_map(&kernel_space, p, VM_KERN_OFFSET + p, VM_PERM_READ | VM_PERM_WRITE | VM_PERM_EXEC);
+  }
+
+  // Map all memory ranges...
+  struct stivale2_struct_tag_memmap *memmap_tag = stivale2_find_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID);
+  for (size_t i = 0; i < memmap_tag->entries; i++) {
+      for (uintptr_t p = memmap_tag->memmap[i].base; p < memmap_tag->memmap[i].length; p += 4096)
+          vm_virt_map(&kernel_space, p, VM_MEM_OFFSET + p, VM_PERM_READ | VM_PERM_WRITE);
   }
   
-  // Actually bootstrap the VM
-  percpu_init_vm();
-
-  // Finally, remap the frambuffer as write combining for improved speed and
-  // unmap the first page (to catch bugs)
-  struct stivale2_struct_tag_framebuffer* f = (struct stivale2_struct_tag_framebuffer*)stivale2_find_tag(STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
-  for (uintptr_t p = f->framebuffer_addr; p < f->framebuffer_addr + (f->framebuffer_pitch * f->framebuffer_height); p += 0x1000) {
-    vm_virt_map(&kernel_space,
-                p,
-                VM_MEM_OFFSET + p,
-                VM_PERM_READ | VM_PERM_WRITE | VM_CACHE_FLAG_WRITE_COMBINING |
-                  (MMU_CHECK(MM_FEAT_GLOBL) ? VM_PAGE_GLOBAL : 1));
+  // Remap the frambuffer as write combining for improved 
+  // speed and unmap the first page (to catch bugs)
+  struct stivale2_struct_tag_framebuffer* d = 
+	  (struct stivale2_struct_tag_framebuffer*)stivale2_find_tag(STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
+  uintptr_t real_base = (uintptr_t)d->framebuffer_addr - VM_MEM_OFFSET;
+ 
+  for (uintptr_t p = real_base; p < (real_base + (d->framebuffer_width * d->framebuffer_height)); p += 4096) {
+    vm_virt_map(&kernel_space, p, p + VM_MEM_OFFSET, VM_PERM_READ | VM_PERM_WRITE | VM_CACHE_FLAG_WRITE_COMBINING); 
   }
-  vm_virt_unmap(&kernel_space, 0xFFFF800000000000);
+  vm_virt_unmap(&kernel_space, VM_MEM_OFFSET);
+  
+  // Finally, finish bootstraping the VM
+  percpu_init_vm();
 }
 

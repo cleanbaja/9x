@@ -80,7 +80,7 @@ static void
 tu_print_location(char* message, struct tu_source_location loc)
 {
   PANIC(NULL,
-        "tinyubsan: %s at file %s, line %d, column %d",
+        "tinyubsan: %s at file %s, line %d, column %d\n",
         message,
         loc.file,
         loc.line,

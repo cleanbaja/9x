@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define VM_MEM_OFFSET 0xffff800000000000
+#define VM_MEM_OFFSET  0xffff800000000000
 #define VM_KERN_OFFSET 0xffffffff80000000
 
 void
