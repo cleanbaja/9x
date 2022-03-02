@@ -1,66 +1,80 @@
 #include <internal/asm.h>
 #include <lib/log.h>
 #include <sys/apic.h>
-#include <sys/tables.h>
+#include <sys/irq.h>
 
-static struct idt_entry entries[256] = { 0 };
-static struct handler handlers[256] = { 0 };
-static int last_vector = 64; // Start a bit high, so we don't overlap with the IO-APIC
+static struct irq_handler handlers[256] = { 0 };
+static int last_vector = 64; // Start over the I/O APIC window, 
+                             // so we don't overlap.
 
 void
-idt_set_handler(struct handler h, int vector)
+register_irq_handler(int vec, struct irq_handler h)
 {
-  handlers[vector] = h;
+  if (vec >= 255) {
+    return; // Out of bounds access
+  } else {
+    handlers[vec] = h;
+  }
 }
 
 int
-idt_allocate_vector()
+alloc_irq_vec()
 {
-  if (last_vector >= 253) {
-    PANIC(NULL, "Out of CPU Interrupt Vectors");
+  // Make sure we don't give out reserved vectors, 
+  // which are from 250-255 and 0-63
+  if (last_vector > 249 || last_vector < 64) {
+    log("sys/irq: (WARN) Unable to find any free vectors!");
+    return -1;
+  } else {
+    return last_vector++;
+  }
+}
+
+int
+find_irq_slot(struct irq_handler h)
+{
+  int slot = alloc_irq_vec();
+  if (slot == -1) {
+    return -1;
+  } else {
+    register_irq_handler(slot, h);
+    return slot;
+  }
+}
+
+cpu_ctx_t*
+sys_dispatch_isr(cpu_ctx_t* context)
+{
+  uint32_t vec = context->int_no;
+
+  // If there is a CPU exception with no handler, then panic.
+  if (vec < 32 && !handlers[vec].hnd) {
+    PANIC(context, NULL);
   }
 
-  return last_vector++;
-}
-
-static struct idt_entry
-idt_make_entry(void* handler, uint8_t ist)
-{
-  uint64_t address = (uint64_t)handler;
-  return (struct idt_entry){ .offset_low = (uint16_t)address,
-                             .selector = 0x08,
-                             .ist = ist,
-                             .flags = 0x8e,
-                             .offset_mid = (uint16_t)(address >> 16),
-                             .offset_hi = (uint32_t)(address >> 32),
-                             .reserved = 0 };
-}
-
-void
-init_idt()
-{
-  for (int i = 0; i < 256; i++) {
-    entries[i] = idt_make_entry(asm_dispatch_table[i], 0);
+  // Call the associated handler (if present)
+  if (handlers[vec].hnd) {
+    handlers[vec].hnd(context, handlers[context->int_no].extra_arg);
   }
 
-  percpu_flush_idt();
-}
-
-void
-percpu_flush_idt()
-{
-  struct table_ptr table_pointer;
-  table_pointer.base = (uint64_t)entries;
-  table_pointer.limit = sizeof(entries) - 1;
-
-  asm_load_idt(table_pointer);
+  // Take the appropriate action based on the handler
+  if (handlers[vec].is_irq) {
+    apic_eoi();
+  }
+  if (handlers[vec].should_return) {
+    return context;
+  } else {
+    __asm__ volatile("cli; hlt");
+    for (;;) {
+      __asm__ volatile("hlt");
+    }
+  }
 }
 
 /*
  * A list of execption messages stolen from the osdev wiki
  * NOTE: I removed some execption that were obsolete
  */
-
 static char* exc_table[] = { [0] = "Division by Zero",
                              [1] = "Debug",
                              [2] = "Non Maskable Interrupt",
@@ -82,45 +96,45 @@ static char* exc_table[] = { [0] = "Division by Zero",
                              [30] = "Security Exception" };
 
 void
-dump_regs(ctx_t* context)
+dump_context(cpu_ctx_t* regs)
 {
-  raw_log("Exception #%d (%s)\n", context->int_no, exc_table[context->int_no]);
+  raw_log("Exception #%d (%s)\n", regs->int_no, exc_table[regs->int_no]);
   raw_log("    Error Code: 0x%08lx, RIP: 0x%08lx, RSP: 0x%08lx\n",
-          context->ec,
-          context->rip,
-          context->rsp);
+          regs->ec,
+          regs->rip,
+          regs->rsp);
   raw_log("    RAX: 0x%08lx, RBX: 0x%08lx, RCX: 0x%08lx, RDX: 0x%08lx\n",
-          context->rax,
-          context->rbx,
-          context->rcx,
-          context->rbx);
+          regs->rax,
+          regs->rbx,
+          regs->rcx,
+          regs->rbx);
   raw_log("    RSI: 0x%08lx, RDI: 0x%08lx, RSP: 0x%08lx, RBP: 0x%08lx\n",
-          context->rsi,
-          context->rdi,
-          context->rsp,
-          context->rbp);
+          regs->rsi,
+          regs->rdi,
+          regs->rsp,
+          regs->rbp);
   raw_log("    R8:  0x%08lx, R9:  0x%08lx, R10: 0x%08lx, R11: 0x%08lx\n",
-          context->r8,
-          context->r9,
-          context->r10,
-          context->r11);
+          regs->r8,
+          regs->r9,
+          regs->r10,
+          regs->r11);
   raw_log("    R12: 0x%08lx, R12: 0x%08lx, R13: 0x%08lx, R14: 0x%08lx\n",
-          context->r12,
-          context->r13,
-          context->r13,
-          context->r14);
+          regs->r12,
+          regs->r13,
+          regs->r13,
+          regs->r14);
   raw_log("    R15: 0x%08lx, CS:  0x%08lx, SS:  0x%08lx\n\n",
-          context->r15,
-          context->cs,
-          context->ss);
+          regs->r15,
+          regs->cs,
+          regs->ss);
 
-  if (context->int_no == 14) {
+  if (regs->int_no == 14) {
     // Print extra information in the case of a page fault
     uint64_t cr2_val = asm_read_cr2();
     raw_log("Linear Address: 0x%lx\nConditions:\n", cr2_val);
 
     // See Intel x86 SDM Volume 3a Chapter 4.7
-    uint64_t error_code = context->ec;
+    uint64_t error_code = regs->ec;
     if (((error_code) & (1 << (0))))
       raw_log("    - Page level protection violation\n");
     else
@@ -151,22 +165,3 @@ dump_regs(ctx_t* context)
     raw_log("\n");
   }
 }
-
-ctx_t*
-sys_dispatch_isr(ctx_t* context)
-{
-  if (context->int_no < 32) {
-    PANIC(context, NULL);
-  }
-
-  if (handlers[context->int_no].func) {
-    handlers[context->int_no].func(context);
-  }
-
-  if (handlers[context->int_no].is_irq) {
-    apic_eoi();
-  }
-
-  return context;
-}
-

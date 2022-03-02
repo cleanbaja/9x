@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <sys/apic.h>
 #include <sys/tables.h>
+#include <sys/timer.h>
 
 #include <lai/core.h>
 #include <lai/drivers/ec.h>
@@ -11,7 +12,6 @@
 #include <lai/helpers/sci.h>
 
 static bool xsdt_found;
-static bool in_shutdown;
 static struct acpi_rsdt_t* rsdt;
 static struct acpi_xsdt_t* xsdt;
 
@@ -104,7 +104,6 @@ setup_ec(void)
       continue;
 
     // Found one
-    log("acpi: Found Embedded Controller!");
     struct lai_ec_driver* driver = kmalloc(sizeof(struct lai_ec_driver));
     lai_init_ec(node, driver);
 
@@ -119,9 +118,10 @@ setup_ec(void)
 }
 
 static void
-sci_handler(struct cpu_ctx* context)
+sci_handler(struct cpu_context* context, void* arg)
 {
   (void)context;
+  (void)arg;
 
   uint16_t ev = lai_get_sci_event();
 
@@ -135,10 +135,8 @@ sci_handler(struct cpu_ctx* context)
 
   log("acpi: a SCI event has occured: 0x%x (%s)", ev, ev_name);
 
-  if (ev & ACPI_POWER_BUTTON && !in_shutdown) {
-    in_shutdown = true;
-    raw_log("\n\nCLICK POWER BUTTON ONE MORE TIME TO SHUT DOWN!\n\n");
-  } else if (ev & ACPI_POWER_BUTTON && in_shutdown) {
+  if (ev & ACPI_POWER_BUTTON) {
+    timer_sleep(7000);
     lai_enter_sleep(5); // Good Night!
   }
 }
@@ -146,18 +144,22 @@ sci_handler(struct cpu_ctx* context)
 void
 setup_sci(void)
 {
+  // Find the required ACPI tables
   acpi_fadt_t* fadt = acpi_query("FACP", 0);
   acpi_madt_t* madt = acpi_query("APIC", 0);
-  int slot = idt_allocate_vector();
+
+  // Register the handler
+  struct irq_handler hnd = { .should_return = true,
+                             .is_irq = true,
+                             .hnd = sci_handler };
+  int slot = find_irq_slot(hnd);
+
+  // Redirect the IRQ to the proper CPU
   if (madt->flags & 1) {
     apic_redirect_irq(0, slot, fadt->sci_irq, false);
   } else {
     apic_redirect_gsi(0, slot, fadt->sci_irq, 0, false);
   }
-
-  // Register the handler
-  struct handler hnd = { .is_irq = true, .func = sci_handler };
-  idt_set_handler(hnd, slot);
 
   // Enable Interrupts
   __asm__ volatile("sti");
@@ -176,52 +178,35 @@ acpi_init(struct stivale2_struct_tag_rsdp* rk)
     rsdt = (acpi_rsdt_t*)((uintptr_t)xsdp->rsdt + VM_MEM_OFFSET);
   }
 
-  log("acpi: dumping tables... (revision: %u)", xsdp->revision);
-  log("    %s %s %s  %s", "Signature", "Rev", "OEMID", "Address");
-  
-  acpi_header_t* h = NULL; 
-  if (xsdt_found) {
-    for (size_t i = 0; i < (xsdt->header.length - sizeof(acpi_header_t)) / 8;
-         i++) {
-      h = (acpi_header_t*)((size_t)xsdt->tables[i] + VM_MEM_OFFSET);
-      if ((uintptr_t)h == VM_MEM_OFFSET)
-	  continue;
+  size_t header_len = (xsdt_found) ? xsdt->header.length : rsdt->header.length;
+  size_t entry_count =
+    ((header_len - sizeof(acpi_header_t))) / ((xsdp->revision > 0) ? 8 : 4);
+  log(
+    "acpi: dumping %u entries... (revision: %u)", entry_count, xsdp->revision);
+  log("    %-8s %-s %-6s  %-11s", "Signature", "Rev", "OEMID", "Address");
 
-      log("    %c%c%c%c      %d   %c%c%c%c%c%c 0x%lx",
-        h->signature[0],
-        h->signature[1],
-        h->signature[2],
-        h->signature[3],
-        h->revision,
-        h->oem[0],
-        h->oem[1],
-        h->oem[2],
-        h->oem[3],
-        h->oem[4],
-        h->oem[5] ? h->oem[5] : ' ',
-        (uint64_t)h);
-    }
-  } else {
-    for (size_t i = 0; i < (rsdt->header.length - sizeof(acpi_header_t)) / 4;
-         i++) {
-      h = (acpi_header_t*)((size_t)rsdt->tables[i] + VM_MEM_OFFSET);
-      if ((uintptr_t)h == VM_MEM_OFFSET)
-	  continue;
+  for (size_t i = 0; i < entry_count; i++) {
+    uint64_t table_addr =
+      (xsdp->revision > 0) ? xsdt->tables[i] : rsdt->tables[i];
+    vm_virt_map(&kernel_space,
+                table_addr,
+                table_addr + VM_MEM_OFFSET,
+                VM_PERM_READ | VM_PERM_WRITE | VM_PERM_EXEC);
 
-      log("    %c%c%c%c      %d   %c%c%c%c%c%c 0x%lx",
-        h->signature[0],
-        h->signature[1],
-        h->signature[2],
-        h->signature[3],
-        h->revision,
-        h->oem[0],
-        h->oem[1],
-        h->oem[2],
-        h->oem[3],
-        h->oem[4],
-        h->oem[5] ? h->oem[5] : ' ',
-        (uint64_t)h);
-    }
+    acpi_header_t* c = (acpi_header_t*)(table_addr + VM_MEM_OFFSET);
+    log("    %-c%c%c%c %6d %3c%c%c%c%c%c %#0lx",
+        c->signature[0],
+        c->signature[1],
+        c->signature[2],
+        c->signature[3],
+        c->revision,
+        c->oem[0],
+        c->oem[1],
+        c->oem[2],
+        c->oem[3],
+        c->oem[4],
+        c->oem[5],
+        (uint64_t)table_addr + VM_MEM_OFFSET);
   }
 
   // Set ACPI Revision and parse the MADT

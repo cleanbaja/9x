@@ -22,19 +22,43 @@ static void hpet_write(uint16_t offset, uint64_t val)
 }
 
 void calibrate_tsc() {
-   for (int i = 0; i < TSC_CALI_CYCLES; i++) {
-     uint64_t start_reading = asm_rdtsc();
-     timer_sleep(10);
-     uint64_t delta = (asm_rdtsc() - start_reading) / 10;
+  // Disable the CPU capability before testing...
+  cpu_features &= ~(CPU_FEAT_INVARIANT);
 
-     per_cpu(tsc_freq) += delta;
+  // Determine the TSC frequency
+  for (int i = 0; i < TSC_CALI_CYCLES; i++) {
+    uint64_t start_reading = asm_rdtsc();
+    timer_sleep(10);
+    uint64_t delta = (asm_rdtsc() - start_reading) / 10;
+
+    per_cpu(tsc_freq) += delta;
    } 
 
    // Average out readings
    per_cpu(tsc_freq) /= TSC_CALI_CYCLES;
-   
-   if (per_cpu(cpu_num) == 0)
-     log("timer/tsc: CPU has a CPU frequency of %u MHz", per_cpu(cpu_num), per_cpu(tsc_freq) / 1000);
+   if (per_cpu(cpu_num) == 0) {
+     uint64_t n = per_cpu(tsc_freq) / 1000;
+     int d4 = (n % 10);
+     int d3 = (n / 10) % 10;
+     int d2 = (n / 100) % 10;
+     int d1 = (n / 1000);
+     log("timer/tsc: CPU frequency is locked in at %d.%d%d%d GHz",
+         d1,
+         d2,
+         d3,
+         d4);
+     timer_sleep(5000);
+   }
+
+   // Return the CPU capability
+   cpu_features |= CPU_FEAT_INVARIANT;
+}
+
+static void
+blep(cpu_ctx_t* context, void* extra_arg)
+{
+  log("we have arrived on CPU %d !!!!", per_cpu(cpu_num));
+  apic_timer_oneshot((uint8_t)context->int_no, 5);
 }
 
 void timer_init() {
@@ -56,13 +80,19 @@ void timer_init() {
   hpet_period = (hpet_read(HPET_CAP_REG) >> 32);
   hpet_write(HPET_MAIN_COUNTER_REG, 0);
   hpet_write(HPET_CONF_REG, hpet_read(HPET_CONF_REG) | (1 << 0));
-  
+  struct irq_handler bl = { .should_return = true,
+                            .is_irq = true,
+                            .hnd = blep };
+  register_irq_handler(32, bl);
+
 common:
-  // Calibrate the TSC, only if its usable
+  // Calibrate the TSC, only if it's usable
   if (CPU_CHECK(CPU_FEAT_INVARIANT))
     calibrate_tsc();
 
-  // TODO: Setup LAPIC timer (if needed?)
+  // Calibrate the APIC, only if it's needed as a time source
+  if (!CPU_CHECK(CPU_FEAT_DEADLINE))
+    calibrate_apic();
 }
 
 void timer_sleep(uint64_t ms) {

@@ -9,6 +9,13 @@
 
 static uint16_t _kstack[8192];
 
+// Adjusts the cpu_local of the BSP, since its invalid at first
+#define PERCPU_FIXUP()                                                         \
+  ({                                                                           \
+    per_cpu(kernel_stack) = (uintptr_t)_kstack + VM_PAGE_SIZE;                 \
+    per_cpu(tss).rsp0 = per_cpu(kernel_stack);                                 \
+  })
+
 static struct stivale2_header_tag_smp smp_tag = {
   .tag = { .identifier = STIVALE2_HEADER_TAG_SMP_ID, .next = 0 },
   .flags = (1 << 0)
@@ -54,18 +61,17 @@ static void
 early_init()
 {
   // Zero out the CPU-local storage (so PANIC dosen't get confused)
-  write_percpu(NULL);
+  WRITE_PERCPU(NULL);
 
-  // Start the console and say hello!
+  // Get arch-specific structures up
+  init_tables();
+
+  // Finally, start the console and say hello!
   console_init();
   log("9x (x86_64) (v0.2.1) - A project by Yusuf M (cleanbaja)");
   log("Bootloader: %s (%s)",
       bootags->bootloader_brand,
       bootags->bootloader_version);
-
-  // Finally, load GDT/IDT so that we're in a basic enviorment
-  init_gdt();
-  init_idt();
 }
 
 void
@@ -84,8 +90,9 @@ kern_entry(struct stivale2_struct* bootinfo)
   // Initialize ACPI
   acpi_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_RSDP_ID));
 
-  // Initialize other CPUs
+  // Initialize other CPUs and fix the percpu structure
   cpu_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_SMP_ID));
+  PERCPU_FIXUP();
 
   // Chill for now...
   log("init: Startup complete, halting all cores!");

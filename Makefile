@@ -4,8 +4,9 @@
 
 # General Configuration ============================================================== 
 
-# Define the build root
+# Define the build/install roots
 BUILD_ROOT ?= build
+DESTDIR ?= /boot
 
 # Only be verbose if required
 ifneq ($(V), 1)
@@ -54,11 +55,16 @@ iso: $(BUILD_ROOT)/test_image.iso
 
 #  Various util commands ============================================================
 
-.PHONY: run clean
+.PHONY: run clean install
 run: $(BUILD_ROOT)/test_image.iso
 	printf "\n"
 	qemu-system-x86_64 -smp 2 --enable-kvm -cpu max -cdrom $(BUILD_ROOT)/test_image.iso -m 2G -M q35 -debugcon stdio
 
 clean:
 	rm -rf $(BUILD_ROOT)
+
+install:
+	mkdir -p $(DESTDIR)/kernel/
+	cp $(BUILD_ROOT)/src/9x.elf $(DESTDIR)/kernel/9x.elf
+	cp share/limine.cfg $(DESTDIR)/limine.cfg
 

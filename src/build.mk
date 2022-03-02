@@ -1,9 +1,9 @@
 KERNEL_SOURCES = kern/init.c      \
 		 kern/acpi.c      \
 		 kern/acpi_lai.c  \
-                 sys/gdt.c        \
-		 sys/idt.c        \
 		 sys/cpu.c        \
+		 sys/tables.c     \
+		 sys/irq.c        \
 		 sys/apic.c       \
 		 sys/timer.c      \
 		 lib/builtin.c    \

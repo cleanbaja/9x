@@ -162,8 +162,9 @@ vm_virt_map(vm_space_t* spc, uintptr_t phys, uintptr_t virt, int flags)
   // Finally, fill in the proper page
   level1[pml1_index] = flags_to_pte(phys, flags, false);
 
-  if (spc->active)
-    vm_invl((void*)spc, virt);
+  // VM invalidation is completly bugy and unusable!
+  /* if (spc->active)
+    vm_invl((void*)spc, virt); */
 }
 
 uint64_t*
@@ -213,7 +214,7 @@ vm_virt_unmap(vm_space_t* spc, uintptr_t virt)
   if (level1 == NULL)
     return;
 
-  level1[level1_index] &= ~(1 << 0);
+  level1[level1_index] = 0;
 }
 
 void

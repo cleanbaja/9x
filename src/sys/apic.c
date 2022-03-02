@@ -13,6 +13,11 @@
 #define LAPIC_ESR      0x280
 #define LAPIC_ERR_CTL  0x370
 
+#define LAPIC_TIMER_LVT 0x320
+#define LAPIC_TIMER_CNT 0x390
+#define LAPIC_TIMER_INIT 0x380
+#define LAPIC_TIMER_DIV 0x3E0
+
 static bool use_x2apic = false;
 static uintptr_t xapic_base = 0x0;
 
@@ -54,6 +59,26 @@ ioapic_write(size_t ioapic_num, uint32_t reg, uint32_t data)
                          VM_MEM_OFFSET);
   *base = reg;
   *(base + 4) = data;
+}
+
+void
+calibrate_apic()
+{
+  // Setup the calibration, with divisor set to 16 (0x3)
+  apic_write(LAPIC_TIMER_DIV, 0x3);
+  apic_write(LAPIC_TIMER_LVT, 0xFF | (1 << 16));
+  apic_write(LAPIC_TIMER_INIT, (uint32_t)-1);
+
+  // Sleep for 10ms
+  timer_sleep(10);
+
+  // Set the frequency, then disable the timer once more
+  per_cpu(lapic_freq) = (((uint32_t)-1) - apic_read(LAPIC_TIMER_CNT)) / 10ull;
+  apic_write(LAPIC_TIMER_INIT, 0);
+  apic_write(LAPIC_TIMER_LVT, (1 << 16));
+
+  if (per_cpu(cpu_num) == 0)
+    log("sys/apic: Timer Frequency is %u MHz", per_cpu(lapic_freq) / 10ull);
 }
 
 void
@@ -223,4 +248,26 @@ apic_redirect_irq(uint8_t lapic_id, uint8_t vec, uint8_t irq, bool masked)
     }
   }
   apic_redirect_gsi(lapic_id, vec, irq, 0, masked);
+}
+
+void
+apic_timer_oneshot(uint8_t vec, uint64_t ms)
+{
+  if (CPU_CHECK(CPU_FEAT_INVARIANT) && CPU_CHECK(CPU_FEAT_DEADLINE)) {
+    apic_write(LAPIC_TIMER_LVT, (0b10 << 17) | vec);
+    uint64_t goal = asm_rdtsc() + (ms * per_cpu(tsc_freq));
+
+    asm_wrmsr(IA32_TSC_DEADLINE, goal);
+  } else {
+    // Stop the LAPIC timer
+    apic_write(LAPIC_TIMER_INIT, 0x0);
+    apic_write(LAPIC_TIMER_LVT, (1 << 16));
+
+    // Calculate the total ticks we need
+    uint64_t ticks = ms * (per_cpu(lapic_freq));
+
+    apic_write(LAPIC_TIMER_LVT, vec);
+    apic_write(LAPIC_TIMER_DIV, 0x3);
+    apic_write(LAPIC_TIMER_INIT, (uint32_t)ticks);
+  }
 }

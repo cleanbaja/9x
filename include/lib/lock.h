@@ -9,7 +9,7 @@
 #define ATOMIC_INC(i)         __sync_add_and_fetch((i), 1)
 
 struct spinlock {
-  volatile int locked;
+  volatile uint64_t locked;
   volatile bool intr_enabled;
 };
 
@@ -21,25 +21,20 @@ static inline void spinlock_acquire(struct spinlock* lock) {
       "pop %0"
       : "=r" (rflags));
 
+  // Enter the busy loop
+  while (__atomic_test_and_set(&lock->locked, __ATOMIC_ACQUIRE)) {
+    __asm__ volatile("pause");
+  }
+
   // Mask interrupts (if needed)
   if (rflags & (1 << 9)) {
     lock->intr_enabled = true;
     __asm__ volatile ("cli"); 
   }
-
-  // Enter the busy loop
-  while (lock->locked == 1) {                        
-    asm volatile(                         
-	"lock; cmpxchgl %1, %0\n"         
-        : "=m"(lock->locked)                         
-        : "r"(1), "a"(0)                  
-        : "cc");                          
-    __asm__ volatile ("pause");          
-  }	
 }
 static inline void spinlock_release(struct spinlock* lock) {
   // Clear the lock to zero (available)
-  __atomic_clear(&lock->locked, __ATOMIC_SEQ_CST);
+  __atomic_clear(&lock->locked, __ATOMIC_RELEASE);
 
   // Restore interrupts (once again, if needed)
   if (lock->intr_enabled)

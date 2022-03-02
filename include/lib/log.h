@@ -5,9 +5,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "sys/tables.h"
-#include "sys/cpu.h"
 #include "lock.h"
+#include "sys/cpu.h"
+#include "sys/irq.h"
 
 void
 log(char* fmt, ...);
@@ -19,7 +19,7 @@ int
 vsnprintf(char* buffer, size_t count, const char* format, va_list va);
 
 static inline uintptr_t
-ctx_to_base(ctx_t* context)
+ctx_to_base(cpu_ctx_t* context)
 {
   return context->rbp;
 }
@@ -35,15 +35,19 @@ extern int in_panic;
 #define PANIC(ctx, m, ...)                                                     \
   ({                                                                           \
     if (in_panic == 1) {                                                       \
-      for(;;) { __asm__ volatile("hlt"); }                                     \
-    } else { in_panic = 1; }                                                   \
+      for (;;) {                                                               \
+        __asm__ volatile("hlt");                                               \
+      }                                                                        \
+    } else {                                                                   \
+      in_panic = 1;                                                            \
+    }                                                                          \
     raw_log("\nKERNEL PANIC on CPU #%d\n",                                     \
-	   (read_percpu() == NULL) ? 0 : per_cpu(cpu_num));                    \
+            (READ_PERCPU() == NULL) ? 0 : per_cpu(cpu_num));                   \
     if (m) {                                                                   \
       raw_log(m, ##__VA_ARGS__);                                               \
     }                                                                          \
     if (ctx) {                                                                 \
-      dump_regs(ctx);                                                          \
+      dump_context(ctx);                                                       \
       strace_unwind(ctx_to_base(ctx));                                         \
     } else {                                                                   \
       strace_unwind(0);                                                        \

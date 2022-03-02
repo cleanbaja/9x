@@ -1,8 +1,8 @@
 #ifndef SYS_TABLES_H
 #define SYS_TABLES_H
 
+#include "sys/irq.h"
 #include <stdbool.h>
-#include <stdint.h>
 
 struct __attribute__((packed)) table_ptr
 {
@@ -10,7 +10,17 @@ struct __attribute__((packed)) table_ptr
   uint64_t base;
 };
 
-// GDT Definitions ==================================================
+struct __attribute__((packed)) tss_entry
+{
+  uint16_t length;
+  uint16_t base_low16;
+  uint8_t base_mid8;
+  uint8_t flags1;
+  uint8_t flags2;
+  uint8_t base_high8;
+  uint32_t base_upper32;
+  uint32_t reserved;
+};
 
 #define GDT_KERNEL_CODE_ENTRY 0x00AF9A000000FFFF
 #define GDT_KERNEL_DATA_ENTRY 0x008F92000000FFFF
@@ -24,14 +34,8 @@ struct __attribute__((packed)) gdt
   uint64_t kdata_entry;
   uint64_t ucode_entry;
   uint64_t udata_entry;
+  struct tss_entry tss;
 };
-
-void
-init_gdt();
-void
-percpu_flush_gdt();
-
-// IDT Definitions ==================================================
 
 struct __attribute__((packed)) idt_entry
 {
@@ -44,32 +48,34 @@ struct __attribute__((packed)) idt_entry
   uint32_t reserved;
 };
 
-typedef struct __attribute__((packed)) cpu_ctx
+struct __attribute__((packed)) tss
 {
-  uint64_t r15, r14, r13, r12, r11, r10, r9;
-  uint64_t r8, rbp, rdi, rsi, rdx, rcx, rbx;
-  uint64_t rax, int_no, ec, rip, cs, rflags;
-  uint64_t rsp, ss;
-} ctx_t;
-
-typedef void (*HandlerFunc)(ctx_t*);
-
-struct handler
-{
-  HandlerFunc func;
-  bool is_irq;
+  uint32_t reserved;
+  uint64_t rsp0;
+  uint64_t rsp1;
+  uint64_t rsp2;
+  uint32_t reserved1;
+  uint32_t reserved2;
+  uint64_t ist1;
+  uint64_t ist2;
+  uint64_t ist3;
+  uint64_t ist4;
+  uint64_t ist5;
+  uint64_t ist6;
+  uint64_t ist7;
+  uint64_t reserved3;
+  uint16_t reserved4;
+  uint16_t iopb;
 };
 
+// Functions to reload/init the CPU tables
 void
-init_idt();
+init_tables();
 void
-percpu_flush_idt();
+reload_tables();
 
+// TSS loading helper
 void
-idt_set_handler(struct handler h, int vector);
-int
-idt_allocate_vector();
-void
-dump_regs(ctx_t* context);
+load_tss(uintptr_t address);
 
 #endif // SYS_TABLES_H

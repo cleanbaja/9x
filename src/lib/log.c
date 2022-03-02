@@ -675,11 +675,10 @@ int in_panic = 0;
 void
 raw_log(char* fmt, ...)
 {
+  spinlock_acquire(&log_lock);
   va_list va;
   va_start(va, fmt);
 
-  spinlock_acquire(&log_lock);
-  
   _vsnprintf(_out_buffer, msg_buf, 512, fmt, va);
   va_end(va);
 
@@ -693,10 +692,9 @@ raw_log(char* fmt, ...)
 void
 log(char* fmt, ...)
 {
+  spinlock_acquire(&log_lock);
   va_list va;
   va_start(va, fmt);
-
-  spinlock_acquire(&log_lock);
 
   _vsnprintf(_out_buffer, msg_buf, 512, fmt, va);
   snprintf(main_buf, 512, "[%*d.%06d] %s\n", 5, 0, 0, msg_buf);
