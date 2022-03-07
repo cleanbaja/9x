@@ -65,9 +65,6 @@ reload_tables()
   table_pointer.limit = sizeof(struct gdt) - 1;
   asm_load_gdt(&table_pointer);
 
-  // Zero memory in between, to prevent corruption
-  memset(&table_pointer, 0, sizeof(struct table_ptr));
-
   // Reload the IDT
   table_pointer.base = (uint64_t)entries;
   table_pointer.limit = sizeof(entries) - 1;

@@ -188,10 +188,10 @@ acpi_init(struct stivale2_struct_tag_rsdp* rk)
   for (size_t i = 0; i < entry_count; i++) {
     uint64_t table_addr =
       (xsdp->revision > 0) ? xsdt->tables[i] : rsdt->tables[i];
-    vm_virt_map(&kernel_space,
+    /*vm_virt_map(&kernel_space,
                 table_addr,
                 table_addr + VM_MEM_OFFSET,
-                VM_PERM_READ | VM_PERM_WRITE | VM_PERM_EXEC);
+                VM_PERM_READ | VM_PERM_WRITE);*/
 
     acpi_header_t* c = (acpi_header_t*)(table_addr + VM_MEM_OFFSET);
     log("    %-c%c%c%c %6d %3c%c%c%c%c%c %#0lx",
@@ -213,12 +213,12 @@ acpi_init(struct stivale2_struct_tag_rsdp* rk)
   lai_set_acpi_revision(xsdp->revision);
   madt_init();
 
-  // Init the ACPI OSL
+  /* Init the ACPI OSL
   lai_create_namespace();
   lai_enable_acpi(1);
 
   // Setup Embedded Controllers (if they exist) and SCI events
   setup_ec();
-  setup_sci();
+  setup_sci();*/
 }
 

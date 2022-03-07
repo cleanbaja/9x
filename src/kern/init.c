@@ -1,11 +1,12 @@
+#include <9x/acpi.h>
+#include <9x/vfs.h>
+#include <9x/vm.h>
 #include <lib/console.h>
 #include <lib/log.h>
-#include <sys/tables.h>
 #include <sys/apic.h>
 #include <sys/cpu.h>
+#include <sys/tables.h>
 #include <sys/timer.h>
-#include <9x/vm.h>
-#include <9x/acpi.h>
 
 static uint16_t _kstack[8192];
 
@@ -93,6 +94,15 @@ kern_entry(struct stivale2_struct* bootinfo)
   // Initialize other CPUs and fix the percpu structure
   cpu_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_SMP_ID));
   PERCPU_FIXUP();
+
+  // Initialize the vfs and filesystems
+  vfs_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_MODULES_ID));
+
+  // Open a file
+  /*struct file_des* fd = vfs_open("/boot/kernel/9x.elf", O_RDONLY);
+  uint32_t data;
+  vfs_read(fd, &data, 0, sizeof(uint32_t));
+  log("data -> 0x%lx", data);*/
 
   // Chill for now...
   log("init: Startup complete, halting all cores!");

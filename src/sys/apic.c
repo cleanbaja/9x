@@ -5,6 +5,7 @@
 #include <lib/log.h>
 #include <sys/apic.h>
 #include <sys/tables.h>
+#include <sys/timer.h>
 
 #define LAPIC_SPURIOUS 0x0f0
 #define LAPIC_ICR0     0x300

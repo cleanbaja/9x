@@ -1,6 +1,7 @@
 KERNEL_SOURCES = kern/init.c      \
 		 kern/acpi.c      \
 		 kern/acpi_lai.c  \
+		 kern/vfs.c       \
 		 sys/cpu.c        \
 		 sys/tables.c     \
 		 sys/irq.c        \
@@ -15,7 +16,9 @@ KERNEL_SOURCES = kern/init.c      \
 		 vm/vm.c          \
 		 vm/virt.c        \
 		 vm/phys.c        \
-		 vm/alloc.c   
+		 vm/alloc.c       \
+		 fs/tmpfs.c       \
+		 fs/backing.c 
 
 KERNEL_ASM = lib/font.asm     \
 	     sys/helpers.asm  \
@@ -34,6 +37,7 @@ KCFLAGS = -ffreestanding             \
 	  -mno-sse2                  \
 	  -mno-red-zone              \
 	  -fno-omit-frame-pointer    \
+          -fplan9-extensions         \
 	  -mcmodel=kernel	     \
 	  -I include                 \
 	  -I third_party/lai/include

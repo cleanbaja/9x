@@ -1,8 +1,10 @@
-#include <sys/timer.h>
-#include <lib/log.h>
 #include <9x/acpi.h>
-#include <lib/lock.h>
 #include <internal/asm.h>
+#include <lib/builtin.h>
+#include <lib/lock.h>
+#include <lib/log.h>
+#include <sys/apic.h>
+#include <sys/timer.h>
 
 static void* hpet_base;
 static uint64_t hpet_period;
@@ -54,13 +56,6 @@ void calibrate_tsc() {
    cpu_features |= CPU_FEAT_INVARIANT;
 }
 
-static void
-blep(cpu_ctx_t* context, void* extra_arg)
-{
-  log("we have arrived on CPU %d !!!!", per_cpu(cpu_num));
-  apic_timer_oneshot((uint8_t)context->int_no, 5);
-}
-
 void timer_init() {
   // First, check if we're the BSP, or APs
   if (!(per_cpu(cpu_num) == 0))
@@ -74,16 +69,11 @@ void timer_init() {
   // Map the HPET into memory
   hpet_base = (void*)((uintptr_t)hp->base.base + VM_MEM_OFFSET);
   vm_virt_map(per_cpu(cur_space), hp->base.base, (uintptr_t)hpet_base, VM_PERM_READ | VM_PERM_WRITE | VM_CACHE_FLAG_UNCACHED);
-  log("timer/hpet: cap reg -> (period: %u, counters: %u)", (hpet_read(HPET_CAP_REG) >> 32), ((hpet_read(HPET_CAP_REG) >> 8) & 0x1F) + 1); 
   
   // Set the period, clear the main counter, and enable the HPET
   hpet_period = (hpet_read(HPET_CAP_REG) >> 32);
   hpet_write(HPET_MAIN_COUNTER_REG, 0);
   hpet_write(HPET_CONF_REG, hpet_read(HPET_CONF_REG) | (1 << 0));
-  struct irq_handler bl = { .should_return = true,
-                            .is_irq = true,
-                            .hnd = blep };
-  register_irq_handler(32, bl);
 
 common:
   // Calibrate the TSC, only if it's usable

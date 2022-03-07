@@ -39,6 +39,7 @@ setup_feature_map()
   }
   if (!(ebx & CPUID_EBX_INVPCID)) {
     // Don't say PCID is supported if there is no invpcid...
+    log("vm/virt: PCID is supported but no INVPCID, ignoring!");
     mmu_features &= ~(1 << 4);
   }
 }
@@ -51,15 +52,16 @@ enable_feature_map()
   if (MMU_CHECK(MM_FEAT_NX)) {
     asm_wrmsr(IA32_EFER, asm_rdmsr(IA32_EFER) | (1 << 11));
   } else {
-    PANIC(NULL,
-          "NX (x86_64 Execute Disable Bit) is not supported on this machine!");
+    PANIC(
+      NULL,
+      "NX (x86_64 Execute Disable Bit) is not supported on this machine!\n");
   }
   if (MMU_CHECK(MM_FEAT_SMEP)) {
     asm_write_cr4(asm_read_cr4() | (1 << 20));
   } else {
     PANIC(NULL,
           "SMEP (x86_64 Supervisor Mode Execution Protection) is not supported "
-          "on this machine!");
+          "on this machine!\n");
   }
 
   // Enable CR4.SMAP and CR4.PCIDE (both of which are not required, see below)
@@ -162,9 +164,9 @@ vm_virt_map(vm_space_t* spc, uintptr_t phys, uintptr_t virt, int flags)
   // Finally, fill in the proper page
   level1[pml1_index] = flags_to_pte(phys, flags, false);
 
-  // VM invalidation is completly bugy and unusable!
-  /* if (spc->active)
-    vm_invl((void*)spc, virt); */
+  // VM invalidation is completly buggy and unusable!
+  if (spc->active)
+    vm_invl((void*)spc, virt);
 }
 
 uint64_t*
@@ -224,7 +226,7 @@ vm_load_space(vm_space_t* spc)
 
   if (MMU_CHECK(MM_FEAT_PCID)) {
     if (spc->pcid >= 4096) {
-      PANIC(NULL, "PCID Overflow detected!");
+      PANIC(NULL, "PCID Overflow detected!\n");
     } else {
       cr3_val |= spc->pcid;
     }

@@ -62,5 +62,14 @@ memmove(void *dest, const void *src, size_t n) {
     }
 
     return dest;
-} 
+}
 
+int
+strlen(const char* str)
+{
+  int i = 0;
+  while (*str++ != '\0') {
+    i++;
+  }
+  return i;
+}

@@ -1,6 +1,7 @@
 #ifndef SYS_APIC_H
 #define SYS_APIC_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #define IA32_APIC 0x1B
@@ -9,6 +10,8 @@
 
 void
 activate_apic();
+void
+calibrate_apic();
 void
 apic_eoi();
 

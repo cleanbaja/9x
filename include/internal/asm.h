@@ -13,8 +13,7 @@
     }                                                                          \
   })
 
-#define asm_invlpg(k)                                                          \
-  ({ __asm__ volatile("invlpg (%0)" : : "r"(k) : "memory"); })
+#define asm_invlpg(k) ({ __asm__ volatile("invlpg %0" ::"m"(k) : "memory"); })
 
 #define INVL_ADDR 0
 #define INVL_PCID 1
