@@ -1,6 +1,7 @@
 #include <9x/acpi.h>
 #include <9x/vm.h>
 #include <lib/log.h>
+#include <lib/cmdline.h>
 #include <stdbool.h>
 #include <sys/apic.h>
 #include <sys/tables.h>
@@ -194,7 +195,7 @@ acpi_init(struct stivale2_struct_tag_rsdp* rk)
                 VM_PERM_READ | VM_PERM_WRITE);*/
 
     acpi_header_t* c = (acpi_header_t*)(table_addr + VM_MEM_OFFSET);
-    log("    %-c%c%c%c %6d %3c%c%c%c%c%c %#0lx",
+    log("    %-c%c%c%c %6d %3c%c%c%c%c%c  %#0lx",
         c->signature[0],
         c->signature[1],
         c->signature[2],
@@ -210,15 +211,18 @@ acpi_init(struct stivale2_struct_tag_rsdp* rk)
   }
 
   // Set ACPI Revision and parse the MADT
-  lai_set_acpi_revision(xsdp->revision);
   madt_init();
 
-  /* Init the ACPI OSL
-  lai_create_namespace();
-  lai_enable_acpi(1);
+  // Enable ACPI (make it a choice, since some ACPI impls are buggy/unsupported upstream)
+  if (!cmdline_is_present("noacpi")) {
+    // Init the ACPI OSL
+    lai_set_acpi_revision(xsdp->revision);
+    lai_create_namespace();
+    lai_enable_acpi(1);
 
-  // Setup Embedded Controllers (if they exist) and SCI events
-  setup_ec();
-  setup_sci();*/
+    // Setup Embedded Controllers (if they exist) and SCI events
+    setup_ec();
+    setup_sci();
+  }
 }
 

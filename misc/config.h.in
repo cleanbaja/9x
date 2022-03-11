@@ -1,0 +1,12 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+// DO NOT TOUCH (config template for Makefile generator)
+
+#define VERSION_MAJOR @VERSION_MAJOR@
+#define VERSION_MINOR @VERSION_MINOR@
+#define VERSION_PATCH @VERSION_PATCH@
+#define GIT_HASH      @GIT_COMMIT_HASH@ 
+
+#endif // CONFIG_H
+

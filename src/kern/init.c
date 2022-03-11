@@ -3,10 +3,13 @@
 #include <9x/vm.h>
 #include <lib/console.h>
 #include <lib/log.h>
+#include <lib/cmdline.h>
 #include <sys/apic.h>
 #include <sys/cpu.h>
 #include <sys/tables.h>
 #include <sys/timer.h>
+
+#include "config.h"
 
 static uint16_t _kstack[8192];
 
@@ -62,18 +65,24 @@ static void
 early_init()
 {
   // Zero out the CPU-local storage (so PANIC dosen't get confused)
-  WRITE_PERCPU(NULL);
+  WRITE_PERCPU(NULL, 0);
 
   // Get arch-specific structures up
   init_tables();
 
-  // Finally, start the console and say hello!
+  // Start the console and say hello!
   console_init();
-  log("9x (x86_64) (v0.2.1) - A project by Yusuf M (cleanbaja)");
+  log("9x [v%d.%d.%d] - A project by Yusuf M (cleanbaja)",
+      VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
   log("Bootloader: %s (%s)",
       bootags->bootloader_brand,
       bootags->bootloader_version);
+
+  // Finally, load the kernel command line
+  struct stivale2_struct_tag_cmdline* cmdline_tag = (struct stivale2_struct_tag_cmdline*)stivale2_find_tag(STIVALE2_STRUCT_TAG_CMDLINE_ID);
+  cmdline_load((char*)(cmdline_tag->cmdline));
 }
+
 
 void
 kern_entry(struct stivale2_struct* bootinfo)
@@ -97,12 +106,6 @@ kern_entry(struct stivale2_struct* bootinfo)
 
   // Initialize the vfs and filesystems
   vfs_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_MODULES_ID));
-
-  // Open a file
-  /*struct file_des* fd = vfs_open("/boot/kernel/9x.elf", O_RDONLY);
-  uint32_t data;
-  vfs_read(fd, &data, 0, sizeof(uint32_t));
-  log("data -> 0x%lx", data);*/
 
   // Chill for now...
   log("init: Startup complete, halting all cores!");

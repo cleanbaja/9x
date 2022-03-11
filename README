@@ -1,30 +1,44 @@
 |---------------------------|
 |                           |
-|         9x v0.xx.x        | 
+|         9x v0.3.x         | 
 |                           |
 |---------------------------|
 
-==== What is 9x? ====
+==== What is 9x ====
 9x is a modern unix kernel that is based on the suckless philosiphy, that is, it aims to provide
-great performace and security, while making the codebase simple and easy to read.
+great performace and stablilty, while making the codebase simple and easy to read. 9x has extensive support for
+the x86_64 ISA and its quirks, with support for aarch64 in consideration, but not one of the goals at the moment.
 
 ==== Building ====
-Building 9x is really simple, all you need is git, xorriso, GCC/Clang GNU make, and QEMU (Optional, you can run it on real 
-hardware if needed). Once all these tools are installed, you can simply run the following commands to build the kernel
- and bundle it into a image (only the ISO format is currently supported).
+Building 9x is really simple, all you need is git, xorriso, GCC/Clang GNU make, and QEMU (Optional, you can run it on real hardware if needed). Once all these tools are installed, you can simply run the following commands to build the kernel and bundle it into a image (only the ISO format is currently supported).
 
 Build & Run in QEMU (Linux KVM required)
-```
+-----------
 $ make run
-```
+-----------
 
 Build kernel and generate ISO (build/test_kernel.iso)
-```
-make iso
-```
+--------
+$ make iso
+--------
+
+==== Hardware Requirements ====
+
+Although 9x is adaptable when it comes to running on multiple types of systems, as it can run on both hypervisors and real hardware alike, it has a few noticable dependecnies, as well as recommendations for a better experience. They are as follows...
+
+  -> Requirements
+    - CPUs must support SMEP/NX, faliure to meet this will result in a kernel panic
+    - System must have more than 1GB of ram
+    - System must have a onboard HPET
+
+  -> Recomendations (for a smoother experience)
+    - CPU should support PCID and SMAP, since these 2 features greatly enhance CPU performance/security
+
+
+
+
 
 NOTE: By default, `make` builds the kernel binary only.
-
 
 Copyright (C) 2021 cleanbaja, All Rights Reserved.
 Use of the source code is permettied under a GPL3 license

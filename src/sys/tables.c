@@ -45,10 +45,10 @@ init_tables()
   }
 
   // Set proper IST entries
-  entries[2] = make_idt_entry(asm_dispatch_table[2], 1);
+  /*entries[2] = make_idt_entry(asm_dispatch_table[2], 1);
   entries[8] = make_idt_entry(asm_dispatch_table[8], 2);
   entries[14] = make_idt_entry(asm_dispatch_table[14], 3);
-  entries[18] = make_idt_entry(asm_dispatch_table[18], 4);
+  entries[18] = make_idt_entry(asm_dispatch_table[18], 4);*/
 
   // Load both the IDT and GDT
   reload_tables();

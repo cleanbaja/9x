@@ -41,6 +41,16 @@ struct vfs_node*
 create_node(const char* name,
             struct filesystem* filesystem,
             struct vfs_node* parent);
+void
+vfs_mkdir(struct vfs_node* parent, char* path, mode_t mode);
+struct backing*
+vfs_open(struct vfs_node* parent,
+         const char* path,
+         bool create,
+         mode_t creat_mode);
+
+// VFS root node, aka the parent of all nodes
+extern struct vfs_node* root_node;
 
 // Kernel provided filesystems
 extern struct filesystem tmpfs;

@@ -5,6 +5,7 @@
 
 struct vfs_node* root_node = NULL;
 vec_t(struct filesystem*) fs_list;
+extern void initramfs_load(struct stivale2_struct_tag_modules* mods);
 
 void
 vfs_register_fs(struct filesystem* fs)
@@ -96,7 +97,7 @@ resolve_path_ex(struct vfs_node* parent,
     return root_node;
   }
 
-  // Finallt, get rid of trailing slashes and uneeded characters
+  // Finally, get rid of trailing slashes and uneeded characters
   if (*path == '/' || *path == '~')
     path++;
   if (path[strlen(path) - 1] == '/')
@@ -117,7 +118,8 @@ resolve_path_ex(struct vfs_node* parent,
 
     testbuf[i] = '\0';
     path++;
-
+    
+ 
     if (final) {
       if (strlen(testbuf) != 0) {
         old_node = cur_node;
@@ -183,17 +185,17 @@ create_dotentries(struct vfs_node* nd, struct vfs_node* parent)
 void
 vfs_mkdir(struct vfs_node* parent, char* path, mode_t mode)
 {
-  char* basename;
-  struct vfs_node* old_node = resolve_path_ex(parent, NULL, path, &basename, 0);
+  char* basename; struct vfs_node* real_parent;
+  struct vfs_node* old_node = resolve_path_ex(parent, &real_parent, path, &basename, 0);
   if (old_node != NULL || basename == NULL) {
     return; // Directory already exists!
   }
 
-  struct vfs_node* new_dir = create_node(basename, parent->fs, parent);
-  create_dotentries(new_dir, parent);
+  struct vfs_node* new_dir = create_node(basename, parent->fs, real_parent);
+  create_dotentries(new_dir, real_parent);
   new_dir->backing =
     parent->fs->mkdir(new_dir, mode); // TODO: Add proper permissions
-  vec_push(&parent->children, new_dir);
+  vec_push(&real_parent->children, new_dir);
   kfree(basename);
 }
 
@@ -211,16 +213,20 @@ vfs_open(struct vfs_node* parent,
     path++;
   }
 
+  struct vfs_node* real_parent = NULL;
   struct vfs_node* nd =
-    resolve_path(parent, (char*)path, (create) ? RESOLVE_CREATE_NODE : 0);
-  if (nd == NULL)
+    resolve_path_ex(parent, &real_parent, (char*)path, NULL, (create) ? RESOLVE_CREATE_NODE : 0);
+  if (nd == NULL || real_parent == NULL)
     return NULL;
 
   if (nd->backing == NULL)
     nd->backing = nd->fs->open(nd, create, creat_mode);
+  else if (nd->backing != NULL && create)
+    create = false;
 
   // Refcount is already set to one by the FS driver, so don't increment it
-  vec_push(&parent->children, nd);
+  if (create)
+    vec_push(&real_parent->children, nd);
 
   return nd->backing;
 }
@@ -293,4 +299,10 @@ vfs_init(struct stivale2_struct_tag_modules* md)
   // Register and mount the tmpfs
   vfs_register_fs(&tmpfs);
   vfs_mount(root_node, NULL, "/", "tmpfs");
+
+  // TODO: Actually mount the devfs
+  vfs_mkdir(root_node, "/dev", 0775);
+
+  // Load the initramfs
+  initramfs_load(md);
 }

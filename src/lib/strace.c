@@ -1,4 +1,5 @@
 #include <lib/log.h>
+#include <lib/builtin.h>
 
 #define BACKTRACE_MAX 20
 
@@ -39,12 +40,23 @@ addr_to_name(uintptr_t addr, uint64_t* offset)
   return NULL;
 }
 
+uintptr_t
+strace_get_symbol(char* name) {
+  if (name == NULL)
+    return 0x0;
+
+  for (int i = 0; ksym_table[i + 1].base < UINT64_MAX; i++) {
+    if (strcmp(name, ksym_table[i].name) == 0) {
+      return ksym_table[i].base;
+    }
+  }
+}
+
 void
 strace_unwind(uintptr_t* base)
 {
   if (base == 0) {
-    // base = (uintptr_t)__builtin_frame_address(0);
-    __asm__ volatile("movq %%rbp, %0" : "=g"(base)::"memory");
+    __asm__ volatile("movq %%rbp, %0" : "=g"(base) :: "memory");
   }
 
   raw_log("Stacktrace:\n");

@@ -37,7 +37,7 @@ setup_feature_map()
   if (ebx & CPUID_EBX_SMAP) {
     mmu_features |= (1 << 3);
   }
-  if (!(ebx & CPUID_EBX_INVPCID)) {
+  if (!(ebx & CPUID_EBX_INVPCID) && MMU_CHECK(MM_FEAT_PCID)) {
     // Don't say PCID is supported if there is no invpcid...
     log("vm/virt: PCID is supported but no INVPCID, ignoring!");
     mmu_features &= ~(1 << 4);
@@ -85,7 +85,7 @@ next_level(uint64_t* prev_level, uint64_t index, bool create)
     if (!create)
       return NULL;
 
-    prev_level[index] = (uint64_t)vm_phys_alloc(1);
+    prev_level[index] = (uint64_t)vm_phys_alloc(1, VM_ALLOC_ZERO);
     prev_level[index] |= 0b111;
   }
 
@@ -228,11 +228,12 @@ vm_load_space(vm_space_t* spc)
     if (spc->pcid >= 4096) {
       PANIC(NULL, "PCID Overflow detected!\n");
     } else {
-      cr3_val |= spc->pcid;
+      cr3_val |= spc->pcid;             // Set the PCID
+      cr3_val &= ~((uint64_t)1 << 63);  // Clear bit 63, to prevent flushing of TLB
     }
   }
 
-  asm_write_cr3(spc->pml4);
+  asm_write_cr3(cr3_val);
   spc->active = true;
 }
 
@@ -280,7 +281,7 @@ vm_init_virt()
   // Setup the kernel pagemap
   kernel_space.pcid = 1;
   kernel_space.active = false;
-  kernel_space.pml4 = (uintptr_t)vm_phys_alloc(1);
+  kernel_space.pml4 = (uintptr_t)vm_phys_alloc(1, VM_ALLOC_ZERO);
 
   // Map some memory...
   for (uintptr_t p = 0; p < 0x100000000; p += 4096) {
@@ -296,7 +297,7 @@ vm_init_virt()
       for (uintptr_t p = memmap_tag->memmap[i].base; p < memmap_tag->memmap[i].length; p += 4096)
           vm_virt_map(&kernel_space, p, VM_MEM_OFFSET + p, VM_PERM_READ | VM_PERM_WRITE);
   }
-  
+ 
   // Remap the frambuffer as write combining for improved 
   // speed and unmap the first page (to catch bugs)
   struct stivale2_struct_tag_framebuffer* d = 

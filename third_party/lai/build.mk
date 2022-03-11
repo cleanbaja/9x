@@ -17,8 +17,8 @@ LAI_SOURCES = core/error.c        \
               drivers/ec.c        \
               drivers/timer.c
 
-LAI_OBJECTS  = $(addprefix $(BUILD_ROOT)/,$(patsubst %.c, %.o, $(LAI_SOURCES)))
-$(BUILD_ROOT)/%.o: third_party/lai/%.c
+LAI_OBJECTS  = $(addprefix $(BUILD_ROOT)/lai/,$(patsubst %.c, %.o, $(LAI_SOURCES)))
+$(BUILD_ROOT)/lai/%.o: third_party/lai/%.c
 	mkdir -p $(@D)
 	echo CC $<
 	$(CC) $(KCFLAGS) $(CFLAGS) -c -o $@ $<

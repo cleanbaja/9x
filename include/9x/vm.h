@@ -24,11 +24,15 @@ vm_init(struct stivale2_struct_tag_memmap* mm_tag);
   })
 #define VM_PAGE_SIZE 4096
 
+// Physical allocation flags
+#define VM_ALLOC_ZERO  (1 << 10)
+#define VM_ALLOC_HUGE  (1 << 11)
+
 // The actual functions
 void
 vm_init_phys(struct stivale2_struct_tag_memmap* mmap);
 void*
-vm_phys_alloc(uint64_t pages);
+vm_phys_alloc(uint64_t pages, int flags);
 void
 vm_phys_free(void* start, uint64_t pages);
 

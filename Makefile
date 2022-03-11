@@ -22,13 +22,25 @@ else
 CFLAGS += -O0 -g 
 endif
 
+.PHONY: all
+all: $(BUILD_ROOT)/9x.elf
+
+# Kernel version stuff
+VMAJOR := 0
+VMINOR := 3
+VPATCH := 4
+GIT_VERSION := $(shell git rev-parse --short HEAD)
+
 # Building the kernel/libs ========================================================== 
 
 include src/build.mk
 include third_party/lai/build.mk
 
-# Build the kernel by default
-all: $(BUILD_ROOT)/src/9x.elf
+# Building the initrd ================================================================
+
+$(BUILD_ROOT)/initrd.img: $(BUILD_ROOT)/9x.elf
+	./tools/mkinitrd.py
+	mv initrd.img $(BUILD_ROOT)/initrd.img
 
 # ISO Generating/Building ============================================================ 
 
@@ -38,11 +50,12 @@ $(BUILD_ROOT)/limine:
 $(BUILD_ROOT)/limine/limine-install: $(BUILD_ROOT)/limine
 	make -C $(BUILD_ROOT)/limine
 
-$(BUILD_ROOT)/test_image.iso: $(BUILD_ROOT)/src/9x.elf $(BUILD_ROOT)/limine/limine-install
+$(BUILD_ROOT)/test_image.iso: $(BUILD_ROOT)/initrd.img $(BUILD_ROOT)/limine/limine-install
 	mkdir -p $(BUILD_ROOT)/isoroot/boot/kernel
 	cp $(BUILD_ROOT)/limine/limine-cd.bin $(BUILD_ROOT)/limine/limine-eltorito-efi.bin $(BUILD_ROOT)/isoroot/boot
-	cp $(BUILD_ROOT)/limine/limine.sys share/limine.cfg $(BUILD_ROOT)/isoroot/boot
-	cp $(BUILD_ROOT)/src/9x.elf $(BUILD_ROOT)/isoroot/boot/kernel
+	cp $(BUILD_ROOT)/limine/limine.sys misc/limine.cfg $(BUILD_ROOT)/isoroot/boot
+	cp $(BUILD_ROOT)/9x.elf $(BUILD_ROOT)/isoroot/boot/kernel
+	cp $(BUILD_ROOT)/initrd.img $(BUILD_ROOT)/isoroot/boot/initrd.img
 	xorriso -as mkisofs -b boot/limine-cd.bin \
 		-no-emul-boot -boot-load-size 4 -boot-info-table \
 		--efi-boot boot/limine-eltorito-efi.bin \
@@ -58,7 +71,7 @@ iso: $(BUILD_ROOT)/test_image.iso
 .PHONY: run clean install
 run: $(BUILD_ROOT)/test_image.iso
 	printf "\n"
-	qemu-system-x86_64 -smp 2 -vnc :0 -cpu max -cdrom $(BUILD_ROOT)/test_image.iso -m 2G -M q35 -debugcon stdio
+	qemu-system-x86_64 -smp 8 -vnc :0 -cpu max -cdrom $(BUILD_ROOT)/test_image.iso -m 2G -M q35 -debugcon stdio
 
 clean:
 	rm -rf $(BUILD_ROOT)
@@ -66,5 +79,6 @@ clean:
 install:
 	mkdir -p $(DESTDIR)/kernel/
 	cp $(BUILD_ROOT)/src/9x.elf $(DESTDIR)/kernel/9x.elf
-	cp share/limine.cfg $(DESTDIR)/limine.cfg
+	cp misc/limine.cfg $(DESTDIR)/limine.cfg
+	cp $(BUILD_ROOT)/initrd.img $(DESTDIR)/initrd.img
 

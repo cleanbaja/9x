@@ -26,39 +26,36 @@ ipi_halt(cpu_ctx_t* c, void* arg)
   }
 }
 
-static void generate_percpu(struct stivale2_smp_info* rinfo) {
-  // Create cpu_local data structure
+static percpu_t* generate_percpu(struct stivale2_smp_info* rinfo) {
+  // Create cpu_local data structure and fill in the basic parts
   percpu_t* my_percpu     = (percpu_t*)kmalloc(sizeof(percpu_t));
   my_percpu->cpu_num      = rinfo->processor_id;
   my_percpu->lapic_id     = rinfo->lapic_id;
   my_percpu->kernel_stack = rinfo->target_stack;
   my_percpu->cur_space    = &kernel_space;
+
+  // Fill in the TSS
   my_percpu->tss.rsp0 = my_percpu->kernel_stack;
   my_percpu->tss.ist1 =
-    (uintptr_t)vm_phys_alloc(2) + VM_PAGE_SIZE + VM_MEM_OFFSET;
+    (uintptr_t)vm_phys_alloc(2, VM_ALLOC_ZERO) + VM_PAGE_SIZE + VM_MEM_OFFSET;
   my_percpu->tss.ist2 =
-    (uintptr_t)vm_phys_alloc(2) + VM_PAGE_SIZE + VM_MEM_OFFSET;
+    (uintptr_t)vm_phys_alloc(2, VM_ALLOC_ZERO) + VM_PAGE_SIZE + VM_MEM_OFFSET;
   my_percpu->tss.ist3 =
-    (uintptr_t)vm_phys_alloc(2) + VM_PAGE_SIZE + VM_MEM_OFFSET;
+    (uintptr_t)vm_phys_alloc(2, VM_ALLOC_ZERO) + VM_PAGE_SIZE + VM_MEM_OFFSET;
   my_percpu->tss.ist4 =
-    (uintptr_t)vm_phys_alloc(2) + VM_PAGE_SIZE + VM_MEM_OFFSET;
+    (uintptr_t)vm_phys_alloc(2, VM_ALLOC_ZERO) + VM_PAGE_SIZE + VM_MEM_OFFSET;
 
-  // Store it, along with the TSS
-  WRITE_PERCPU(my_percpu);
-  load_tss((uintptr_t)&my_percpu->tss);
-
-  // Save it to the list, so we can get to it later...
-  vec_push(&cpu_locals, my_percpu);
+  return my_percpu;
 }
 
 static void setup_cpu_features() {
-  if (per_cpu(cpu_num) != 0)
+  if (cpunum() != 0)
     goto enable;
-
+   
   uint32_t eax, ebx, ecx, edx;
   cpuid_subleaf(1, 0x0, &eax, &ebx, &ecx, &edx);
-
-  // MONITOR/MWAIT and TSC Deadline
+  
+  // MONITOR/MWAIT and TSC Deadline  
   if (ecx & CPUID_ECX_MONITOR) {
     cpu_features |= CPU_FEAT_MWAIT;
   }
@@ -85,15 +82,17 @@ enable:
 }
 
 static void ap_entry(struct stivale2_smp_info* info) {
+  info = (void*)((uintptr_t)info + VM_MEM_OFFSET);
   spinlock_acquire(&smp_lock);
 
   // Initialize basic CPU features
   reload_tables();
   percpu_init_vm();
 
-  // Setup percpu stuff
-  generate_percpu((void*)((uintptr_t)info + VM_MEM_OFFSET));
-
+  // Save and activate percpu stuff
+  WRITE_PERCPU(cpu_locals.data[info->processor_id], info->processor_id);
+  load_tss((uintptr_t)&per_cpu(tss));
+  
   // Enable the rest of the CPU features...
   setup_cpu_features();
   activate_apic();
@@ -104,18 +103,34 @@ static void ap_entry(struct stivale2_smp_info* info) {
   ATOMIC_INC(&active_cpus);
   __asm__ volatile("xor %rbp, %rbp; sti");
 
-  // Wait until scheduler is ready
-  for (;;) {
-    __asm__ volatile("sti; pause");
-  }
+  // Take a nap while the kernel does its thing...
+  for(;;) { __asm__ volatile ("pause"); }
 }
 
 void cpu_init(struct stivale2_struct_tag_smp *smp_tag) {
+  // Check for RDTSCP first, since percpu depends on this instruction
+  // NOTE: this feature is not marked when present, since its implied 
+  // that the computer supports this instruction
+  uint32_t eax, ebx, ecx, edx;
+  cpuid_subleaf(0x80000001, 0x0, &eax, &ebx, &ecx, &edx);
+  if (!(edx & (1 << 27))) {
+    raw_log("\nFATAL: CPUs don't support the 'rdtscp` instruction, which is required for boot!\n");
+    __asm__ volatile ("cli; hlt");
+  }
+
+
   // Set the handler for Halt IPIs
   struct irq_handler h = { .should_return = false,
                            .is_irq = true,
                            .hnd = ipi_halt };
   register_irq_handler(IPI_HALT, h);
+
+
+  // Generate CPU locals for every core
+  for (int i = 0; i < smp_tag->cpu_count; i++) {
+    percpu_t* pcp = generate_percpu(&smp_tag->smp_info[i]);
+    vec_insert(&cpu_locals, i, pcp);
+  } 
 
   // Init the BSP
   for (int i = 0; i < smp_tag->cpu_count; i++) {
@@ -123,10 +138,13 @@ void cpu_init(struct stivale2_struct_tag_smp *smp_tag) {
     if (sp->lapic_id != smp_tag->bsp_lapic_id) {
       continue;
     }
+   
+    // Load the newly created CPU local data
+    WRITE_PERCPU(cpu_locals.data[0], 0);
+    load_tss((uintptr_t)&per_cpu(tss));
 
     // For the BSP, all we have to do is setup the cpu_local 
     // data, along with the Timer/APIC and features
-    generate_percpu(sp);
     setup_cpu_features();
     activate_apic();
     timer_init();
@@ -139,7 +157,7 @@ void cpu_init(struct stivale2_struct_tag_smp *smp_tag) {
       continue;
     }
 
-    sp->target_stack = ((uint64_t)vm_phys_alloc(2) + VM_MEM_OFFSET);
+    sp->target_stack = ((uint64_t)vm_phys_alloc(2, VM_ALLOC_ZERO) + VM_MEM_OFFSET);
     ATOMIC_WRITE((uint64_t*)&sp->goto_address, ap_entry);
   }
 

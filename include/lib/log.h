@@ -29,6 +29,8 @@ void
 strace_unwind();
 void
 strace_load(uint64_t ptr);
+uintptr_t
+strace_get_symbol(char* name);
 
 extern int in_panic;
 

@@ -18,5 +18,7 @@ memmove(void *dest, const void *src, size_t n);
 
 int
 strlen(const char* str);
+int
+strcmp(const char* s1, const char* s2);
 
 #endif // LIB_BUILTIN_H

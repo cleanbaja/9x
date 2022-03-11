@@ -82,7 +82,7 @@ vm_init_phys(struct stivale2_struct_tag_memmap* mmap)
   }
 
   // Activate the page frame allocator by making a quick allocation
-  void* warmup_ptr = vm_phys_alloc(20);
+  void* warmup_ptr = vm_phys_alloc(10, 0);
   vm_phys_free(warmup_ptr, 10);
 }
 
@@ -109,8 +109,9 @@ inner_alloc(size_t count, size_t limit)
 }
 
 void*
-vm_phys_alloc(size_t pages)
+vm_phys_alloc(size_t pages, int flags)
 {
+  (void)flags;
   spinlock_acquire(&pmm_lock);
 
   size_t l = last_index;

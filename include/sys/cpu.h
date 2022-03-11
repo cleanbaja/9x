@@ -30,10 +30,22 @@ void calibrate_tsc();
 typedef vec_t(percpu_t*) vec_percpu_t;
 extern vec_percpu_t cpu_locals;
 
+// A quick way to get the current CPUs number
+static inline uint32_t __get_cpunum() {
+  uint32_t ret;
+  asm volatile ("rdtscp" : "=c" (ret) :: "rax", "rdx");
+  return ret;
+}
+
 // Functions for reading/writing kernel GS
-#define READ_PERCPU(ptr) (percpu_t*)asm_rdmsr(0xC0000102)
-#define WRITE_PERCPU(ptr) asm_wrmsr(0xC0000102, (uint64_t)ptr)
+#define READ_PERCPU(ptr) (percpu_t*)asm_rdmsr(0xc0000102)
+// #define READ_PERCPU(ptr) (cpu_locals.data[__get_cpunum()])
+#define WRITE_PERCPU(ptr, id) ({               \
+	asm_wrmsr(0xC0000102, (uint64_t)ptr);  \
+	asm_wrmsr(0xC0000103, id);             \
+})
 #define per_cpu(k) ((READ_PERCPU())->k)
+#define cpunum() __get_cpunum()
 
 #endif // SYS_CPU_H
 

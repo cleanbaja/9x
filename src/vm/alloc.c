@@ -132,7 +132,7 @@ liballoc_unlock()
 void*
 liballoc_alloc(size_t pages)
 {
-  return (void*)((uintptr_t)vm_phys_alloc(pages) + VM_MEM_OFFSET);
+  return (void*)((uintptr_t)vm_phys_alloc(pages, VM_ALLOC_ZERO) + VM_MEM_OFFSET);
 }
 
 int
