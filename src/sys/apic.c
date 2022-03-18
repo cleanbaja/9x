@@ -1,11 +1,12 @@
 #include <9x/acpi.h>
-#include <9x/vm.h>
 #include <internal/asm.h>
 #include <internal/cpuid.h>
 #include <lib/log.h>
 #include <sys/apic.h>
 #include <sys/tables.h>
 #include <sys/timer.h>
+#include <vm/virt.h>
+#include <vm/vm.h>
 
 #define LAPIC_SPURIOUS 0x0f0
 #define LAPIC_ICR0     0x300
@@ -78,7 +79,7 @@ calibrate_apic()
   apic_write(LAPIC_TIMER_INIT, 0);
   apic_write(LAPIC_TIMER_LVT, (1 << 16));
 
-  if (per_cpu(cpu_num) == 0)
+  if (cpunum() == 0)
     log("sys/apic: Timer Frequency is %u MHz", per_cpu(lapic_freq) / 10ull);
 }
 

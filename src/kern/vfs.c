@@ -1,7 +1,7 @@
 #include <9x/vfs.h>
-#include <9x/vm.h>
 #include <lib/builtin.h>
 #include <lib/log.h>
+#include <vm/vm.h>
 
 struct vfs_node* root_node = NULL;
 vec_t(struct filesystem*) fs_list;

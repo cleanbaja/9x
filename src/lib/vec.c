@@ -1,13 +1,13 @@
-/** 
+/**
  * Copyright (c) 2014 rxi
  *
- * This library is kfree software; you can redistribute it and/or modify it
+ * This library is free software; you can redistribute it and/or modify it
  * under the terms of the MIT license. See LICENSE for details.
  */
 
-#include <9x/vm.h>
 #include <lib/builtin.h>
 #include <lib/vec.h>
+#include <vm/vm.h>
 
 int vec_expand_(char **data, int *length, int *capacity, int memsz) {
   if (*length + 1 > *capacity) {

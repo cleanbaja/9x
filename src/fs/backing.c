@@ -1,4 +1,5 @@
 #include <fs/backing.h>
+#include <vm/vm.h>
 
 ssize_t
 default_read(struct backing* b, void* buf, off_t loc, size_t count)

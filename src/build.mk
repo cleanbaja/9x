@@ -15,10 +15,11 @@ KERNEL_SOURCES = kern/init.c      \
 		 lib/ubsan.c      \
 		 lib/cmdline.c    \
 		 vm/vm.c          \
-		 vm/virt.c        \
-		 vm/phys.c        \
+		 vm/virt/virt.c   \
+		 vm/virt/invl.c   \
+		 vm/phys/phys.c   \
+		 vm/phys/zone.c   \
 		 vm/alloc.c       \
-		 vm/cache.c       \
 		 fs/tmpfs.c       \
 		 fs/backing.c     \
 		 fs/initramfs.c 

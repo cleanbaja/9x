@@ -1,11 +1,12 @@
-#include <9x/vm.h>
 #include <internal/cpuid.h>
 #include <lib/lock.h>
 #include <lib/log.h>
 #include <sys/apic.h>
 #include <sys/cpu.h>
-#include <sys/timer.h>
 #include <sys/tables.h>
+#include <sys/timer.h>
+#include <vm/phys.h>
+#include <vm/vm.h>
 
 uint64_t cpu_features = 0; 
 vec_percpu_t cpu_locals;

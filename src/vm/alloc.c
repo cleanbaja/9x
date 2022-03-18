@@ -1,6 +1,7 @@
-#include <9x/vm.h>
 #include <lib/lock.h>
 #include <lib/log.h>
+#include <vm/phys.h>
+#include <vm/vm.h>
 
 /*
  *  Page-based allocator ported to 9x

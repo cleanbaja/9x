@@ -5,13 +5,14 @@
 #include <lib/log.h>
 #include <sys/apic.h>
 #include <sys/timer.h>
+#include <vm/vm.h>
 
 static void* hpet_base;
 static uint64_t hpet_period;
 static CREATE_SPINLOCK(timer_lock);
 
 #define FEMTO_PER_MS     (1000000000000)
-#define TSC_CALI_CYCLES  5
+#define TSC_CALI_CYCLES 2
 
 static uint64_t hpet_read(uint16_t offset)
 {
@@ -23,22 +24,31 @@ static void hpet_write(uint16_t offset, uint64_t val)
     *((volatile uint64_t*)(hpet_base + offset)) = val;
 }
 
-void calibrate_tsc() {
-  // Disable the CPU capability before testing...
-  cpu_features &= ~(CPU_FEAT_INVARIANT);
+static void
+hpet_sleep(uint64_t ms)
+{
+  uint64_t goal =
+    hpet_read(HPET_MAIN_COUNTER_REG) + (ms * (FEMTO_PER_MS / hpet_period));
 
+  while (hpet_read(HPET_MAIN_COUNTER_REG) < goal)
+    __asm__ volatile("pause");
+}
+
+void
+calibrate_tsc()
+{
   // Determine the TSC frequency
   for (int i = 0; i < TSC_CALI_CYCLES; i++) {
     uint64_t start_reading = asm_rdtsc();
-    timer_sleep(10);
-    uint64_t delta = (asm_rdtsc() - start_reading) / 10;
+    hpet_sleep(10);
+    uint64_t final_reading = asm_rdtsc();
 
-    per_cpu(tsc_freq) += delta;
-   } 
+    per_cpu(tsc_freq) += ((final_reading - start_reading) / 10);
+  }
 
    // Average out readings
    per_cpu(tsc_freq) /= TSC_CALI_CYCLES;
-   if (per_cpu(cpu_num) == 0) {
+   if (cpunum() == 0) {
      uint64_t n = per_cpu(tsc_freq) / 1000;
      int d4 = (n % 10);
      int d3 = (n / 10) % 10;
@@ -51,14 +61,11 @@ void calibrate_tsc() {
          d4);
      timer_sleep(5000);
    }
-
-   // Return the CPU capability
-   cpu_features |= CPU_FEAT_INVARIANT;
 }
 
 void timer_init() {
   // First, check if we're the BSP, or APs
-  if (!(per_cpu(cpu_num) == 0))
+  if (!(cpunum() == 0))
     goto common;
 
   // Find the HPET table

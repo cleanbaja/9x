@@ -3,7 +3,10 @@
 #include <internal/stivale2.h>
 #include <lib/builtin.h>
 #include <lib/log.h>
-#include <9x/vm.h>
+
+#include <vm/phys.h>
+#include <vm/virt.h>
+#include <vm/vm.h>
 
 uint64_t mmu_features = 0;
 vm_space_t kernel_space;
@@ -128,7 +131,8 @@ flags_to_pte(uintptr_t phys, int flags, bool huge_page)
 
     // TODO: Write Through
     default:
-      break; // Use the default memory type (Write Back), which is already optimized 
+      break; // Use the default memory type (Write Back), which is already
+             // optimized
   }
 
   return raw_page | phys | (1 << 0); // Present plus address
@@ -228,8 +232,9 @@ vm_load_space(vm_space_t* spc)
     if (spc->pcid >= 4096) {
       PANIC(NULL, "PCID Overflow detected!\n");
     } else {
-      cr3_val |= spc->pcid;             // Set the PCID
-      cr3_val &= ~((uint64_t)1 << 63);  // Clear bit 63, to prevent flushing of TLB
+      cr3_val |= spc->pcid; // Set the PCID
+      cr3_val &=
+        ~((uint64_t)1 << 63); // Clear bit 63, to prevent flushing of TLB
     }
   }
 
@@ -257,7 +262,7 @@ percpu_init_vm()
   asm_wrmsr(0x277, 0x105040600070406);
 
   // Clear the entire CPU tlb
-  __asm__ volatile ("wbinvd" ::: "memory");
+  __asm__ volatile("wbinvd" ::: "memory");
 }
 
 void
@@ -277,7 +282,7 @@ vm_init_virt()
            MMU_CHECK(MM_FEAT_PCID) ? "PCID" : "-PCID",
            MMU_CHECK(MM_FEAT_1GB) ? "1GB" : "-1GB");
   log(buf);
-  
+
   // Setup the kernel pagemap
   kernel_space.pcid = 1;
   kernel_space.active = false;
@@ -285,31 +290,44 @@ vm_init_virt()
 
   // Map some memory...
   for (uintptr_t p = 0; p < 0x100000000; p += 4096) {
-      vm_virt_map(&kernel_space, p, VM_MEM_OFFSET + p, VM_PERM_READ | VM_PERM_WRITE);
+    vm_virt_map(
+      &kernel_space, p, VM_MEM_OFFSET + p, VM_PERM_READ | VM_PERM_WRITE);
   }
   for (uintptr_t p = 0; p < 0x80000000; p += 4096) {
-      vm_virt_map(&kernel_space, p, VM_KERN_OFFSET + p, VM_PERM_READ | VM_PERM_WRITE | VM_PERM_EXEC);
+    vm_virt_map(&kernel_space,
+                p,
+                VM_KERN_OFFSET + p,
+                VM_PERM_READ | VM_PERM_WRITE | VM_PERM_EXEC);
   }
 
   // Map all memory ranges...
-  struct stivale2_struct_tag_memmap *memmap_tag = stivale2_find_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID);
+  struct stivale2_struct_tag_memmap* memmap_tag =
+    stivale2_find_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID);
   for (size_t i = 0; i < memmap_tag->entries; i++) {
-      for (uintptr_t p = memmap_tag->memmap[i].base; p < memmap_tag->memmap[i].length; p += 4096)
-          vm_virt_map(&kernel_space, p, VM_MEM_OFFSET + p, VM_PERM_READ | VM_PERM_WRITE);
+    for (uintptr_t p = memmap_tag->memmap[i].base;
+         p < memmap_tag->memmap[i].length;
+         p += 4096)
+      vm_virt_map(
+        &kernel_space, p, VM_MEM_OFFSET + p, VM_PERM_READ | VM_PERM_WRITE);
   }
- 
-  // Remap the frambuffer as write combining for improved 
+
+  // Remap the frambuffer as write combining for improved
   // speed and unmap the first page (to catch bugs)
-  struct stivale2_struct_tag_framebuffer* d = 
-	  (struct stivale2_struct_tag_framebuffer*)stivale2_find_tag(STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
+  struct stivale2_struct_tag_framebuffer* d =
+    (struct stivale2_struct_tag_framebuffer*)stivale2_find_tag(
+      STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
   uintptr_t real_base = (uintptr_t)d->framebuffer_addr - VM_MEM_OFFSET;
- 
-  for (uintptr_t p = real_base; p < (real_base + (d->framebuffer_width * d->framebuffer_height)); p += 4096) {
-    vm_virt_map(&kernel_space, p, p + VM_MEM_OFFSET, VM_PERM_READ | VM_PERM_WRITE | VM_CACHE_FLAG_WRITE_COMBINING); 
+
+  for (uintptr_t p = real_base;
+       p < (real_base + (d->framebuffer_width * d->framebuffer_height));
+       p += 4096) {
+    vm_virt_map(&kernel_space,
+                p,
+                p + VM_MEM_OFFSET,
+                VM_PERM_READ | VM_PERM_WRITE | VM_CACHE_FLAG_WRITE_COMBINING);
   }
   vm_virt_unmap(&kernel_space, VM_MEM_OFFSET);
-  
+
   // Finally, finish bootstraping the VM
   percpu_init_vm();
 }
-

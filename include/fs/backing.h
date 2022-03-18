@@ -3,6 +3,7 @@
 
 #include <internal/posix.h>
 #include <lib/lock.h>
+#include <stddef.h>
 
 struct backing
 {

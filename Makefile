@@ -78,7 +78,7 @@ clean:
 
 install:
 	mkdir -p $(DESTDIR)/kernel/
-	cp $(BUILD_ROOT)/src/9x.elf $(DESTDIR)/kernel/9x.elf
+	cp $(BUILD_ROOT)/9x.elf $(DESTDIR)/kernel/9x.elf
 	cp misc/limine.cfg $(DESTDIR)/limine.cfg
 	cp $(BUILD_ROOT)/initrd.img $(DESTDIR)/initrd.img
 

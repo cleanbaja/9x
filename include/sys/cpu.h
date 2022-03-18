@@ -1,11 +1,11 @@
 #ifndef SYS_CPU_H
 #define SYS_CPU_H
 
-#include <9x/vm.h>
 #include <internal/asm.h>
 #include <internal/stivale2.h>
 #include <lib/vec.h>
 #include <sys/tables.h>
+#include <vm/virt.h>
 
 // List of CPU features recognized by 9x
 #define CPU_FEAT_MWAIT     (1 << 0)
@@ -33,17 +33,18 @@ extern vec_percpu_t cpu_locals;
 // A quick way to get the current CPUs number
 static inline uint32_t __get_cpunum() {
   uint32_t ret;
-  asm volatile ("rdtscp" : "=c" (ret) :: "rax", "rdx");
+  asm volatile("mov %%gs:0, %0" : "=r"(ret));
   return ret;
 }
 
 // Functions for reading/writing kernel GS
-#define READ_PERCPU(ptr) (percpu_t*)asm_rdmsr(0xc0000102)
-// #define READ_PERCPU(ptr) (cpu_locals.data[__get_cpunum()])
-#define WRITE_PERCPU(ptr, id) ({               \
-	asm_wrmsr(0xC0000102, (uint64_t)ptr);  \
-	asm_wrmsr(0xC0000103, id);             \
-})
+#define READ_PERCPU(ptr) (cpu_locals.data[__get_cpunum()])
+#define WRITE_PERCPU(ptr, id)                                                  \
+  ({                                                                           \
+    asm_wrmsr(IA32_KERNEL_GS_BASE, (uint64_t)ptr);                             \
+    asm_wrmsr(IA32_TSC_AUX, id);                                               \
+    asm_swapgs();                                                              \
+  })
 #define per_cpu(k) ((READ_PERCPU())->k)
 #define cpunum() __get_cpunum()
 

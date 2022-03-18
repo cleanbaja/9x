@@ -1,8 +1,10 @@
-#include <internal/asm.h>
 #include <9x/acpi.h>
-#include <9x/vm.h>
-#include <lib/log.h>
+#include <internal/asm.h>
 #include <lai/core.h>
+#include <lib/log.h>
+#include <vm/phys.h>
+#include <vm/virt.h>
+#include <vm/vm.h>
 
 void *laihost_malloc(size_t size) {
     return kmalloc(size);

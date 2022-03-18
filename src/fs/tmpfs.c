@@ -1,7 +1,7 @@
 #include <9x/vfs.h>
-#include <9x/vm.h>
 #include <fs/backing.h>
 #include <lib/builtin.h>
+#include <vm/vm.h>
 
 struct tmpfs_backing
 {

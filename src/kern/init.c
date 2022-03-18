@@ -1,13 +1,14 @@
 #include <9x/acpi.h>
 #include <9x/vfs.h>
-#include <9x/vm.h>
+#include <lib/cmdline.h>
 #include <lib/console.h>
 #include <lib/log.h>
-#include <lib/cmdline.h>
 #include <sys/apic.h>
 #include <sys/cpu.h>
 #include <sys/tables.h>
 #include <sys/timer.h>
+#include <vm/phys.h>
+#include <vm/vm.h>
 
 #include "config.h"
 

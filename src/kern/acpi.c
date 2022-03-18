@@ -1,11 +1,12 @@
 #include <9x/acpi.h>
-#include <9x/vm.h>
-#include <lib/log.h>
 #include <lib/cmdline.h>
+#include <lib/log.h>
 #include <stdbool.h>
 #include <sys/apic.h>
 #include <sys/tables.h>
 #include <sys/timer.h>
+#include <vm/virt.h>
+#include <vm/vm.h>
 
 #include <lai/core.h>
 #include <lai/drivers/ec.h>

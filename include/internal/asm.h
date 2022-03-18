@@ -14,6 +14,7 @@
   })
 
 #define asm_invlpg(k) ({ __asm__ volatile("invlpg %0" ::"m"(k) : "memory"); })
+#define asm_swapgs() __asm__ volatile("swapgs" ::: "memory");
 
 #define INVL_ADDR 0
 #define INVL_PCID 1
@@ -62,6 +63,7 @@ ASM_MAKE_CRN(8)
 
 #define IA32_EFER 0xC0000080
 #define IA32_KERNEL_GS_BASE 0xC0000102
+#define IA32_TSC_AUX 0xC0000103
 
 static inline uint64_t
 asm_rdmsr(uint32_t msr)

@@ -1,8 +1,8 @@
 #include <9x/vfs.h>
-#include <9x/vm.h>
 #include <lib/builtin.h>
 #include <lib/cmdline.h>
 #include <lib/log.h>
+#include <vm/vm.h>
 
 struct ustar_header {
     char name[100];
