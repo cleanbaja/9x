@@ -62,6 +62,10 @@ vm_init(struct stivale2_struct_tag_memmap* mm_tag)
       vm_create_zone(entry.base, entry.length);
   }
 
+  // Check to make sure we have at least one possible zone we can use
+  if (head_zone == NULL)
+    PANIC(NULL, "No suitable memory zones!\n");
+
   // Then init the virtual memory subsystem
-  vm_init_virt();
+  vm_init_virt(mm_tag);
 }

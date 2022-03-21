@@ -4,17 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// CPU features that 9x is aware of, and utilizes (except for 1GB pages)
-#define MM_FEAT_NX 0x0
-#define MM_FEAT_GLOBL 0x1
-#define MM_FEAT_SMEP 0x2
-#define MM_FEAT_SMAP 0x3
-#define MM_FEAT_PCID 0x4
-#define MM_FEAT_1GB 0x5
-#define MMU_CHECK(k) (mmu_features & (1 << k))
-
-extern uint64_t mmu_features;
-
 // Flags passed to vm_virt_map()...
 typedef enum
 {
@@ -30,30 +19,32 @@ typedef enum
 
   // Cache flags
   VM_CACHE_MASK = (4 << 15),
-  VM_CACHE_FLAG_UNCACHED = (1 << 15),
-  VM_CACHE_FLAG_WRITE_COMBINING = (2 << 15),
-  VM_CACHE_FLAG_WRITE_PROTECT = (3 << 15),
+  VM_CACHE_UNCACHED = (1 << 15),
+  VM_CACHE_WRITE_COMBINING = (2 << 15),
+  VM_CACHE_WRITE_PROTECT = (3 << 15),
 } vm_flags_t;
 
 // Repersents a virtual memory space, in which pages and objects are mapped
 typedef struct
 {
-  uint64_t pml4;
+  uint64_t root;
   uint16_t pcid;
   bool active;
 } vm_space_t;
 
-// Functions for manipulating a address space
+// Functions for messing with the lower level PTE structures...
 void
 vm_virt_map(vm_space_t* spc, uintptr_t phys, uintptr_t virt, int flags);
 void
 vm_virt_unmap(vm_space_t* spc, uintptr_t virt);
+void
+vm_virt_fragment(vm_space_t* spc, uintptr_t virt, int flags);
 uint64_t*
 virt2pte(vm_space_t* spc, uintptr_t virt);
 
 // Misc virt functions...
 void
-vm_init_virt();
+vm_init_virt(struct stivale2_struct_tag_memmap* mmap);
 void
 vm_invl(vm_space_t* spc, uintptr_t addr);
 void

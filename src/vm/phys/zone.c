@@ -38,6 +38,7 @@ vm_create_zone(uintptr_t base, uint64_t len)
 
   // Create the zone and bitmap, then realign the base
   struct vm_zone* zone = (struct vm_zone*)(aligned_base + VM_MEM_OFFSET);
+  memset(zone, 0, sizeof(struct vm_zone));
   aligned_base += sizeof(struct vm_zone);
   zone->bitmap = (uint8_t*)(aligned_base + VM_MEM_OFFSET);
   aligned_base += bitmap_size;

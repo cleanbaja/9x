@@ -166,11 +166,11 @@ activate_apic()
 
   if (!use_x2apic && apic_msr & (1 << 8)) {
     xapic_base = asm_rdmsr(IA32_APIC) & 0xfffff000;
-    vm_virt_unmap(&kernel_space, xapic_base + VM_MEM_OFFSET);
+    vm_virt_fragment(&kernel_space, xapic_base + VM_MEM_OFFSET, VM_PERM_READ | VM_PERM_WRITE);
     vm_virt_map(&kernel_space,
                 xapic_base,
                 xapic_base + VM_MEM_OFFSET,
-                VM_PERM_READ | VM_PERM_WRITE | VM_CACHE_FLAG_UNCACHED);
+                VM_PERM_READ | VM_PERM_WRITE | VM_CACHE_UNCACHED);
   }
 
   // Commence the reciving of interrupts...

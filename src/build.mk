@@ -7,6 +7,7 @@ KERNEL_SOURCES = kern/init.c      \
 		 sys/irq.c        \
 		 sys/apic.c       \
 		 sys/timer.c      \
+		 sys/hat.c        \
 		 lib/builtin.c    \
 		 lib/console.c    \
 		 lib/strace.c     \

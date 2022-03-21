@@ -8,10 +8,13 @@
 #include <vm/virt.h>
 
 // List of CPU features recognized by 9x
-#define CPU_FEAT_MWAIT     (1 << 0)
-#define CPU_FEAT_FSGSBASE  (1 << 1)
-#define CPU_FEAT_INVARIANT (1 << 2)
-#define CPU_FEAT_DEADLINE  (1 << 3)
+#define CPU_FEAT_FSGSBASE  (1 << 0)
+#define CPU_FEAT_INVARIANT (1 << 1)
+#define CPU_FEAT_DEADLINE  (1 << 2)
+#define CPU_FEAT_PCID      (1 << 3)
+#define CPU_FEAT_INVPCID   (1 << 4)
+#define CPU_FEAT_SMAP      (1 << 5)
+#define CPU_FEAT_TCE       (1 << 6)
 #define CPU_CHECK(k) (cpu_features & k)
 extern uint64_t cpu_features;
 
@@ -26,9 +29,10 @@ typedef struct {
 
 // CPU related functions/decls
 void cpu_init(struct stivale2_struct_tag_smp *smp_tag);
+void cpu_early_init();
 void calibrate_tsc();
-typedef vec_t(percpu_t*) vec_percpu_t;
-extern vec_percpu_t cpu_locals;
+extern percpu_t** cpu_locals;
+extern int cpu_count;
 
 // A quick way to get the current CPUs number
 static inline uint32_t __get_cpunum() {
@@ -38,7 +42,7 @@ static inline uint32_t __get_cpunum() {
 }
 
 // Functions for reading/writing kernel GS
-#define READ_PERCPU(ptr) (cpu_locals.data[__get_cpunum()])
+#define READ_PERCPU(ptr) (cpu_locals[__get_cpunum()])
 #define WRITE_PERCPU(ptr, id)                                                  \
   ({                                                                           \
     asm_wrmsr(IA32_KERNEL_GS_BASE, (uint64_t)ptr);                             \

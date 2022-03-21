@@ -39,7 +39,7 @@ vm_phys_alloc(size_t pages, int flags)
     void* ptr = vm_zone_alloc(zn, pages, align);
     if (ptr != NULL) {
       if (flags & VM_ALLOC_ZERO)
-        memset64(ptr + VM_MEM_OFFSET, 0, VM_PAGE_SIZE * pages);
+        memset64((void*)((uintptr_t)ptr + VM_MEM_OFFSET), 0, pages * VM_PAGE_SIZE);
 
       return ptr;
     }

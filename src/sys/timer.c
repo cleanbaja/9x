@@ -75,7 +75,8 @@ void timer_init() {
 
   // Map the HPET into memory
   hpet_base = (void*)((uintptr_t)hp->base.base + VM_MEM_OFFSET);
-  vm_virt_map(per_cpu(cur_space), hp->base.base, (uintptr_t)hpet_base, VM_PERM_READ | VM_PERM_WRITE | VM_CACHE_FLAG_UNCACHED);
+  vm_virt_fragment(per_cpu(cur_space), hpet_base, VM_PERM_READ | VM_PERM_WRITE);
+  vm_virt_map(per_cpu(cur_space), hp->base.base, (uintptr_t)hpet_base, VM_PERM_READ | VM_PERM_WRITE | VM_CACHE_UNCACHED);
   
   // Set the period, clear the main counter, and enable the HPET
   hpet_period = (hpet_read(HPET_CAP_REG) >> 32);

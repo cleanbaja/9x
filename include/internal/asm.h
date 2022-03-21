@@ -14,25 +14,7 @@
   })
 
 #define asm_invlpg(k) ({ __asm__ volatile("invlpg %0" ::"m"(k) : "memory"); })
-#define asm_swapgs() __asm__ volatile("swapgs" ::: "memory");
-
-#define INVL_ADDR 0
-#define INVL_PCID 1
-
-static inline void
-asm_invpcid(uint64_t mode, int pcid, uintptr_t addr)
-{
-  struct
-  {
-    uint64_t pcid;
-    uintptr_t address;
-  } invl_des;
-
-  invl_des.pcid = pcid;
-  invl_des.address = addr;
-
-  __asm__ volatile("invpcid %1, %0" : : "r"(mode), "m"(invl_des) : "memory");
-}
+#define asm_swapgs()  ({__asm__ volatile("swapgs" ::: "memory");})
 
 // GDT/IDT asm routines
 extern void* asm_dispatch_table[256];
@@ -99,16 +81,11 @@ asm_wrmsr(uint32_t msr, uint64_t val)
     : "eax", "ecx", "edx");
 }
 
-// Locking asm functions...
 
-// Uses 'pause' between checks (better for locks held shorter)
+// Old asm spinlock impl that uses 'pause' to wait
 extern void
 asm_spinlock_acquire(
   volatile int* lock);
-
-// Uses 'monitor/mwait' between checks (better for locks held longer)
-extern void
-asm_sleeplock_acquire(volatile int* lock);
 
 // Reading of the TSC
 static inline uint64_t asm_rdtsc() {
@@ -117,7 +94,6 @@ static inline uint64_t asm_rdtsc() {
                   : "=a" (eax), "=d" (edx));
     return ((uint64_t)edx << 32) | eax;
 }
-
 
 // ASM Port I/O
 static inline uint8_t asm_inb(uint16_t port) {

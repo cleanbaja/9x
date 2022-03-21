@@ -34,12 +34,17 @@ static struct stivale2_header_tag_framebuffer fbuf_tag = {
   .framebuffer_bpp = 0
 };
 
+static struct stivale2_tag five_lv_tag = {
+  .identifier = STIVALE2_HEADER_TAG_5LV_PAGING_ID,
+  .next = (uintptr_t)&fbuf_tag,
+};
+
 __attribute__((section(".stivale2hdr"),
                used)) static struct stivale2_header hdr = {
   .entry_point = 0,
   .stack = (uintptr_t)_kstack + sizeof(_kstack),
   .flags = (1 << 1) | (1 << 4),
-  .tags = (uintptr_t)&fbuf_tag,
+  .tags = (uintptr_t)&five_lv_tag,
 };
 
 static struct stivale2_struct* bootags;
@@ -65,11 +70,9 @@ stivale2_find_tag(uint64_t id)
 static void
 early_init()
 {
-  // Zero out the CPU-local storage (so PANIC dosen't get confused)
-  WRITE_PERCPU(NULL, 0);
-
   // Get arch-specific structures up
   init_tables();
+  cpu_early_init();
 
   // Start the console and say hello!
   console_init();
@@ -78,6 +81,9 @@ early_init()
   log("Bootloader: %s (%s)",
       bootags->bootloader_brand,
       bootags->bootloader_version);
+  
+  // Zero out the CPU-local storage (so PANIC dosen't get confused)
+  WRITE_PERCPU(NULL, 0);
 
   // Finally, load the kernel command line
   struct stivale2_struct_tag_cmdline* cmdline_tag = (struct stivale2_struct_tag_cmdline*)stivale2_find_tag(STIVALE2_STRUCT_TAG_CMDLINE_ID);

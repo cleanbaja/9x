@@ -30,6 +30,7 @@
 #define CPUID_ECX_AES (1U << 25U)
 #define CPUID_ECX_XSAVE (1U << 26U)
 #define CPUID_ECX_OSXSAVE (1U << 27U)
+#define CPUID_ECX_TCE     (1U << 17U)
 #define CPUID_ECX_AVX (1U << 28U)
 #define CPUID_ECX_HV (1U << 31U)
 #define CPUID_EDX_FPU (1U << 0U)

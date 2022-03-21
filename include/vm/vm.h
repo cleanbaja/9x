@@ -5,9 +5,10 @@
 #include <stddef.h>
 
 // Hard-coded kernel virtual/physical memory constants
-#define VM_MEM_OFFSET 0xffff800000000000
 #define VM_KERN_OFFSET 0xffffffff80000000
 #define VM_PAGE_SIZE 0x1000
+extern uintptr_t kernel_vma;
+#define VM_MEM_OFFSET kernel_vma
 
 // Bootstraps the entire VM, including allocators and Virtual Memory
 void

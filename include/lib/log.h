@@ -43,8 +43,7 @@ extern int in_panic;
     } else {                                                                   \
       in_panic = 1;                                                            \
     }                                                                          \
-    raw_log("\nKERNEL PANIC on CPU #%d\n",                                     \
-            (READ_PERCPU() == NULL) ? 0 : per_cpu(cpu_num));                   \
+    raw_log("\nKERNEL PANIC on CPU #%d\n", cpunum());                          \
     if (m) {                                                                   \
       raw_log(m, ##__VA_ARGS__);                                               \
     }                                                                          \
