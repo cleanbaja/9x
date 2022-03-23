@@ -7,7 +7,6 @@
 // in the kernel. Its responsible for the lower-level paging and asid code, and should ONLY
 // be called by the VM...
 
-
 void hat_map_page(uintptr_t root, uintptr_t phys, uintptr_t virt, int flags);
 void hat_map_huge_page(uintptr_t root, uintptr_t phys, uintptr_t virt, int flags); // Map 2MB page, instead of the usual 4KB
 void hat_unmap_page(uintptr_t root, uintptr_t virt);

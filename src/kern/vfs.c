@@ -290,8 +290,6 @@ vfs_mount(struct vfs_node* parent, char* source, char* target, char* filesystem)
 void
 vfs_init(struct stivale2_struct_tag_modules* md)
 {
-  (void)md;
-
   // Create the root node
   root_node = create_node("/", NULL, NULL);
   create_dotentries(root_node, NULL);
@@ -300,9 +298,7 @@ vfs_init(struct stivale2_struct_tag_modules* md)
   vfs_register_fs(&tmpfs);
   vfs_mount(root_node, NULL, "/", "tmpfs");
 
-  // TODO: Actually mount the devfs
-  vfs_mkdir(root_node, "/dev", 0775);
-
   // Load the initramfs
   initramfs_load(md);
 }
+

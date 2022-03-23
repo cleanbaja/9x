@@ -1,10 +1,10 @@
 #include <9x/acpi.h>
 #include <lib/cmdline.h>
 #include <lib/log.h>
-#include <stdbool.h>
 #include <sys/apic.h>
 #include <sys/tables.h>
 #include <sys/timer.h>
+#include <vm/phys.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
 
@@ -54,6 +54,18 @@ acpi_query(const char* signature, int index)
 
   // log("acpi: \"%s\" not found", signature);
   return NULL;
+}
+
+
+static void map_table(uintptr_t phys) {
+  size_t    length = ((acpi_header_t*)(phys + VM_MEM_OFFSET))->length;
+  uintptr_t paddr  = phys & ~(VM_PAGE_SIZE - 1);
+  uint64_t  vsize  = (DIV_ROUNDUP(length, 0x1000) * 0x1000) + VM_PAGE_SIZE*2;
+
+  for(size_t pg = 0; pg < vsize; pg += VM_PAGE_SIZE) {
+    vm_virt_fragment(&kernel_space, paddr + pg + VM_MEM_OFFSET, VM_PERM_READ | VM_PERM_WRITE);
+    vm_virt_map(&kernel_space, paddr + pg, paddr + pg + VM_MEM_OFFSET, VM_PERM_READ | VM_CACHE_UNCACHED);
+  }
 }
 
 void madt_init() {
@@ -183,18 +195,14 @@ acpi_init(struct stivale2_struct_tag_rsdp* rk)
   size_t header_len = (xsdt_found) ? xsdt->header.length : rsdt->header.length;
   size_t entry_count =
     ((header_len - sizeof(acpi_header_t))) / ((xsdp->revision > 0) ? 8 : 4);
-  log(
-    "acpi: dumping %u entries... (revision: %u)", entry_count, xsdp->revision);
+  log("acpi: dumping %u entries... (revision: %u)", entry_count, xsdp->revision);
   log("    %-8s %-s %-6s  %-11s", "Signature", "Rev", "OEMID", "Address");
 
   for (size_t i = 0; i < entry_count; i++) {
     uint64_t table_addr =
       (xsdp->revision > 0) ? xsdt->tables[i] : rsdt->tables[i];
-    /*vm_virt_map(&kernel_space,
-                table_addr,
-                table_addr + VM_MEM_OFFSET,
-                VM_PERM_READ | VM_PERM_WRITE);*/
 
+    // TODO: Map ACPI tables (current func is broken)
     acpi_header_t* c = (acpi_header_t*)(table_addr + VM_MEM_OFFSET);
     log("    %-c%c%c%c %6d %3c%c%c%c%c%c  %#0lx",
         c->signature[0],
@@ -211,7 +219,7 @@ acpi_init(struct stivale2_struct_tag_rsdp* rk)
         (uint64_t)table_addr + VM_MEM_OFFSET);
   }
 
-  // Set ACPI Revision and parse the MADT
+  // Parse the MADT for IO-APIC information
   madt_init();
 
   // Enable ACPI (make it a choice, since some ACPI impls are buggy/unsupported upstream)

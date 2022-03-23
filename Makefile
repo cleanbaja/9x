@@ -27,8 +27,8 @@ all: $(BUILD_ROOT)/9x.elf
 
 # Kernel version stuff
 VMAJOR := 0
-VMINOR := 3
-VPATCH := 4
+VMINOR := 4
+VPATCH := 1
 GIT_VERSION := $(shell git rev-parse --short HEAD)
 
 # Building the kernel/libs ========================================================== 
@@ -71,7 +71,7 @@ iso: $(BUILD_ROOT)/test_image.iso
 .PHONY: run clean install
 run: $(BUILD_ROOT)/test_image.iso
 	printf "\n"
-	qemu-system-x86_64 -smp 8 -vnc :0 -cpu max -cdrom $(BUILD_ROOT)/test_image.iso -m 2G -M q35 -debugcon stdio
+	qemu-system-x86_64 -s -monitor telnet:localhost:4321,server,nowait -smp 11 -vnc :0 -cpu max,-la57 -cdrom $(BUILD_ROOT)/test_image.iso -m 2G -M q35 -debugcon stdio
 
 clean:
 	rm -rf $(BUILD_ROOT)

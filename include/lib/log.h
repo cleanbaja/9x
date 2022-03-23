@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 #include "lock.h"
-#include "sys/cpu.h"
+#include "proc/smp.h"
 #include "sys/irq.h"
 
 void
@@ -43,7 +43,7 @@ extern int in_panic;
     } else {                                                                   \
       in_panic = 1;                                                            \
     }                                                                          \
-    raw_log("\nKERNEL PANIC on CPU #%d\n", cpunum());                          \
+    /*raw_log("\nKERNEL PANIC on CPU #%d\n", cpunum());*/                      \
     if (m) {                                                                   \
       raw_log(m, ##__VA_ARGS__);                                               \
     }                                                                          \

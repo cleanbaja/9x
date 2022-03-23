@@ -9,7 +9,7 @@
 #define IA32_TSC_DEADLINE 0x6E0
 
 void
-activate_apic();
+apic_enable();
 void
 calibrate_apic();
 void
@@ -38,6 +38,6 @@ enum ipi_mode
 #define IPI_INVL_TLB 253
 
 void
-send_ipi(uint8_t vec, uint32_t cpu, enum ipi_mode mode);
+apic_send_ipi(uint8_t vec, uint32_t cpu, enum ipi_mode mode);
 
 #endif // SYS_APIC_H

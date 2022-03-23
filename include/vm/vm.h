@@ -4,9 +4,10 @@
 #include <internal/stivale2.h>
 #include <stddef.h>
 
-// Hard-coded kernel virtual/physical memory constants
+// Hard-coded kernel virtual/physical memory constants for x86_64
 #define VM_KERN_OFFSET 0xffffffff80000000
-#define VM_PAGE_SIZE 0x1000
+#define VM_ASID_MAX    4096
+#define VM_PAGE_SIZE   0x1000
 extern uintptr_t kernel_vma;
 #define VM_MEM_OFFSET kernel_vma
 

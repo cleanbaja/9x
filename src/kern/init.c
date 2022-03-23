@@ -4,11 +4,11 @@
 #include <lib/console.h>
 #include <lib/log.h>
 #include <sys/apic.h>
-#include <sys/cpu.h>
 #include <sys/tables.h>
 #include <sys/timer.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
+#include <proc/smp.h>
 
 #include "config.h"
 
@@ -17,7 +17,7 @@ static uint16_t _kstack[8192];
 // Adjusts the cpu_local of the BSP, since its invalid at first
 #define PERCPU_FIXUP()                                                         \
   ({                                                                           \
-    per_cpu(kernel_stack) = (uintptr_t)_kstack + VM_PAGE_SIZE;                 \
+    per_cpu(kernel_stack) = (uintptr_t)_kstack + VM_PAGE_SIZE*4;               \
     per_cpu(tss).rsp0 = per_cpu(kernel_stack);                                 \
   })
 
@@ -70,26 +70,21 @@ stivale2_find_tag(uint64_t id)
 static void
 early_init()
 {
+   // Start the console and say hello!
+  console_init();
+  log("9x (x86_64) (%s) - A project by cleanbaja", GIT_HASH);
+  log("Bootloader: %s [%s]",
+      bootags->bootloader_brand,
+      bootags->bootloader_version);
+
   // Get arch-specific structures up
   init_tables();
   cpu_early_init();
-
-  // Start the console and say hello!
-  console_init();
-  log("9x [v%d.%d.%d] - A project by Yusuf M (cleanbaja)",
-      VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
-  log("Bootloader: %s (%s)",
-      bootags->bootloader_brand,
-      bootags->bootloader_version);
-  
-  // Zero out the CPU-local storage (so PANIC dosen't get confused)
-  WRITE_PERCPU(NULL, 0);
 
   // Finally, load the kernel command line
   struct stivale2_struct_tag_cmdline* cmdline_tag = (struct stivale2_struct_tag_cmdline*)stivale2_find_tag(STIVALE2_STRUCT_TAG_CMDLINE_ID);
   cmdline_load((char*)(cmdline_tag->cmdline));
 }
-
 
 void
 kern_entry(struct stivale2_struct* bootinfo)
@@ -108,7 +103,7 @@ kern_entry(struct stivale2_struct* bootinfo)
   acpi_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_RSDP_ID));
 
   // Initialize other CPUs and fix the percpu structure
-  cpu_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_SMP_ID));
+  smp_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_SMP_ID));
   PERCPU_FIXUP();
 
   // Initialize the vfs and filesystems
@@ -116,7 +111,7 @@ kern_entry(struct stivale2_struct* bootinfo)
 
   // Chill for now...
   log("init: Startup complete, halting all cores!");
-  send_ipi(IPI_HALT, 0, IPI_OTHERS);
+  apic_send_ipi(IPI_HALT, 0, IPI_OTHERS);
 
   for (;;) {
     __asm__ volatile("sti; hlt");

@@ -15,10 +15,10 @@
 #define LAPIC_ESR      0x280
 #define LAPIC_ERR_CTL  0x370
 
-#define LAPIC_TIMER_LVT 0x320
-#define LAPIC_TIMER_CNT 0x390
+#define LAPIC_TIMER_LVT  0x320
+#define LAPIC_TIMER_CNT  0x390
 #define LAPIC_TIMER_INIT 0x380
-#define LAPIC_TIMER_DIV 0x3E0
+#define LAPIC_TIMER_DIV  0x3E0
 
 static bool use_x2apic = false;
 static uintptr_t xapic_base = 0x0;
@@ -114,7 +114,7 @@ generate_flags(enum ipi_mode md)
 }
 
 void
-send_ipi(uint8_t vec, uint32_t cpu, enum ipi_mode mode)
+apic_send_ipi(uint8_t vec, uint32_t cpu, enum ipi_mode mode)
 {
   uint32_t icr_low  = 0;
   uint32_t icr_high = 0;
@@ -147,11 +147,10 @@ send_ipi(uint8_t vec, uint32_t cpu, enum ipi_mode mode)
 }
 
 void
-activate_apic()
+enable_apic()
 {
-  uint32_t eax, ebx, ecx, edx;
-
   if (!use_x2apic) {
+    uint32_t eax, ebx, ecx, edx;
     cpuid_subleaf(0x1, 0, &eax, &ebx, &ecx, &edx); 
     
     if (ecx & CPUID_ECX_x2APIC) {
@@ -160,11 +159,11 @@ activate_apic()
   }
 
   uint64_t apic_msr = asm_rdmsr(IA32_APIC);
-  apic_msr |= (use_x2apic << 10); // Set x2apic (if available)    
+  apic_msr |= (use_x2apic << 10); // Set x2apic (if available)
   apic_msr |= (1 << 11);          // Enable the APIC
   asm_wrmsr(IA32_APIC, apic_msr);
 
-  if (!use_x2apic && apic_msr & (1 << 8)) {
+  if (!use_x2apic && xapic_base == NULL) {
     xapic_base = asm_rdmsr(IA32_APIC) & 0xfffff000;
     vm_virt_fragment(&kernel_space, xapic_base + VM_MEM_OFFSET, VM_PERM_READ | VM_PERM_WRITE);
     vm_virt_map(&kernel_space,

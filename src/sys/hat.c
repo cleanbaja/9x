@@ -1,13 +1,14 @@
+#include <internal/asm.h>
 #include <sys/hat.h>
 #include <vm/virt.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
 #include <lib/log.h>
 
-
 // Set defaults to match 4LV paging
 enum { VM_5LV_PAGING, VM_4LV_PAGING } paging_mode = VM_4LV_PAGING;
 uintptr_t kernel_vma = 0xFFFF800000000000;
+static CREATE_SPINLOCK(hat_lock);
 
 static uint64_t
 create_pte(uintptr_t phys, int flags, bool huge_page)
@@ -72,7 +73,7 @@ next_level(uint64_t* prev_level, uint64_t index, bool create)
 }
 
 void hat_map_page(uintptr_t root, uintptr_t phys, uintptr_t virt, int flags) {
-  if (!(phys % 0x1000 == 0) || !(virt % 0x1000 == 0))
+  if (!(phys % 0x1000 == 0))
     log("hat: unaligned 4KB mapping! (phys, virt: 0x%lx, 0x%lx)", phys, virt);
 
   // Index the virtual address
@@ -104,7 +105,7 @@ void hat_map_page(uintptr_t root, uintptr_t phys, uintptr_t virt, int flags) {
 }
 
 void hat_map_huge_page(uintptr_t root, uintptr_t phys, uintptr_t virt, int flags) {
-  if (!(phys % 0x200000 == 0) || !(virt % 0x200000 == 0))
+  if (!(phys % 0x200000 == 0))
     log("hat: unaligned 2MB mapping! (phys, virt: 0x%lx, 0x%lx)", phys, virt);
 
   // Index the virtual address
@@ -147,7 +148,10 @@ uint64_t* hat_resolve_addr(uintptr_t root, uintptr_t virt) {
   } else {
     uint64_t *level5 = (uint64_t*)(root + VM_MEM_OFFSET);
     level4 = next_level(level5, level5_index, false);
+    if (level4 == NULL)
+      return NULL;
   }
+
   level3 = next_level(level4, level4_index, false);
   if (level3 == NULL)
     return NULL;
@@ -172,6 +176,7 @@ void hat_unmap_page(uintptr_t root, uintptr_t virt) {
 }
 
 void hat_invl(uintptr_t root, uintptr_t virt, uint32_t asid, int mode) {
+  spinlock_acquire(&hat_lock);
 
   if (CPU_CHECK(CPU_FEAT_PCID)) {
     // Use the INVPCID instruction, if supported!
@@ -183,14 +188,15 @@ void hat_invl(uintptr_t root, uintptr_t virt, uint32_t asid, int mode) {
 
       __asm__ volatile("invpcid %1, %0" : : "r"((uint64_t)(mode - 0x10)), "m"(desc) : "memory");
     } else {
+      uint64_t old_cr3, new_cr3;
       switch (mode) {
       case INVL_SINGLE_ADDR:
         asm_invlpg(virt);
         break;
 
       case INVL_SINGLE_ASID:
-	uint64_t old_cr3 = asm_read_cr3();
-	uint64_t new_cr3 = (uint16_t)asid | kernel_space.root;
+	old_cr3 = asm_read_cr3();
+	new_cr3 = (uint16_t)asid | kernel_space.root;
 	new_cr3 &= ~(1ull << 63);                              // Clear bit 63, to invalidate the PCID
         
 	asm_write_cr3(new_cr3);
@@ -225,6 +231,8 @@ void hat_invl(uintptr_t root, uintptr_t virt, uint32_t asid, int mode) {
       log("hat: Invalidation mode %d is not supported!", mode); 
     }
   }
+
+  spinlock_release(&hat_lock);
 }
 
 

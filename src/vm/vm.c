@@ -1,7 +1,10 @@
 #include <lib/log.h>
+#include <sys/apic.h>
 #include <vm/phys.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
+
+extern void ipi_invl(void*, void*);
 
 static char*
 mem_to_str(int mem_type)
@@ -68,4 +71,11 @@ vm_init(struct stivale2_struct_tag_memmap* mm_tag)
 
   // Then init the virtual memory subsystem
   vm_init_virt(mm_tag);
+
+  // Set the handler for VM invalidation IPIs
+  struct irq_handler h = { .should_return = false,
+                           .is_irq = true,
+                           .hnd = ipi_invl };
+  register_irq_handler(IPI_INVL_TLB, h);
 }
+

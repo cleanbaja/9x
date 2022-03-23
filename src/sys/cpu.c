@@ -8,25 +8,8 @@
 #include <vm/phys.h>
 #include <vm/vm.h>
 
-uint64_t cpu_features = 0; 
-percpu_t** cpu_locals = NULL;
-int cpu_count = 0;
-static volatile int active_cpus = 1;
-static CREATE_SPINLOCK(smp_lock);
-
-// TODO: Rewrite the kernel init process,
-// its really mangled at the moment
-
-static void
-ipi_halt(cpu_ctx_t* c, void* arg)
-{
-  (void)c;
-  (void)arg;
-
-  for (;;) {
-    asm_halt();
-  }
-}
+uint64_t cpu_features  = 0; 
+uint64_t fpu_save_size = 0;
 
 static void detect_cpu_features() {
   uint32_t eax, ebx, ecx, edx;
@@ -37,6 +20,9 @@ static void detect_cpu_features() {
   }
   if (ecx & CPUID_ECX_PCID) {
     cpu_features |= CPU_FEAT_PCID;
+  }
+  if (ecx & CPUID_ECX_XSAVE) {
+    cpu_features |= CPU_FEAT_XSAVE;
   }
   
   cpuid_subleaf(0x7, 0x0, &eax, &ebx, &ecx, &edx);
@@ -71,9 +57,77 @@ static void detect_cpu_features() {
   cpu_features |= (1ull << 63ull);
 }
 
+void fpu_save(uint8_t* zone) {
+  if (CPU_CHECK(CPU_FEAT_XSAVE)) {
+    asm volatile ("xsave %0"
+                  : "+m" (zone)
+                  : "a" (0xffffffff), "d" (0xffffffff)
+                  : "memory");
+  } else {
+    asm volatile ("fxsave %0"
+                  : "+m" (zone)
+                  :
+                  : "memory");
+  }
+}
+
+void fpu_restore(uint8_t* zone) {
+  if (CPU_CHECK(CPU_FEAT_XSAVE)) {
+    asm volatile ("xrstor %0"
+                  : "+m" (zone)
+                  : "a" (0xffffffff), "d" (0xffffffff)
+                  : "memory");
+  } else {
+    asm volatile ("fxrstor %0"
+                  : "+m" (zone)
+                  :
+                  : "memory");
+  }
+}
+
+static void fpu_init() {
+  uint32_t a, b, c, d;
+  cpuid_subleaf(1, 0, &a, &b, &c, &d);
+  if (CPU_CHECK(CPU_FEAT_XSAVE)) {
+    // Enable XSAVE and XRSTOR, along with xgetbv/xsetbv
+    asm_write_cr4(asm_read_cr4() | (1 << 18));  
+    log("fpu: using extended FPU save/restore");
+
+    uint64_t xcr0 = 0;
+    xcr0 |= (1 << 0) | // Save x87 state with x{save,rstor}, required
+            (1 << 1);  // Save SSE state with x{save,rstor}
+
+    if (c & CPUID_ECX_AVX) {
+      xcr0 |= (1 << 2);
+      log("fpu: saving AVX state with XSAVE");
+    }
+
+    cpuid_subleaf(0x7, 0, &a, &b, &c, &d);
+    if (b & CPUID_EBX_AVX512) {
+      xcr0 |= (1 << 5) | // Enable AVX-512 foundation
+              (1 << 6) | // Enable the lower 15 ZMM registers
+              (1 << 7);  // Enable the higher 15 ZMM registers
+      log("fpu: saving AVX-512 state with XSAVE");
+    }
+    
+    if (c & CPUID_ECX_PKE) {
+      xcr0 |= (1 << 9); // Enable management of the PKRU register
+      log("fpu: saving PKU (Protection Keys for Userspace) state with XSAVE");
+    }
+
+    asm_wrxcr(0, xcr0);
+    cpuid_subleaf(0xD, 0, &a, &b, &c, &d);
+    fpu_save_size = (uint64_t)c;
+  } else {
+    fpu_save_size = 512;
+    log("fpu: using legacy fxsave/fxrstor");
+  }
+}
+
 void cpu_early_init() {
   // Find features if we haven't done that already
   if (cpu_features == 0) detect_cpu_features();
+  if (fpu_save_size == 0) fpu_init();
 
   // Assert that certain CPU features are present...
   uint32_t eax, ebx, ecx, edx;
@@ -99,118 +153,54 @@ void cpu_early_init() {
 	 (1 << 20);  // Enables Supervisor Mode Execution Prevention
   asm_write_cr4(cr4);
 
-  // Enable No-Execute pages
   uint64_t efer = asm_rdmsr(IA32_EFER);
-  efer |= (1 << 11);
+  efer |= (1 << 11) | // Enable No-Execute
+          (1 << 0);   // Enable the syscall/sysret mechanism
   asm_wrmsr(IA32_EFER, efer);
 
   /* Enable optional features, if supported! */
   cr4 = asm_read_cr4();
   
   // Enable Supervisor Mode Access Prevention
-  cr4 |= (CPU_CHECK(CPU_FEAT_SMAP) << 21);
+  if (CPU_CHECK(CPU_FEAT_SMAP))
+    cr4 |= (1 << 21);
   
   // Enable PCID
-  cr4 |= (CPU_CHECK(CPU_FEAT_PCID) << 17);
+  if (CPU_CHECK(CPU_FEAT_PCID))
+    cr4 |= (1 << 17);
   
   // Enable FSGSBASE instructions
-  cr4 |= (CPU_CHECK(CPU_FEAT_FSGSBASE) << 16);
+  if (CPU_CHECK(CPU_FEAT_FSGSBASE))
+    cr4 |= (1 << 16);
   asm_write_cr4(cr4);
 
   // Enable Translation Cache Extension, a AMD only feature.
   efer = asm_rdmsr(IA32_EFER);
-  efer |= (CPU_CHECK(CPU_FEAT_TCE) << 15);
+  if (CPU_CHECK(CPU_FEAT_TCE))
+    efer |= (1 << 15);
   asm_wrmsr(IA32_EFER, efer);
+
+  // Finally, setup syscall
+  asm_wrmsr(IA32_STAR, 0x13ull << 48 | 0x8ull << 32);
+  asm_wrmsr(IA32_LSTAR, (uintptr_t)asm_syscall_entry);
+  asm_wrmsr(IA32_SFMASK, ~(uint32_t)2);
 }
 
-static percpu_t* generate_percpu(struct stivale2_smp_info* rinfo) {
-  // Create cpu_local data structure and fill in the basic parts
-  percpu_t* my_percpu     = (percpu_t*)kmalloc(sizeof(percpu_t));
-  my_percpu->cpu_num      = rinfo->processor_id;
-  my_percpu->lapic_id     = rinfo->lapic_id;
-  my_percpu->kernel_stack = rinfo->target_stack;
-  my_percpu->cur_space    = &kernel_space;
+#define ARCHCTL_WRITE_FS  0xB0
+#define ARCHCTL_READ_MSR  0xB1
+#define ARCHCTL_WRITE_MSR 0xb2
 
-  // Fill in the TSS
-  my_percpu->tss.rsp0 = my_percpu->kernel_stack;
-  my_percpu->tss.ist1 =
-    (uintptr_t)vm_phys_alloc(2, VM_ALLOC_ZERO) + VM_PAGE_SIZE + VM_MEM_OFFSET;
-  my_percpu->tss.ist2 =
-    (uintptr_t)vm_phys_alloc(2, VM_ALLOC_ZERO) + VM_PAGE_SIZE + VM_MEM_OFFSET;
-  my_percpu->tss.ist3 =
-    (uintptr_t)vm_phys_alloc(2, VM_ALLOC_ZERO) + VM_PAGE_SIZE + VM_MEM_OFFSET;
-  my_percpu->tss.ist4 =
-    (uintptr_t)vm_phys_alloc(2, VM_ALLOC_ZERO) + VM_PAGE_SIZE + VM_MEM_OFFSET;
-
-  return my_percpu;
-}
-
-static void ap_entry(struct stivale2_smp_info* info) {
-  info = (void*)((uintptr_t)info + VM_MEM_OFFSET);
-  spinlock_acquire(&smp_lock);
-
-  // Initialize basic CPU features
-  cpu_early_init();
-  reload_tables();
-  percpu_init_vm();
-
-  // Save and activate percpu stuff
-  percpu_t* data = generate_percpu(info);
-  cpu_locals[info->processor_id] = data;
-  WRITE_PERCPU(data, info->processor_id);
-  load_tss((uintptr_t)&per_cpu(tss));
-  
-  // Activate the remaining devices
-  activate_apic();
-
-  // Let the BSP know we're done, and give other CPUs their turn
-  spinlock_release(&smp_lock);
-  ATOMIC_INC(&active_cpus);
-  __asm__ volatile("xor %rbp, %rbp; cli");
-
-  // Take a nap while the kernel does its thing...
-  for(;;) { __asm__ volatile ("hlt"); }
-}
-
-void cpu_init(struct stivale2_struct_tag_smp *smp_tag) {
-  // Set the handler for Halt IPIs
-  struct irq_handler h = { .should_return = false,
-                           .is_irq = true,
-                           .hnd = ipi_halt };
-  register_irq_handler(IPI_HALT, h);
-
-  cpu_locals = (percpu_t**)kmalloc(sizeof(void*) * smp_tag->cpu_count);
-  cpu_count = smp_tag->cpu_count;
-
-  // Init the BSP
-  for (int i = 0; i < smp_tag->cpu_count; i++) {
-    struct stivale2_smp_info* sp = &smp_tag->smp_info[i];
-    if (sp->lapic_id != smp_tag->bsp_lapic_id) {
-      continue;
-    }
-   
-    // Load the newly created CPU local data
-    percpu_t* data = generate_percpu(sp);
-    cpu_locals[0] = data;
-    WRITE_PERCPU(data, 0);
-    load_tss((uintptr_t)&per_cpu(tss));
-
-    activate_apic();
-  }
-
-  // Detect and init all other CPUs
-  for (int i = 0; i < smp_tag->cpu_count; i++) {
-    struct stivale2_smp_info* sp = &smp_tag->smp_info[i];
-    if (sp->lapic_id == smp_tag->bsp_lapic_id) {
-      continue;
-    }
-
-    sp->target_stack = ((uint64_t)vm_phys_alloc(2, VM_ALLOC_ZERO) + VM_MEM_OFFSET);
-    ATOMIC_WRITE((uint64_t*)&sp->goto_address, ap_entry);
-  }
-
-  // Wait for all CPUs to be ready
-  while (ATOMIC_READ(&active_cpus) != smp_tag->cpu_count);
-  log("smp: %d CPUs initialized!", active_cpus);
+void syscall_archctl(cpu_ctx_t* context) {
+  switch (context->rdi) {
+  case ARCHCTL_WRITE_FS:
+    asm_wrmsr(IA32_FS_BASE, context->rsi);
+    break;
+  case ARCHCTL_READ_MSR:
+    context->rax = asm_rdmsr(context->rsi);
+    break;
+  case ARCHCTL_WRITE_MSR:
+    asm_wrmsr(context->rsi, context->rdx);
+    break;
+  } 
 }
 

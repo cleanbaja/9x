@@ -3,6 +3,7 @@
 
 #include <fs/backing.h>
 #include <lib/vec.h>
+#include <internal/stivale2.h>
 
 #define MAX_NAME_LEN 256
 

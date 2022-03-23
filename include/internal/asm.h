@@ -43,9 +43,14 @@ ASM_MAKE_CRN(3)
 ASM_MAKE_CRN(4)
 ASM_MAKE_CRN(8)
 
-#define IA32_EFER 0xC0000080
+#define IA32_EFER           0xC0000080
 #define IA32_KERNEL_GS_BASE 0xC0000102
-#define IA32_TSC_AUX 0xC0000103
+#define IA32_USER_GS_BASE   0xC0000101
+#define IA32_FS_BASE        0xC0000100
+#define IA32_STAR           0xC0000081
+#define IA32_LSTAR          0xC0000082
+#define IA32_SFMASK         0xC0000084
+#define IA32_TSC_AUX        0xC0000103
 
 static inline uint64_t
 asm_rdmsr(uint32_t msr)
@@ -81,11 +86,17 @@ asm_wrmsr(uint32_t msr, uint64_t val)
     : "eax", "ecx", "edx");
 }
 
+static inline void asm_wrxcr(uint32_t reg, uint64_t value) {
+    uint32_t edx = value >> 32;
+    uint32_t eax = (uint32_t)value;
+    asm volatile ("xsetbv"
+                  :
+                  : "a" (eax), "d" (edx), "c" (reg)
+                  : "memory");
+}
 
-// Old asm spinlock impl that uses 'pause' to wait
-extern void
-asm_spinlock_acquire(
-  volatile int* lock);
+// Syscall entrypoint
+extern void asm_syscall_entry();
 
 // Reading of the TSC
 static inline uint64_t asm_rdtsc() {
@@ -126,4 +137,10 @@ static inline void asm_outd(uint16_t port, uint32_t data) {
     __asm__ volatile("out %0, %1" :: "a"(data), "Nd"(port));
 }
 
+// A quick way to get the current CPUs number
+static inline uint32_t __get_cpunum() {
+  uint32_t ret;
+  asm volatile("mov %%gs:0, %0" : "=r"(ret));
+  return ret;
+}
 #endif // INTERNAL_ASM_H

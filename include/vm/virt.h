@@ -28,7 +28,7 @@ typedef enum
 typedef struct
 {
   uint64_t root;
-  uint16_t pcid;
+  uint16_t asid;
   bool active;
 } vm_space_t;
 
@@ -49,8 +49,15 @@ void
 vm_invl(vm_space_t* spc, uintptr_t addr);
 void
 vm_load_space(vm_space_t* spc);
+vm_space_t*
+vm_create_space();
 void
 percpu_init_vm();
+
+// Invalidation related functions
+void vm_invl_addr(vm_space_t* spc, uintptr_t address);
+void vm_invl_range(vm_space_t* spc, uintptr_t address, uintptr_t len); 
+void vm_invl_asid(vm_space_t* spc, uint32_t asid); 
 
 // The kernel's space, which all others inherit from
 extern vm_space_t kernel_space;

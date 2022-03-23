@@ -44,12 +44,6 @@ init_tables()
     entries[i] = make_idt_entry(asm_dispatch_table[i], 0);
   }
 
-  // Set proper IST entries
-  entries[2] = make_idt_entry(asm_dispatch_table[2], 1);
-  entries[8] = make_idt_entry(asm_dispatch_table[8], 2);
-  entries[14] = make_idt_entry(asm_dispatch_table[14], 3);
-  entries[18] = make_idt_entry(asm_dispatch_table[18], 4);
-
   // Load both the IDT and GDT
   reload_tables();
 }
@@ -79,6 +73,7 @@ load_tss(uintptr_t address)
   spinlock_acquire(
     &table_lock); // We use a lock, becuase this modifies the global GDT
 
+  // Activate the TSS, after configuring it...
   main_gdt.tss.base_low16 = (uint16_t)address;
   main_gdt.tss.base_mid8 = (uint8_t)(address >> 16);
   main_gdt.tss.flags1 = 0b10001001;
@@ -86,7 +81,20 @@ load_tss(uintptr_t address)
   main_gdt.tss.base_high8 = (uint8_t)(address >> 24);
   main_gdt.tss.base_upper32 = (uint32_t)(address >> 32);
   main_gdt.tss.reserved = 0;
-
   __asm__ volatile("ltr %0" ::"rm"((uint16_t)0x28) : "memory");
+
+  // Update the IDT to become TSS aware
+  entries[2] = make_idt_entry(asm_dispatch_table[2], 1);
+  entries[8] = make_idt_entry(asm_dispatch_table[8], 2);
+  entries[14] = make_idt_entry(asm_dispatch_table[14], 3);
+  entries[18] = make_idt_entry(asm_dispatch_table[18], 4);
+  
+  // Then reload it
+  struct table_ptr idt_pointer;
+  idt_pointer.base = (uint64_t)entries;
+  idt_pointer.limit = sizeof(entries) - 1;
+  asm_load_idt(idt_pointer);
+
   spinlock_release(&table_lock);
 }
+

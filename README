@@ -18,9 +18,9 @@ $ make run
 -----------
 
 Build kernel and generate ISO (build/test_kernel.iso)
---------
+-----------
 $ make iso
---------
+-----------
 
 ==== Hardware Requirements ====
 
@@ -29,14 +29,11 @@ Although 9x is adaptable when it comes to running on multiple types of systems, 
   -> Requirements
     - CPUs must support SMEP/NX, faliure to meet this will result in a kernel panic
     - System must have more than 1GB of ram
-    - System must have a onboard HPET
+    - The hardest requirement to meet by far, CPUs must support Invariant TSC (dosen't apply to hypervisors)
 
   -> Recomendations (for a smoother experience)
     - CPU should support PCID and SMAP, since these 2 features greatly enhance CPU performance/security
-
-
-
-
+    - Having more cores greatly improves the speed of 9x
 
 NOTE: By default, `make` builds the kernel binary only.
 

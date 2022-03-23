@@ -39,7 +39,7 @@ void *laihost_scan(const char *signature, size_t index) {
 
         // Scan for the FADT
         acpi_fadt_t *fadt = (acpi_fadt_t *)acpi_query("FACP", 0);
-        void *dsdt = (char *)(size_t)fadt->dsdt + VM_MEM_OFFSET;
+        void *dsdt = (char *)((size_t)fadt->dsdt + VM_MEM_OFFSET);
 
         log("acpi: Address of DSDT is 0x%lx", dsdt);
         return dsdt;
