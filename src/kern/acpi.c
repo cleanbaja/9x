@@ -3,7 +3,6 @@
 #include <lib/log.h>
 #include <sys/apic.h>
 #include <sys/tables.h>
-#include <sys/timer.h>
 #include <vm/phys.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
@@ -150,7 +149,6 @@ sci_handler(struct cpu_context* context, void* arg)
   log("acpi: a SCI event has occured: 0x%x (%s)", ev, ev_name);
 
   if (ev & ACPI_POWER_BUTTON) {
-    timer_sleep(7000);
     lai_enter_sleep(5); // Good Night!
   }
 }

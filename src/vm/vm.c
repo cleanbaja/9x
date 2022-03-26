@@ -4,7 +4,7 @@
 #include <vm/virt.h>
 #include <vm/vm.h>
 
-extern void ipi_invl(void*, void*);
+extern void ipi_invl(cpu_ctx_t*, void*);
 
 static char*
 mem_to_str(int mem_type)

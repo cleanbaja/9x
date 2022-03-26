@@ -64,26 +64,6 @@ ioapic_write(size_t ioapic_num, uint32_t reg, uint32_t data)
 }
 
 void
-calibrate_apic()
-{
-  // Setup the calibration, with divisor set to 16 (0x3)
-  apic_write(LAPIC_TIMER_DIV, 0x3);
-  apic_write(LAPIC_TIMER_LVT, 0xFF | (1 << 16));
-  apic_write(LAPIC_TIMER_INIT, (uint32_t)-1);
-
-  // Sleep for 10ms
-  timer_sleep(10);
-
-  // Set the frequency, then disable the timer once more
-  per_cpu(lapic_freq) = (((uint32_t)-1) - apic_read(LAPIC_TIMER_CNT)) / 10ull;
-  apic_write(LAPIC_TIMER_INIT, 0);
-  apic_write(LAPIC_TIMER_LVT, (1 << 16));
-
-  if (cpunum() == 0)
-    log("sys/apic: Timer Frequency is %u MHz", per_cpu(lapic_freq) / 10ull);
-}
-
-void
 apic_eoi()
 {
   apic_write(LAPIC_EOI, 0);
@@ -147,7 +127,7 @@ apic_send_ipi(uint8_t vec, uint32_t cpu, enum ipi_mode mode)
 }
 
 void
-enable_apic()
+apic_enable()
 {
   if (!use_x2apic) {
     uint32_t eax, ebx, ecx, edx;
@@ -163,7 +143,7 @@ enable_apic()
   apic_msr |= (1 << 11);          // Enable the APIC
   asm_wrmsr(IA32_APIC, apic_msr);
 
-  if (!use_x2apic && xapic_base == NULL) {
+  if (!use_x2apic && xapic_base == 0x0) {
     xapic_base = asm_rdmsr(IA32_APIC) & 0xfffff000;
     vm_virt_fragment(&kernel_space, xapic_base + VM_MEM_OFFSET, VM_PERM_READ | VM_PERM_WRITE);
     vm_virt_map(&kernel_space,
@@ -251,8 +231,23 @@ apic_redirect_irq(uint8_t lapic_id, uint8_t vec, uint8_t irq, bool masked)
   apic_redirect_gsi(lapic_id, vec, irq, 0, masked);
 }
 
+void apic_calibrate() {
+  // Setup the calibration, with divisor set to 16 (0x3)
+  apic_write(LAPIC_TIMER_DIV, 0x3);
+  apic_write(LAPIC_TIMER_LVT, 0xFF | (1 << 16));
+  apic_write(LAPIC_TIMER_INIT, (uint32_t)-1);
+
+  // Sleep for 10ms
+  timer_msleep(10);
+
+  // Set the frequency, then disable the timer once more
+  per_cpu(lapic_freq) = (((uint32_t)-1) - apic_read(LAPIC_TIMER_CNT)) / 10ull;
+  apic_write(LAPIC_TIMER_INIT, 0);
+  apic_write(LAPIC_TIMER_LVT, (1 << 16));
+}
+
 void
-apic_timer_oneshot(uint8_t vec, uint64_t ms)
+apic_oneshot(uint8_t vec, uint64_t ms)
 {
   if (CPU_CHECK(CPU_FEAT_INVARIANT) && CPU_CHECK(CPU_FEAT_DEADLINE)) {
     apic_write(LAPIC_TIMER_LVT, (0b10 << 17) | vec);
@@ -265,10 +260,16 @@ apic_timer_oneshot(uint8_t vec, uint64_t ms)
     apic_write(LAPIC_TIMER_LVT, (1 << 16));
 
     // Calculate the total ticks we need
-    uint64_t ticks = ms * (per_cpu(lapic_freq));
+    uint64_t ticks = ms * per_cpu(lapic_freq);
 
-    apic_write(LAPIC_TIMER_LVT, vec);
+    // Setup the registers
+    apic_write(LAPIC_TIMER_LVT, (apic_read(LAPIC_TIMER_LVT) & ~(0b11 << 17)));
+    apic_write(LAPIC_TIMER_LVT, (apic_read(LAPIC_TIMER_LVT) & 0xFFFFFF00) | vec);
     apic_write(LAPIC_TIMER_DIV, 0x3);
-    apic_write(LAPIC_TIMER_INIT, (uint32_t)ticks);
+    apic_write(LAPIC_TIMER_INIT, per_cpu(lapic_freq) * ms);
+
+    // Clear the mask, and off we go!
+    apic_write(LAPIC_TIMER_LVT, apic_read(LAPIC_TIMER_LVT) & ~(1 << 16));
   }
 }
+

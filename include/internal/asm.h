@@ -102,7 +102,7 @@ extern void asm_syscall_entry();
 static inline uint64_t asm_rdtsc() {
     uint32_t edx, eax;
     asm volatile ("rdtsc"
-                  : "=a" (eax), "=d" (edx));
+                  : "=a" (eax), "=d" (edx) :: "memory");
     return ((uint64_t)edx << 32) | eax;
 }
 

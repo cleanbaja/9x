@@ -3,8 +3,8 @@
 #include <lib/log.h>
 #include <sys/apic.h>
 #include <sys/cpu.h>
-#include <sys/tables.h>
 #include <sys/timer.h>
+#include <sys/tables.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
 
@@ -56,10 +56,11 @@ void ap_entry(struct stivale2_smp_info* sm) {
     reload_tables();
     cpu_early_init();
     percpu_init_vm();
-    enable_apic();
+    apic_enable();
 
     WRITE_PERCPU(sm->extra_argument, sm->processor_id);
     load_tss((uintptr_t)&per_cpu(tss));
+    tsc_calibrate();
   }
 
   // Release the CPU lock, and tell the BSP we're done!
@@ -80,7 +81,7 @@ void smp_init(struct stivale2_struct_tag_smp *smp_tag) {
   register_irq_handler(IPI_HALT, h);
 
   // Create the percpu array
-  cpu_locals = (percpu_t**)kmalloc(sizeof(void*) * smp_tag->cpu_count);
+  cpu_locals = (percpu_t**)kmalloc(sizeof(void*) * (smp_tag->cpu_count + 1));
 
   // Wakeup all the waiting CPUs
   for (int i = 0; i < smp_tag->cpu_count; i++) {
@@ -89,7 +90,8 @@ void smp_init(struct stivale2_struct_tag_smp *smp_tag) {
       percpu_t* p = generate_percpu(sp);
       WRITE_PERCPU(p, sp->processor_id);
       load_tss((uintptr_t)&per_cpu(tss));
-      enable_apic();
+      apic_enable();
+      tsc_calibrate();
 
       continue;
     }

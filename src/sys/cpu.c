@@ -4,7 +4,6 @@
 #include <sys/apic.h>
 #include <sys/cpu.h>
 #include <sys/tables.h>
-#include <sys/timer.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
 

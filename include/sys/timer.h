@@ -1,8 +1,10 @@
-#ifndef SYS_TIMER_H
-#define SYS_TIMER_H
+#ifndef SYS_TSC_H
+#define SYS_TSC_H
 
+#include <sys/apic.h>
 #include <acpispec/tables.h>
 
+/* Although the files are called tsc.{c,h}, they contain code for the HPET as well */
 typedef struct acpi_hpet_t {
     acpi_header_t header;
     
@@ -19,12 +21,22 @@ typedef struct acpi_hpet_t {
     uint8_t       page_protection;
 } __attribute__((packed)) acpi_hpet_t;
 
-#define HPET_CAP_REG           0x0
-#define HPET_CONF_REG          0x10
-#define HPET_MAIN_COUNTER_REG  0x0F0
+#define HPET_REG_CAP      0x0
+#define HPET_REG_CONF     0x10
+#define HPET_REG_COUNTER  0x0F0
 
-void timer_init();
-void timer_sleep(uint64_t ms);
+void timer_usleep(uint64_t us);
+void timer_msleep(uint64_t ms);
 
-#endif // SYS_TIMER_H
+/* Amount of times that the TSC calibration code 
+ * is repeated, more higher value means longer 
+ * boot time and better accuracy, and vice versa
+ *
+ * I personally find 5 to be the best balance.
+ */
+#define TSC_CALI_CYCLES 5
+
+void tsc_calibrate();
+
+#endif // SYS_TSC_H
 

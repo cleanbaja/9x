@@ -5,7 +5,6 @@
 #include <lib/log.h>
 #include <sys/apic.h>
 #include <sys/tables.h>
-#include <sys/timer.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
 #include <proc/smp.h>

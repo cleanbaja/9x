@@ -61,17 +61,23 @@ $(BUILD_ROOT)/test_image.iso: $(BUILD_ROOT)/initrd.img $(BUILD_ROOT)/limine/limi
 		--efi-boot boot/limine-eltorito-efi.bin \
 		-efi-boot-part --efi-boot-image --protective-msdos-label \
 		$(BUILD_ROOT)/isoroot -o $@
-	$(BUILD_ROOT)/limine/limine-install $@
+	$(BUILD_ROOT)/limine/limine-s2deploy $@
 	rm -rf $(BUILD_ROOT)/isoroot
 
 iso: $(BUILD_ROOT)/test_image.iso
 
 #  Various util commands ============================================================
 
+QEMU_BASE_FLAGS += -cdrom $(BUILD_ROOT)/test_image.iso -m 2G -M q35 -debugcon stdio -smp 4
+
 .PHONY: run clean install
 run: $(BUILD_ROOT)/test_image.iso
 	printf "\n"
-	qemu-system-x86_64 -s -monitor telnet:localhost:4321,server,nowait -smp 11 -vnc :0 -cpu max,-la57 -cdrom $(BUILD_ROOT)/test_image.iso -m 2G -M q35 -debugcon stdio
+	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu max
+
+run-kvm: $(BUILD_ROOT)/test_image.iso
+	printf "\n"
+	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu host,+smep,check
 
 clean:
 	rm -rf $(BUILD_ROOT)

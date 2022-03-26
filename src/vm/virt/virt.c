@@ -70,7 +70,7 @@ vm_virt_unmap(vm_space_t* spc, uintptr_t virt)
   if (pte != NULL)
     *pte = 0;
 
-  if (spc->active)
+  if (spc->active && was_active)
     vm_invl_addr(spc, virt);
 }
 
@@ -100,11 +100,11 @@ vm_load_space(vm_space_t* spc)
   uint64_t cr3_val = spc->root;
 
   if (CPU_CHECK(CPU_FEAT_PCID)) {
-    if (spc->root >= 4096) {
-      PANIC(NULL, "PCID Overflow detected!\n");
+    if (spc->asid >= VM_ASID_MAX) {
+      PANIC(NULL, "PCID %u is larger than VM_ASID_MAX (%d), resuling in a overflow!\n", spc->asid, VM_ASID_MAX);
     } else {
       // Set bit 63, to prevent flushing and set the PCID
-      cr3_val |= spc->root | (1ull << 63);
+      cr3_val |= (uint16_t)spc->asid | (1ull << 63);
     }
   }
 

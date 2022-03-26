@@ -1,7 +1,7 @@
 #ifndef SYS_CPU_H
 #define SYS_CPU_H
 
-#include <stdint.h>
+#include <internal/asm.h>
 
 // List of CPU features recognized by 9x
 #define CPU_FEAT_FSGSBASE  (1 << 0)
@@ -23,6 +23,11 @@ void calibrate_tsc();
 extern uint64_t fpu_save_size;
 void fpu_save(uint8_t* zone);    // Must be 16 or 64-byte aligned
 void fpu_restore(uint8_t* zone);
+
+// Tell if we're BSP
+static inline bool is_bsp() {
+  return (asm_rdmsr(0x1B) & (1 << 8));
+}
 
 #endif // SYS_CPU_H
 

@@ -24,7 +24,9 @@ apic_redirect_gsi(uint8_t lapic_id,
 void
 apic_redirect_irq(uint8_t lapic_id, uint8_t vec, uint8_t irq, bool masked);
 void
-apic_timer_oneshot(uint8_t vec, uint64_t ms);
+apic_oneshot(uint8_t vec, uint64_t us);
+void
+apic_calibrate();
 
 enum ipi_mode
 {
