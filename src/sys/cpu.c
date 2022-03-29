@@ -7,8 +7,9 @@
 #include <vm/phys.h>
 #include <vm/vm.h>
 
-uint64_t cpu_features  = 0; 
+uint64_t cpu_features = 0;
 uint64_t fpu_save_size = 0;
+uint64_t fpu_save_align = 0;
 
 static void detect_cpu_features() {
   uint32_t eax, ebx, ecx, edx;
@@ -57,30 +58,34 @@ static void detect_cpu_features() {
 }
 
 void fpu_save(uint8_t* zone) {
+  // Align the pointer if needed
+  if (((uintptr_t)zone % fpu_save_align) != 0) {
+    log("fpu: save area isn't aligned!!!");
+  }
+
+  // Then save the context...
   if (CPU_CHECK(CPU_FEAT_XSAVE)) {
-    asm volatile ("xsave %0"
-                  : "+m" (zone)
-                  : "a" (0xffffffff), "d" (0xffffffff)
-                  : "memory");
+    asm volatile(
+      "xsaveq %[zone]" ::[zone] "m"(*zone), "a"(0xFFFFFFFF), "d"(0xFFFFFFFF)
+      : "memory");
   } else {
-    asm volatile ("fxsave %0"
-                  : "+m" (zone)
-                  :
-                  : "memory");
+    asm volatile("fxsaveq %[zone]" ::[zone] "m"(*zone) : "memory");
   }
 }
 
 void fpu_restore(uint8_t* zone) {
+  // Align the pointer if needed
+  if (((uintptr_t)zone % fpu_save_align) != 0) {
+    log("fpu: save area isn't aligned!!!");
+  }
+
+  // Then restore the context...
   if (CPU_CHECK(CPU_FEAT_XSAVE)) {
-    asm volatile ("xrstor %0"
-                  : "+m" (zone)
-                  : "a" (0xffffffff), "d" (0xffffffff)
-                  : "memory");
+    asm volatile(
+      "xrstorq %[zone]" ::[zone] "m"(*zone), "a"(0xFFFFFFFF), "d"(0xFFFFFFFF)
+      : "memory");
   } else {
-    asm volatile ("fxrstor %0"
-                  : "+m" (zone)
-                  :
-                  : "memory");
+    asm volatile("fxrstorq %[zone]" ::[zone] "m"(*zone) : "memory");
   }
 }
 
@@ -117,9 +122,11 @@ static void fpu_init() {
     asm_wrxcr(0, xcr0);
     cpuid_subleaf(0xD, 0, &a, &b, &c, &d);
     fpu_save_size = (uint64_t)c;
+    fpu_save_align = 64;
   } else {
     fpu_save_size = 512;
-    log("fpu: using legacy fxsave/fxrstor");
+    fpu_save_align = 16;
+    log("fpu: using legacy FXSAVE/FXRSTOR");
   }
 }
 
@@ -171,6 +178,11 @@ void cpu_early_init() {
   // Enable FSGSBASE instructions
   if (CPU_CHECK(CPU_FEAT_FSGSBASE))
     cr4 |= (1 << 16);
+
+  // Enable X{SAVE,RSTOR} instructions
+  if (CPU_CHECK(CPU_FEAT_XSAVE))
+    cr4 |= (1 << 18);
+
   asm_write_cr4(cr4);
 
   // Enable Translation Cache Extension, a AMD only feature.

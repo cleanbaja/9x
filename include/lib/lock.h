@@ -7,6 +7,12 @@
 #define ATOMIC_READ(j)        __atomic_load_n(j, __ATOMIC_SEQ_CST)
 #define ATOMIC_WRITE(ptr, j)  __atomic_store_n(ptr, j, __ATOMIC_SEQ_CST)
 #define ATOMIC_INC(i)         __sync_add_and_fetch((i), 1)
+#define ATOMIC_CAS(VAR, COND, WRITE)                                           \
+  ({                                                                           \
+    bool ret = __atomic_compare_exchange_n(                                    \
+      VAR, COND, WRITE, false, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED);            \
+    ret;                                                                       \
+  })
 
 struct spinlock {
   volatile uint64_t locked;

@@ -1,14 +1,16 @@
 #include <internal/cpuid.h>
 #include <lib/lock.h>
 #include <lib/log.h>
+#include <proc/sched.h>
 #include <sys/apic.h>
 #include <sys/cpu.h>
-#include <sys/timer.h>
 #include <sys/tables.h>
+#include <sys/timer.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
 
 percpu_t** cpu_locals = NULL;
+uint64_t total_cpus = 0;
 uint64_t active_cpus = 1;
 static CREATE_SPINLOCK(smp_lock);
 
@@ -29,6 +31,7 @@ static percpu_t* generate_percpu(struct stivale2_smp_info* rinfo) {
   my_percpu->lapic_id     = rinfo->lapic_id;
   my_percpu->kernel_stack = rinfo->target_stack;
   my_percpu->cur_space    = &kernel_space;
+  my_percpu->cur_thread = 0x0;
 
   // Fill in the TSS
   my_percpu->tss.rsp0 = my_percpu->kernel_stack;
@@ -61,6 +64,8 @@ void ap_entry(struct stivale2_smp_info* sm) {
     WRITE_PERCPU(sm->extra_argument, sm->processor_id);
     load_tss((uintptr_t)&per_cpu(tss));
     tsc_calibrate();
+
+    sched_init();
   }
 
   // Release the CPU lock, and tell the BSP we're done!
@@ -80,8 +85,9 @@ void smp_init(struct stivale2_struct_tag_smp *smp_tag) {
                            .hnd = ipi_halt };
   register_irq_handler(IPI_HALT, h);
 
-  // Create the percpu array
+  // Create the percpu array and enable the APIC before all others
   cpu_locals = (percpu_t**)kmalloc(sizeof(void*) * (smp_tag->cpu_count + 1));
+  total_cpus = smp_tag->cpu_count + 1;
 
   // Wakeup all the waiting CPUs
   for (int i = 0; i < smp_tag->cpu_count; i++) {

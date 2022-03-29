@@ -39,13 +39,13 @@ void vm_invl_addr(vm_space_t* spc, uintptr_t address) {
 
   // Try to invalidate the other TLBs first
   if (cpu_locals != NULL) {
-    for (int i = 0; i < (active_cpus - 1); i++) {
+    for (int i = 0; i < active_cpus; i++) {
       if (cpu_locals[i]->cur_space == spc && cpu_locals[i] != READ_PERCPU()) {
         // Send a invalidation IPI
         apic_send_ipi(IPI_INVL_TLB, cpu_locals[i]->cpu_num, IPI_SPECIFIC);
       }
     }
- 
+
     // Finally, invalidate our own TLB
     ipi_invl(NULL, NULL);
   } else {
@@ -68,7 +68,7 @@ void vm_invl_range(vm_space_t* spc, uintptr_t address, uintptr_t len) {
 
   // Try to invalidate the other TLBs first
   if (cpu_locals != NULL) {
-    for (int i = 0; i < (active_cpus - 1); i++) {
+    for (int i = 0; i < active_cpus; i++) {
       if (cpu_locals[i]->cur_space == spc && cpu_locals[i] != READ_PERCPU()) {
         // Send a invalidation IPI
         apic_send_ipi(IPI_INVL_TLB, cpu_locals[i]->cpu_num, IPI_SPECIFIC);
@@ -96,7 +96,7 @@ void vm_invl_asid(vm_space_t* spc, uint32_t asid) {
 
   // Try to invalidate the other TLBs first
   if (cpu_locals != NULL) {
-    for (int i = 0; i < (active_cpus - 1); i++) {
+    for (int i = 0; i < active_cpus; i++) {
       if (cpu_locals[i]->cur_space == spc && cpu_locals[i] != READ_PERCPU()) {
         // Send a invalidation IPI
         apic_send_ipi(IPI_INVL_TLB, cpu_locals[i]->cpu_num, IPI_SPECIFIC);

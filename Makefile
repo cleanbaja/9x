@@ -73,7 +73,7 @@ QEMU_BASE_FLAGS += -cdrom $(BUILD_ROOT)/test_image.iso -m 2G -M q35 -debugcon st
 .PHONY: run clean install
 run: $(BUILD_ROOT)/test_image.iso
 	printf "\n"
-	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu max
+	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu max,-la57
 
 run-kvm: $(BUILD_ROOT)/test_image.iso
 	printf "\n"

@@ -105,4 +105,18 @@ struct dirent
   char d_name[1024];
 };
 
+#define AT_ENTRY 10
+#define AT_PHDR 20
+#define AT_PHENT 21
+#define AT_PHNUM 22
+#define AT_CPUCAP 0x8086
+
+typedef struct
+{
+  uintptr_t at_entry;
+  uintptr_t at_phdr;
+  uintptr_t at_phent;
+  uintptr_t at_phnum;
+} auxval_t;
+
 #endif // INTERNAL_POSIX_H

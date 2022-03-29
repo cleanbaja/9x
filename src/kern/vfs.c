@@ -124,12 +124,11 @@ resolve_path_ex(struct vfs_node* parent,
       if (strlen(testbuf) != 0) {
         old_node = cur_node;
         cur_node = search_for_node(cur_node, testbuf, true);
-        // log("search_for_node(0x%lx, %s, %d) -> 0x%lx", old_node, testbuf, 1,
-        // cur_node);
         basename_ret = testbuf;
 
         if (cur_node == NULL && flags & RESOLVE_CREATE_NODE) {
           cur_node = create_node(testbuf, old_node->fs, old_node);
+          vec_push(&old_node->children, cur_node);
         }
         goto out;
       }
@@ -219,9 +218,9 @@ vfs_open(struct vfs_node* parent,
   if (nd == NULL || real_parent == NULL)
     return NULL;
 
-  if (nd->backing == NULL)
+  if (nd->backing == NULL) {
     nd->backing = nd->fs->open(nd, create, creat_mode);
-  else if (nd->backing != NULL && create)
+  } else if (nd->backing != NULL && create)
     create = false;
 
   // Refcount is already set to one by the FS driver, so don't increment it

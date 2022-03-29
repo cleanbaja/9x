@@ -3,6 +3,7 @@
 
 #include <internal/asm.h>
 #include <internal/stivale2.h>
+#include <proc/proc.h>
 #include <sys/tables.h>
 #include <vm/virt.h>
 
@@ -14,11 +15,12 @@ typedef struct {
   struct tss tss;
   vm_space_t* cur_space;
   uint64_t tsc_freq, lapic_freq;
+  thread_t* cur_thread;
 } percpu_t;
 
 // List of active CPUs
 extern percpu_t** cpu_locals;
-extern uint64_t active_cpus;
+extern uint64_t total_cpus, active_cpus;
 
 // Functions for reading/writing the percpu structure
 #define READ_PERCPU(ptr) (cpu_locals[__get_cpunum()])

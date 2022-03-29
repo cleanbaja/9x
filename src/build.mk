@@ -24,7 +24,9 @@ KERNEL_SOURCES = kern/init.c      \
 		 fs/tmpfs.c       \
 		 fs/backing.c     \
 		 fs/initramfs.c   \
-                 proc/smp.c 
+                 proc/smp.c       \
+                 proc/sched.c     \
+                 proc/proc.c 
 
 KERNEL_ASM = lib/font.asm     \
 	     sys/helpers.asm  \
