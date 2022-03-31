@@ -1,7 +1,7 @@
 #ifndef VM_H
 #define VM_H
 
-#include <internal/stivale2.h>
+#include <lib/stivale2.h>
 #include <stddef.h>
 
 // Hard-coded kernel virtual/physical memory constants for x86_64

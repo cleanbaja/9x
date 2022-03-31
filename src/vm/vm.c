@@ -1,5 +1,5 @@
 #include <lib/log.h>
-#include <sys/apic.h>
+#include <arch/apic.h>
 #include <vm/phys.h>
 #include <vm/virt.h>
 #include <vm/vm.h>

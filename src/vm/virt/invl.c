@@ -1,8 +1,8 @@
 #include <vm/vm.h>
 #include <vm/virt.h>
-#include <sys/apic.h>
-#include <sys/hat.h>
-#include <proc/smp.h>
+#include <arch/apic.h>
+#include <arch/hat.h>
+#include <generic/smp.h>
 #include <lib/lock.h>
 
 static uintptr_t invl_base, invl_length;

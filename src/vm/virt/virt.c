@@ -1,9 +1,8 @@
-#include <internal/asm.h>
-#include <internal/cpuid.h>
-#include <internal/stivale2.h>
-#include <sys/hat.h>
+#include <arch/asm.h>
+#include <arch/hat.h>
 #include <lib/builtin.h>
 #include <lib/log.h>
+#include <lib/stivale2.h>
 
 #include <vm/phys.h>
 #include <vm/virt.h>

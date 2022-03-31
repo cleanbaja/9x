@@ -1,8 +1,8 @@
 #ifndef LIB_LOCK_H
 #define LIB_LOCK_H
 
-#include <internal/asm.h>
-#include <sys/cpu.h>
+#include <arch/asm.h>
+#include <arch/cpu.h>
 
 #define ATOMIC_READ(j)        __atomic_load_n(j, __ATOMIC_SEQ_CST)
 #define ATOMIC_WRITE(ptr, j)  __atomic_store_n(ptr, j, __ATOMIC_SEQ_CST)

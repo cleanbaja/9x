@@ -1,7 +1,7 @@
 #ifndef FS_BACKING_H
 #define FS_BACKING_H
 
-#include <internal/posix.h>
+#include <lib/posix.h>
 #include <lib/lock.h>
 #include <stddef.h>
 

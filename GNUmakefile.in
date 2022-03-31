@@ -1,0 +1,149 @@
+# Set some defaults first
+override COOL_PROMPT := printf '[\e[1;31m%s\e[m] \e[1;32m%s\e[m\n'
+override SOURCE_DIR  := @srcdir@/src
+override INCLUDE_DIR := @srcdir@/include
+override ARCH_DIR    := $(SOURCE_DIR)/arch/@ARCH@
+override LAI_DIR     := @srcdir@/third_party/lai
+override VERSION     := @PACKAGE_VERSION@
+override ECHFS       := @srcdir@/third_party/echfs/echfs-utils
+override IMAGE       := ninex.hdd
+
+# Do a verbose build only when requested
+ifeq ($(V),)
+.SILENT:
+endif
+
+# Import in variables from automake
+CC ?= @CC@
+LD ?= @LD@
+AR ?= @AR@
+KERNEL_CFLAGS  ?= @KERNEL_CFLAGS@ 
+KERNEL_LDFLAGS ?= @KERNEL_LDFLAGS@
+ARCH ?= @ARCH@
+PREFIX ?= @prefix@
+DESTDIR ?=
+
+# Set compiler flags
+override CREALFLAGS := $(KERNEL_CFLAGS)           \
+                       -ffreestanding             \
+	               -fno-stack-protector       \
+	               -fpic                      \
+	               -mno-red-zone              \
+	               -fno-omit-frame-pointer    \
+                       -fplan9-extensions 
+
+override LDREALFLAGS := $(KERNEL_LDFLAGS) -zmax-page-size=0x1000 -nostdlib -pie
+override CREALFLAGS  +=  -I .                       \
+                         -I $(INCLUDE_DIR)          \
+                         -I $(LAI_DIR)/include      \
+                         -I $(ARCH_DIR)/include
+
+# Find all the source code
+override KERNEL_SOURCE := $(shell find $(SOURCE_DIR)/generic $(SOURCE_DIR)/lib $(SOURCE_DIR)/vm $(SOURCE_DIR)/fs -name '*.c')
+override LAI_SOURCE    := $(shell find $(LAI_DIR) -name '*.c')
+override ARCH_SOURCE   := $(shell find $(ARCH_DIR) -name '*.c')
+ifeq ($(ARCH), x86_64)
+    override ARCH_ASSEMBLY_SOURCE := $(shell find $(ARCH_DIR) -name '*.asm')
+    override CREALFLAGS += -mno-80387                 \
+                           -mno-mmx                   \
+                           -mno-3dnow                 \
+                           -mno-sse                   \
+                           -mno-sse2               
+else ifeq ($(ARCH), aarch64)
+    override ARCH_ASSEMBLY_SOURCE := $(shell find $(ARCH_DIR)/src -name '*.S')
+    override CREALFLAGS += -mgeneral-regs-only
+endif
+
+# Create all the objects
+override KERNEL      := vr9x.elf
+override LAI_LIB     := liblai.a
+override OBJECTS     := $(KERNEL_SOURCE:.c=.o)
+override LAI_OBJECTS := $(LAI_SOURCE:.c=.o)
+ifeq ($(ARCH), x86_64)
+    override ARCH_LIB := libx86_64.a
+    override ARCH_OBJECTS := $(ARCH_SOURCE:.c=.o) $(ARCH_ASSEMBLY_SOURCE:.asm=.o) 
+else ifeq ($(ARCH), aarch64)
+    override ARCH_LIB := libaarch64.a
+    override ARCH_OBJECTS := $(ARCH_SOURCE:.c=.o) $(ARCH_ASSEMBLY_SOURCE:.S=.o) 
+endif
+
+# Build the kernel by default
+.PHONY: all clean distclean maintainer-clean
+all: $(KERNEL)
+
+%.o: %.c
+	@$(COOL_PROMPT) " CC " $<
+	$(CC) $(CREALFLAGS) -c -o $@ $<
+
+ifeq ($(ARCH), x86_64)
+%.o: %.asm
+	$(COOL_PROMPT) "ASM " $<
+	@
+	nasm -f elf64 -o $@ $<
+
+$(ARCH_LIB): $(ARCH_OBJECTS)
+	$(COOL_PROMPT) "LIB " $@
+	$(AR) rcs $@ $(ARCH_OBJECTS)
+endif
+
+# Cleaning targets
+clean:
+	@rm -rf $(OBJECTS) $(LAI_OBJECTS) $(ARCH_OBJECTS) $(KERNEL) $(LAI_LIB) $(ARCH_LIB)
+
+distclean: clean
+	@rm -rf GNUmakefile config.log config.status config.h $(IMAGE)
+
+maintainer-clean: distclean
+	@rm -rf configure install-sh autom4te* *'~' third_party
+
+# Installation/Distribution targets
+.PHONY: install install-strip dist
+install: $(KERNEL)
+	@@INSTALL@ -d "$(DESTDIR)$(PREFIX)/kernel"
+	@@INSTALL@ $(KERNEL) "$(DESTDIR)$(PREFIX)/kernel"
+
+install-strip: $(KERNEL)
+	@@INSTALL@ -d "$(DESTDIR)$(PREFIX)/kernel"
+	@@INSTALL@ -s $(KERNEL) "$(DESTDIR)$(PREFIX)/kernel"
+
+dist:
+	rm -rf "ninex-$(VERSION)"
+	mkdir -p "ninex-$(VERSION)"
+	cp -r @srcdir@/.git "ninex-$(VERSION)"/
+	cd "ninex-$(VERSION)" && git checkout .
+	cd "ninex-$(VERSION)" && NOCONFIGURE=yes ../autogen.sh
+	rm -rf "ninex-$(VERSION)/.git"
+	rm -rf "ninex-$(VERSION)/autom4te.cache"
+	tar -zcf "ninex-$(VERSION).tar.gz" "ninex-$(VERSION)"
+	rm -rf "ninex-$(VERSION)"
+
+# Kernel testing/running targets
+$(IMAGE): $(KERNEL)
+	$(COOL_PROMPT) "GEN " $@
+	dd if=/dev/zero of=$(IMAGE) bs=1M count=32
+	parted -s $(IMAGE) mklabel msdos
+	parted -s $(IMAGE) mkpart primary 2048s 100%
+	@$(ECHFS) -m -p0 $(IMAGE) quick-format 512
+	@$(ECHFS) -m -p0 $(IMAGE) import $(KERNEL) /boot/kernel/$(KERNEL)
+	@$(ECHFS) -m -p0 $(IMAGE) import @srcdir@/misc/limine.cfg /boot/limine.cfg
+	@$(ECHFS) -m -p0 $(IMAGE) import @srcdir@/third_party/limine/limine.sys \
+				           /boot/limine.sys
+	third_party/limine/limine-s2deploy $(IMAGE)
+
+.PHONY: run run-kvm
+override QEMU_BASE_FLAGS ?= -m 2G -M q35 --drive id=disk,file=$(IMAGE),if=none -device ahci,id=ahci -device ide-hd,drive=disk,bus=ahci.0 -debugcon stdio
+run: $(IMAGE)
+	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu max
+run-kvm: $(IMAGE)
+	qemu-system-x86_64 $(QEMU_BASE_FLAGS) --enable-kvm -cpu host,+smep,check
+
+
+# Remaining targets for compiling libraries/the kernel
+$(LAI_LIB): $(LAI_OBJECTS)
+	$(COOL_PROMPT) "LIB " $@
+	$(AR) rcs $@ $(LAI_OBJECTS)
+
+$(KERNEL): $(LAI_LIB) $(ARCH_LIB) $(OBJECTS)
+	$(COOL_PROMPT) "LINK" $@
+	$(LD) $(LDREALFLAGS) -T $(ARCH_DIR)/kernel.ld -o $@ $(OBJECTS) $(LAI_LIB) $(ARCH_LIB)
+

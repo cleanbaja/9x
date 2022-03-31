@@ -1,7 +1,7 @@
 #ifndef VM_VIRT_H
 #define VM_VIRT_H
 
-#include <internal/stivale2.h>
+#include <lib/stivale2.h>
 #include <stdbool.h>
 
 // Flags passed to vm_virt_map()...

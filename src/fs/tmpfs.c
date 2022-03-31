@@ -1,4 +1,4 @@
-#include <9x/vfs.h>
+#include <fs/vfs.h>
 #include <fs/backing.h>
 #include <lib/builtin.h>
 #include <vm/vm.h>

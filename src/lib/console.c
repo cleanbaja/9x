@@ -1,13 +1,11 @@
-#include <internal/stivale2.h>
+#include <lib/stivale2.h>
 #include <lib/builtin.h>
 #include <lib/console.h>
-#include <stddef.h>
 
 #define SSFN_CONSOLEBITMAP_TRUECOLOR /* use the special renderer for 32 bit    \
                                         truecolor packed pixels */
 #define SSFN_CONSOLEBITMAP_CONTROL   /* let the renderer manage the cursor */ 
-#include <internal/ssfn.h>
-
+#include <lib/ssfn.h>
 
 extern unsigned char font_data;
 

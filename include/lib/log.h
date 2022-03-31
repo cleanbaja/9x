@@ -6,8 +6,8 @@
 #include <stdint.h>
 
 #include "lock.h"
-#include "proc/smp.h"
-#include "sys/irq.h"
+#include <generic/smp.h>
+#include <arch/irq.h>
 
 void
 log(char* fmt, ...);

@@ -1,4 +1,4 @@
-#include <9x/vfs.h>
+#include <fs/vfs.h>
 #include <lib/builtin.h>
 #include <lib/cmdline.h>
 #include <lib/log.h>
