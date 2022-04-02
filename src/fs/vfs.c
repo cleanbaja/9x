@@ -1,6 +1,6 @@
 #include <fs/vfs.h>
 #include <lib/builtin.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <vm/vm.h>
 
 struct vfs_node* root_node = NULL;
@@ -82,7 +82,7 @@ resolve_path_ex(struct vfs_node* parent,
 
   // Non-Relative paths aren't supported, nor are NULL parents...
   if (parent == NULL) {
-    log("vfs: resolve_path() doesn't know where to start!");
+    klog("vfs: resolve_path() doesn't know where to start!");
     return NULL;
   }
 
@@ -280,9 +280,9 @@ vfs_mount(struct vfs_node* parent, char* source, char* target, char* filesystem)
   }
 
   if (source_node == NULL) {
-    log("vfs: mounted a %s instance to `%s`", filesystem, target);
+    klog("vfs: mounted a %s instance to `%s`", filesystem, target);
   } else {
-    log("vfs: mounted `%s` to `%s` (type: %s)", source, target, filesystem);
+    klog("vfs: mounted `%s` to `%s` (type: %s)", source, target, filesystem);
   }
 }
 

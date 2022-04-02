@@ -22,18 +22,47 @@ struct __attribute__((packed)) tss_entry
   uint32_t reserved;
 };
 
+#define GDT_16BIT_CODE_ENTRY  0x008F9A000000FFFF
+#define GDT_16BIT_DATA_ENTRY  0x008F92000000FFFF
+#define GDT_LEGACY_CODE_ENTRY 0x00CF9A000000FFFF
+#define GDT_LEGACY_DATA_ENTRY 0x00CF92000000FFFF
 #define GDT_KERNEL_CODE_ENTRY 0x00AF9A000000FFFF
 #define GDT_KERNEL_DATA_ENTRY 0x008F92000000FFFF
 #define GDT_USER_CODE_ENTRY   0x00AFFA000000FFFF
 #define GDT_USER_DATA_ENTRY   0x008FF2000000FFFF
 
+#ifdef LIMINE_EARLYCONSOLE
+  #define GDT_KERNEL_CODE  0x28
+  #define GDT_KERNEL_DATA  0x30
+  #define GDT_TSS_SELECTOR 0x48
+#else
+  #define GDT_KERNEL_CODE  0x08
+  #define GDT_KERNEL_DATA  0x10
+  #define GDT_TSS_SELECTOR 0x28
+#endif
+
 struct __attribute__((packed)) gdt
 {
   uint64_t null_entry;
+
+#ifdef LIMINE_EARLYCONSOLE
+  // 16-bit kernel code/data
+  uint64_t ocode_entry;
+  uint64_t odata_entry;
+
+  // 32-bit kernel code/data
+  uint64_t lcode_entry;
+  uint64_t ldata_entry;
+#endif // LIMINE_EARLYCONSOLE
+
+  // 64-bit kernel code/data
   uint64_t kcode_entry;
   uint64_t kdata_entry;
+
+  // 64-bit kernel code/data
   uint64_t ucode_entry;
   uint64_t udata_entry;
+
   struct tss_entry tss;
 };
 

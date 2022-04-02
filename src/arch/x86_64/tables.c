@@ -11,7 +11,7 @@ make_idt_entry(void* handler, uint8_t ist)
 {
   uint64_t address = (uint64_t)handler;
   return (struct idt_entry){ .offset_low = (uint16_t)address,
-                             .selector = 0x08,
+                             .selector = GDT_KERNEL_CODE,
                              .ist = ist,
                              .flags = 0x8e,
                              .offset_mid = (uint16_t)(address >> 16),
@@ -24,6 +24,16 @@ init_tables()
 {
   // Setup the GDT
   main_gdt.null_entry = 0;
+
+  // Add the Legacy Entries, if we're using the limine terminal
+#ifdef LIMINE_EARLYCONSOLE
+  main_gdt.ocode_entry = GDT_16BIT_CODE_ENTRY;
+  main_gdt.odata_entry = GDT_16BIT_DATA_ENTRY;
+  main_gdt.lcode_entry = GDT_LEGACY_CODE_ENTRY;
+  main_gdt.ldata_entry = GDT_LEGACY_DATA_ENTRY; 
+#endif // LIMINE_EARLYCONSOLE
+
+  // Add the standard 64-bit user/kernel entries
   main_gdt.kcode_entry = GDT_KERNEL_CODE_ENTRY;
   main_gdt.kdata_entry = GDT_KERNEL_DATA_ENTRY;
   main_gdt.ucode_entry = GDT_USER_CODE_ENTRY;
@@ -57,7 +67,7 @@ reload_tables()
   // Reload the GDT
   table_pointer.base = (uint64_t)&main_gdt;
   table_pointer.limit = sizeof(struct gdt) - 1;
-  asm_load_gdt(&table_pointer);
+  asm_load_gdt(&table_pointer, GDT_KERNEL_CODE, GDT_KERNEL_DATA);
 
   // Reload the IDT
   table_pointer.base = (uint64_t)entries;
@@ -70,8 +80,7 @@ reload_tables()
 void
 load_tss(uintptr_t address)
 {
-  spinlock_acquire(
-    &table_lock); // We use a lock, becuase this modifies the global GDT
+  spinlock_acquire(&table_lock);
 
   // Activate the TSS, after configuring it...
   main_gdt.tss.base_low16 = (uint16_t)address;
@@ -81,7 +90,7 @@ load_tss(uintptr_t address)
   main_gdt.tss.base_high8 = (uint8_t)(address >> 24);
   main_gdt.tss.base_upper32 = (uint32_t)(address >> 32);
   main_gdt.tss.reserved = 0;
-  __asm__ volatile("ltr %0" ::"rm"((uint16_t)0x28) : "memory");
+  __asm__ volatile("ltr %0" ::"rm"((uint16_t)GDT_TSS_SELECTOR) : "memory");
 
   // Update the IDT to become TSS aware
   entries[2] = make_idt_entry(asm_dispatch_table[2], 1);

@@ -1,8 +1,9 @@
 #include <generic/acpi.h>
 #include <generic/sched.h>
+#include <generic/smp.h>
 #include <lib/cmdline.h>
-#include <lib/console.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
+#include <lib/kcon.h>
 #include <arch/apic.h>
 #include <arch/tables.h>
 #include <vm/phys.h>
@@ -25,9 +26,23 @@ static struct stivale2_header_tag_smp smp_tag = {
   .flags = (1 << 0)
 };
 
+#ifdef LIMINE_EARLYCONSOLE
+static struct stivale2_header_tag_terminal terminal_hdr_tag = {
+    .tag = {
+        .identifier = STIVALE2_HEADER_TAG_TERMINAL_ID,
+        .next = (uintptr_t)&smp_tag
+    },
+    .flags = 0
+};
+#endif
+
 static struct stivale2_header_tag_framebuffer fbuf_tag = {
   .tag = { .identifier = STIVALE2_HEADER_TAG_FRAMEBUFFER_ID,
+  #ifdef LIMINE_EARLYCONSOLE
+           .next = (uintptr_t)&terminal_hdr_tag },
+  #else
            .next = (uintptr_t)&smp_tag },
+  #endif
   .framebuffer_width = 0,
   .framebuffer_height = 0,
   .framebuffer_bpp = 0
@@ -69,16 +84,16 @@ stivale2_find_tag(uint64_t id)
 static void
 early_init()
 {
-   // Start the console and say hello!
-  console_init();
-  log("9x (%s) (%s) - A project by cleanbaja", NINEX_VERSION, NINEX_ARCH);
-  log("Bootloader: %s [%s]",
-      bootags->bootloader_brand,
-      bootags->bootloader_version);
+  // Start the console and say hello!
+  kcon_init();
+  klog("9x (%s) (%s) - A project by cleanbaja", NINEX_VERSION, NINEX_ARCH);
+  klog("Bootloader: %s [%s]",
+       bootags->bootloader_brand,
+       bootags->bootloader_version);
 
   // Get arch-specific structures up
-  init_tables();
   cpu_early_init();
+  init_tables();
 
   // Finally, load the kernel command line
   struct stivale2_struct_tag_cmdline* cmdline_tag = (struct stivale2_struct_tag_cmdline*)stivale2_find_tag(STIVALE2_STRUCT_TAG_CMDLINE_ID);
@@ -92,7 +107,7 @@ main_thread(uint64_t arg)
   __asm__ volatile("cli");
 
   // Chill for now...
-  log("init: Startup complete, halting all cores!");
+  klog("init: Startup complete, halting all cores!");
   apic_send_ipi(IPI_HALT, 0, IPI_OTHERS);
   sched_kill_thread(per_cpu(cur_thread));
 

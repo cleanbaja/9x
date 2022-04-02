@@ -1,7 +1,7 @@
 #include <generic/acpi.h>
 #include <arch/asm.h>
 #include <lai/core.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <vm/phys.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
@@ -24,20 +24,22 @@ laihost_free(void* p, size_t unused)
 
 void laihost_panic(const char* str) {
   PANIC(NULL, "lai: %s\n");
+
+  for(;;); // To satisfy GCC
 }
 
 void laihost_log(int level, const char *msg) {
   if (level == LAI_WARN_LOG) {
-    log("WARNING: (lai) %s", msg);
+    klog("WARNING: (lai) %s", msg);
   } else {
-    log("lai: %s", msg);
+    klog("lai: %s", msg);
   }
 }
 
 void *laihost_scan(const char *signature, size_t index) {
     if (!memcmp(signature, "DSDT", 4)) {
         if (index > 0) {
-            log("acpi: Only valid index for DSDT is 0");
+            klog("acpi: Only valid index for DSDT is 0");
             return NULL;
         }
 
@@ -45,7 +47,7 @@ void *laihost_scan(const char *signature, size_t index) {
         acpi_fadt_t *fadt = (acpi_fadt_t *)acpi_query("FACP", 0);
         void *dsdt = (char *)((size_t)fadt->dsdt + VM_MEM_OFFSET);
 
-        log("acpi: Address of DSDT is 0x%lx", dsdt);
+        klog("acpi: Address of DSDT is 0x%lx", dsdt);
         return dsdt;
     } else {
       return acpi_query(signature, index);
@@ -118,7 +120,7 @@ void laihost_sleep(uint64_t ms) {
 }
 
 // The following are stubs functions I keep in here, so that the linker dosen't generate R_X86_64_GLOB_DAT relocs
-#define STUB_CALLED() log("lai: STUB CALLED!!!")
+#define STUB_CALLED() klog("lai: STUB CALLED!!!")
 uint64_t laihost_timer() {
   STUB_CALLED();
   return 0;

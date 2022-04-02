@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <stdarg.h>
 
 // Memset functions
 void
@@ -23,10 +24,23 @@ int
 strlen(const char* str);
 int
 strcmp(const char* s1, const char* s2);
+int
+snprintf(char* buffer, size_t count, const char* format, ...);
+int
+vsnprintf(char* buffer, size_t count, const char* format, va_list va);
 
 // Bitwise functions
 #define BIT_SET(bitmap, __bit) (bitmap[(__bit) / 8] |= (1 << ((__bit) % 8)))
 #define BIT_CLEAR(bitmap, __bit) (bitmap[(__bit) / 8] &= ~(1 << ((__bit) % 8)))
 #define BIT_TEST(bitmap, __bit) ((bitmap[(__bit) / 8] >> ((__bit) % 8)) & 1)
 
+// Stack tracing functions
+void
+strace_unwind();
+void
+strace_load(uint64_t ptr);
+uintptr_t
+strace_get_symbol(char* name);
+
 #endif // LIB_BUILTIN_H
+

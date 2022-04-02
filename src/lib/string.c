@@ -1,10 +1,7 @@
 #include <lib/builtin.h>
 #include <lib/lock.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 
-#include <lib/console.h>
-#include <stdbool.h>
-#include <stdint.h>
 
 /*
  *  printf-family of functions ported to 9x
@@ -660,52 +657,3 @@ vsnprintf(char* buffer, size_t count, const char* format, va_list va)
   return _vsnprintf(_out_buffer, buffer, count, format, va);
 }
 
-static void
-_debug_write(const char* str)
-{
-  for (int i = 0; i < _strnlen_s(str, 512); i++) {
-    __asm__ volatile("outb %1, %0" : : "dN"(0xE9), "a"(str[i]));
-  }
-}
-
-char msg_buf[512], main_buf[512];
-static CREATE_SPINLOCK(log_lock);
-int in_panic = 0;
-
-void
-raw_log(char* fmt, ...)
-{
-  spinlock_acquire(&log_lock);
-  va_list va;
-  va_start(va, fmt);
-
-  _vsnprintf(_out_buffer, msg_buf, 512, fmt, va);
-  va_end(va);
-
-  _debug_write(msg_buf);
-  console_write(msg_buf);
-  memset64(msg_buf, 0, 512);
-
-  spinlock_release(&log_lock);
-}
-
-void
-log(char* fmt, ...)
-{
-  spinlock_acquire(&log_lock);
-  va_list va;
-  va_start(va, fmt);
-
-  _vsnprintf(_out_buffer, msg_buf, 512, fmt, va);
-  snprintf(main_buf, 512, "[%*d.%06d] %s\n", 5, 0, 0, msg_buf);
-  va_end(va);
-
-  _debug_write(main_buf);
-  console_write(main_buf);
-
-  // Clear both buffers
-  memset64(msg_buf, 0, 512);
-  memset64(main_buf, 0, 512);
-
-  spinlock_release(&log_lock);
-}

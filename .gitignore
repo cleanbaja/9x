@@ -1,8 +1,13 @@
-# Ignore commonly used build dirs
-build
-out
-res
-dbg
+# generated things
+*.o
+*.elf
+ninex.hdd
+GNUmakefile
+configure
+*.cache
+config.h
+install-sh
+config.status
 
 # clang intellisense
 .clang

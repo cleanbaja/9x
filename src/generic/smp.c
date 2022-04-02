@@ -1,7 +1,8 @@
 #include <arch/cpuid.h>
 #include <lib/lock.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <generic/sched.h>
+#include <generic/smp.h>
 #include <arch/apic.h>
 #include <arch/cpu.h>
 #include <arch/tables.h>
@@ -110,7 +111,7 @@ void smp_init(struct stivale2_struct_tag_smp *smp_tag) {
 
   // Wait for all CPUs to be ready
   while (ATOMIC_READ(&active_cpus) != smp_tag->cpu_count);
-  log("smp: %d CPUs initialized!", active_cpus);
+  klog("smp: %d CPUs initialized!", active_cpus);
 }
 
 

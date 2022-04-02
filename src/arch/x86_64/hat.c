@@ -3,7 +3,7 @@
 #include <vm/virt.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 
 // Set defaults to match 4LV paging
 enum { VM_5LV_PAGING, VM_4LV_PAGING } paging_mode = VM_4LV_PAGING;
@@ -17,7 +17,7 @@ create_pte(uintptr_t phys, int flags, bool huge_page)
 
   // Encode permissions
   if (!(flags & VM_PERM_READ)) {
-    log("vm/virt: (WARN) Non-Readable mappings not supported on x86 (flags: 0x%x)",
+    klog("vm/virt: (WARN) Non-Readable mappings not supported on x86 (flags: 0x%x)",
         flags);
   }
   if (flags & VM_PERM_WRITE) {
@@ -74,7 +74,7 @@ next_level(uint64_t* prev_level, uint64_t index, bool create)
 
 void hat_map_page(uintptr_t root, uintptr_t phys, uintptr_t virt, int flags) {
   if (!(phys % 0x1000 == 0))
-    log("hat: unaligned 4KB mapping! (phys, virt: 0x%lx, 0x%lx)", phys, virt);
+    klog("hat: unaligned 4KB mapping! (phys, virt: 0x%lx, 0x%lx)", phys, virt);
 
   // Index the virtual address
   uint64_t pml5_index = (virt & ((uint64_t)0x1ff << 48)) >> 48;
@@ -106,7 +106,7 @@ void hat_map_page(uintptr_t root, uintptr_t phys, uintptr_t virt, int flags) {
 
 void hat_map_huge_page(uintptr_t root, uintptr_t phys, uintptr_t virt, int flags) {
   if (!(phys % 0x200000 == 0))
-    log("hat: unaligned 2MB mapping! (phys, virt: 0x%lx, 0x%lx)", phys, virt);
+    klog("hat: unaligned 2MB mapping! (phys, virt: 0x%lx, 0x%lx)", phys, virt);
 
   // Index the virtual address
   uint64_t pml5_index = (virt & ((uint64_t)0x1ff << 48)) >> 48;
@@ -211,7 +211,7 @@ void hat_invl(uintptr_t root, uintptr_t virt, uint32_t asid, int mode) {
         break;
 
       default:
-        log("hat: Invalidation mode %d is not supported!", mode); 
+        klog("hat: Invalidation mode %d is not supported!", mode); 
       }
     }
   } else {
@@ -228,7 +228,7 @@ void hat_invl(uintptr_t root, uintptr_t virt, uint32_t asid, int mode) {
       break;
 
     default:
-      log("hat: Invalidation mode %d is not supported!", mode); 
+      klog("hat: Invalidation mode %d is not supported!", mode); 
     }
   }
 

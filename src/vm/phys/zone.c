@@ -1,5 +1,5 @@
 #include <lib/builtin.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
 
@@ -61,7 +61,7 @@ vm_create_zone(uintptr_t base, uint64_t len)
     zone->prev = head_zone;
   }
 
-  log("vm/zone: created zone [0x%lx - 0x%lx] (%u KiB)",
+  klog("vm/zone: created zone [0x%lx - 0x%lx] (%u KiB)",
       aligned_base,
       zone->limit,
       zone->bitmap_len / 1000);

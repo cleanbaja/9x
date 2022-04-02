@@ -1,7 +1,8 @@
 #include <arch/asm.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <arch/apic.h>
 #include <arch/irq.h>
+#include <stddef.h>
 
 static struct irq_handler handlers[256] = { 0 };
 static int last_vector = 64; // Start over the I/O APIC window, 
@@ -22,7 +23,7 @@ alloc_irq_vec()
   // Make sure we don't give out reserved vectors, 
   // which are from 250-255 and 0-63
   if (last_vector > 249 || last_vector < 64) {
-    log("sys/irq: (WARN) Unable to find any free vectors!");
+    klog("sys/irq: (WARN) Unable to find any free vectors!");
     return -1;
   } else {
     return last_vector++;
@@ -97,32 +98,32 @@ static char* exc_table[] = { [0] = "Division by Zero",
 void
 dump_context(cpu_ctx_t* regs)
 {
-  raw_log("Exception #%d (%s)\n", regs->int_no, exc_table[regs->int_no]);
-  raw_log("    Error Code: 0x%08lx, RIP: 0x%08lx, RSP: 0x%08lx\n",
+  klog_unlocked("Exception #%d (%s)\n", regs->int_no, exc_table[regs->int_no]);
+  klog_unlocked("    Error Code: 0x%08lx, RIP: 0x%08lx, RSP: 0x%08lx\n",
           regs->ec,
           regs->rip,
           regs->rsp);
-  raw_log("    RAX: 0x%08lx, RBX: 0x%08lx, RCX: 0x%08lx, RDX: 0x%08lx\n",
+  klog_unlocked("    RAX: 0x%08lx, RBX: 0x%08lx, RCX: 0x%08lx, RDX: 0x%08lx\n",
           regs->rax,
           regs->rbx,
           regs->rcx,
           regs->rbx);
-  raw_log("    RSI: 0x%08lx, RDI: 0x%08lx, RSP: 0x%08lx, RBP: 0x%08lx\n",
+  klog_unlocked("    RSI: 0x%08lx, RDI: 0x%08lx, RSP: 0x%08lx, RBP: 0x%08lx\n",
           regs->rsi,
           regs->rdi,
           regs->rsp,
           regs->rbp);
-  raw_log("    R8:  0x%08lx, R9:  0x%08lx, R10: 0x%08lx, R11: 0x%08lx\n",
+  klog_unlocked("    R8:  0x%08lx, R9:  0x%08lx, R10: 0x%08lx, R11: 0x%08lx\n",
           regs->r8,
           regs->r9,
           regs->r10,
           regs->r11);
-  raw_log("    R12: 0x%08lx, R12: 0x%08lx, R13: 0x%08lx, R14: 0x%08lx\n",
+  klog_unlocked("    R12: 0x%08lx, R12: 0x%08lx, R13: 0x%08lx, R14: 0x%08lx\n",
           regs->r12,
           regs->r13,
           regs->r13,
           regs->r14);
-  raw_log("    R15: 0x%08lx, CS:  0x%08lx, SS:  0x%08lx\n\n",
+  klog_unlocked("    R15: 0x%08lx, CS:  0x%08lx, SS:  0x%08lx\n\n",
           regs->r15,
           regs->cs,
           regs->ss);
@@ -130,37 +131,37 @@ dump_context(cpu_ctx_t* regs)
   if (regs->int_no == 14) {
     // Print extra information in the case of a page fault
     uint64_t cr2_val = asm_read_cr2();
-    raw_log("Linear Address: 0x%lx\nConditions:\n", cr2_val);
+    klog_unlocked("Linear Address: 0x%lx\nConditions:\n", cr2_val);
 
     // See Intel x86 SDM Volume 3a Chapter 4.7
     uint64_t error_code = regs->ec;
     if (((error_code) & (1 << (0))))
-      raw_log("    - Page level protection violation\n");
+      klog_unlocked("    - Page level protection violation\n");
     else
-      raw_log("    - Non-present page\n");
+      klog_unlocked("    - Non-present page\n");
 
     if (((error_code) & (1 << (1))))
-      raw_log("    - Write\n");
+      klog_unlocked("    - Write\n");
     else
-      raw_log("    - Read\n");
+      klog_unlocked("    - Read\n");
 
     if (((error_code) & (1 << (2))))
-      raw_log("    - User access\n");
+      klog_unlocked("    - User access\n");
     else
-      raw_log("    - Supervisor access\n");
+      klog_unlocked("    - Supervisor access\n");
 
     if (((error_code) & (1 << (3))))
-      raw_log("    - Reserved bit set\n");
+      klog_unlocked("    - Reserved bit set\n");
 
     if (((error_code) & (1 << (4))))
-      raw_log("    - Instruction fetch\n");
+      klog_unlocked("    - Instruction fetch\n");
 
     if (((error_code) & (1 << (5))))
-      raw_log("    - Protection key violation\n");
+      klog_unlocked("    - Protection key violation\n");
 
     if (((error_code) & (1 << (15))))
-      raw_log("    - SGX violation\n");
+      klog_unlocked("    - SGX violation\n");
 
-    raw_log("\n");
+    klog_unlocked("\n");
   }
 }

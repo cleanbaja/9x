@@ -1,5 +1,5 @@
 #include <lib/builtin.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <generic/sched.h>
 #include <generic/smp.h>
 #include <arch/apic.h>

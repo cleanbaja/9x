@@ -9,10 +9,31 @@ if ! test "x$NASM_LOCATED" = "xyes"; then
 fi
 
 # Kernel features that can be enabled/disabled
+#----------------------------------------------#
 AC_ARG_ENABLE(hardened-kernel,
     AS_HELP_STRING([--enable-hardened-kernel], [enables kernel security features like UBSAN/STK Protector]),
     HARDENED_BUILD="$enableval")
 AC_SUBST(HARDENED_BUILD, [$HARDENED_BUILD])
+echo configure: hardened-build is $HARDENED_BUILD
+
+#----------------------------------------------#
+AC_ARG_ENABLE(earlyconsole,
+    AS_HELP_STRING([--disable-earlyconsole], [disables the use of the stivale2 terminal as a early logging output, required if not using limine]),
+    LIMINE_EARLYCONSOLE="$enableval")
+
+# If we're on aarch64, disable the LIMINE_EARLYCONSOLE, even if the flag isn't passed
+if test "x$ARCH" = "xaarch64"; then
+    LIMINE_EARLYCONSOLE=""
+fi
+if test "x$LIMINE_EARLYCONSOLE" = "xno"; then
+    LIMINE_EARLYCONSOLE=""
+else
+    LIMINE_EARLYCONSOLE="yes"
+fi
+
+AC_SUBST(LIMINE_EARLYCONSOLE, [$LIMINE_EARLYCONSOLE])
+
+#----------------------------------------------#
 
 # Kernel arguments
 AC_ARG_VAR(ARCH, [Kernel CPU Architecture [x86_64]])

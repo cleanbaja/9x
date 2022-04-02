@@ -1,4 +1,5 @@
-#include <lib/log.h>
+#include <lib/kcon.h>
+#include <stddef.h>
 #include <stdint.h>
 
 struct tu_source_location

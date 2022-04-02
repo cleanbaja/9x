@@ -1,5 +1,6 @@
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <arch/apic.h>
+#include <arch/irq.h>
 #include <vm/phys.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
@@ -45,12 +46,12 @@ vm_init(struct stivale2_struct_tag_memmap* mm_tag)
 {
   // Dump all memmap entries
   if (mm_tag->entries > 20) {
-    log("vm/phys: a total of %d entries in memmap!", mm_tag->entries);
+    klog("vm/phys: a total of %d entries in memmap!", mm_tag->entries);
   } else {
-    log("vm/phys: Dumping memory map (entries: %d):", mm_tag->entries);
+    klog("vm/phys: Dumping memory map (entries: %d):", mm_tag->entries);
     for (int i = 0; i < mm_tag->entries; i++) {
       struct stivale2_mmap_entry entry = mm_tag->memmap[i];
-      log("    (0x%016lx-0x%016lx) %s",
+      klog("    (0x%016lx-0x%016lx) %s",
           entry.base,
           entry.base + entry.length,
           mem_to_str(entry.type));

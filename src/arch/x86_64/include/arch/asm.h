@@ -19,7 +19,7 @@
 // GDT/IDT asm routines
 extern void* asm_dispatch_table[256];
 extern void
-asm_load_gdt(void* g);
+asm_load_gdt(void* g, uint16_t codeseg, uint16_t dataseg);
 #define asm_load_idt(ptr) __asm__ volatile("lidt %0" ::"m"(ptr))
 
 // CR0-4 & MSR asm routines

@@ -1,7 +1,7 @@
 #include <generic/acpi.h>
 #include <arch/timer.h>
 #include <arch/cpu.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <generic/smp.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
@@ -46,7 +46,7 @@ void tsc_calibrate() {
   if (hpet_base == 0x0) hpet_init();
   if (!CPU_CHECK(CPU_FEAT_INVARIANT)) {
     if (is_bsp())
-      log("tsc: Invariant TSC is not supported!");
+      klog("tsc: Invariant TSC is not supported!");
  
     goto outro;
   }
@@ -78,7 +78,7 @@ void tsc_calibrate() {
     int d3 = (n / 10) % 10;
     int d2 = (n / 100) % 10;
     int d1 = (n / 1000);
-    log("tsc: CPU frequency is locked at %d.%d%d%d GHz",
+    klog("tsc: CPU frequency is locked at %d.%d%d%d GHz",
         d1,
         d2,
         d3,

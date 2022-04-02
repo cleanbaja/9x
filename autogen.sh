@@ -19,7 +19,7 @@ git clone https://github.com/echfs/echfs.git $srcdir/third_party/echfs
 make -C $srcdir/third_party/echfs echfs-utils
 
 # Pull in limine, which is the bootloader we currently use
-git clone https://github.com/limine-bootloader/limine.git --branch=latest-binary --depth=1 $srcdir/third_party/limine
+git clone https://github.com/limine-bootloader/limine.git --branch=v3.0-branch-binary --depth=1 $srcdir/third_party/limine
 make -C $srcdir/third_party/limine
 
 # Run 'configure' unless we're told not to...

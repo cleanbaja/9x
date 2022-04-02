@@ -1,5 +1,6 @@
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <generic/sched.h>
+#include <arch/tables.h>
 #include <arch/cpu.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
@@ -52,8 +53,8 @@ proc_create_kthread(uint64_t entry, uint64_t arg1)
   new_thread->context.rip = entry;
   new_thread->context.rdi = arg1;
   new_thread->context.rflags = 0x202;
-  new_thread->context.cs = 0x8;
-  new_thread->context.ss = 0x10;
+  new_thread->context.cs = GDT_KERNEL_CODE;
+  new_thread->context.ss = GDT_KERNEL_DATA;
 
   // Setup the remaining values
   new_thread->timeslice = DEFAULT_TIMESLICE;

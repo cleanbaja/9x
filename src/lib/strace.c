@@ -1,4 +1,4 @@
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <lib/builtin.h>
 
 #define BACKTRACE_MAX 20
@@ -59,7 +59,7 @@ strace_unwind(uintptr_t* base)
     __asm__ volatile("movq %%rbp, %0" : "=g"(base) :: "memory");
   }
 
-  raw_log("Stacktrace:\n");
+  klog_unlocked("Stacktrace:\n");
   for (;;) {
     uintptr_t old_bp = base[0];
     uintptr_t ret_addr = base[1];
@@ -71,9 +71,9 @@ strace_unwind(uintptr_t* base)
     char* name = addr_to_name(ret_addr, &offset);
 
     if (name)
-      raw_log("  * 0x%lx <%s+0x%lx>\n", ret_addr, name, offset);
+      klog_unlocked("  * 0x%lx <%s+0x%lx>\n", ret_addr, name, offset);
     else
-      raw_log("  * 0x%lx\n", ret_addr);
+      klog_unlocked("  * 0x%lx\n", ret_addr);
 
     if (!old_bp)
       break;

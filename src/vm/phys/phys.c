@@ -1,5 +1,5 @@
 #include <lib/builtin.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
 
@@ -46,7 +46,7 @@ vm_phys_alloc(size_t pages, int flags)
   }
 
   // We couldn't find anything, so return NULL
-  log("vm/phys: (WARN) Out of physical memory!");
+  klog("vm/phys: (WARN) Out of physical memory!");
   return NULL;
 }
 
@@ -55,7 +55,7 @@ vm_phys_free(void* ptr, size_t count)
 {
   struct vm_zone* zn = find_zone((uintptr_t)ptr);
   if (zn == NULL) {
-    log("vm/phys: address 0x%lx dosen't fit in any zone!", zn);
+    klog("vm/phys: address 0x%lx dosen't fit in any zone!", zn);
     return;
   } else {
     vm_zone_free(zn, ptr, count);

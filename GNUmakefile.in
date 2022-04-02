@@ -20,13 +20,14 @@ AR ?= @AR@
 KERNEL_CFLAGS  ?= @KERNEL_CFLAGS@ 
 KERNEL_LDFLAGS ?= @KERNEL_LDFLAGS@
 ARCH ?= @ARCH@
+HARDENED_BUILD ?= @HARDENED_BUILD@
+LIMINE_EARLYCONSOLE ?= @LIMINE_EARLYCONSOLE@
 PREFIX ?= @prefix@
 DESTDIR ?=
 
 # Set compiler flags
 override CREALFLAGS := $(KERNEL_CFLAGS)           \
                        -ffreestanding             \
-	               -fno-stack-protector       \
 	               -fpic                      \
 	               -mno-red-zone              \
 	               -fno-omit-frame-pointer    \
@@ -37,6 +38,16 @@ override CREALFLAGS  +=  -I .                       \
                          -I $(INCLUDE_DIR)          \
                          -I $(LAI_DIR)/include      \
                          -I $(ARCH_DIR)/include
+
+# Enable a hardened build/earlyconsole if requested
+ifeq ($(HARDENED_BUILD), yes)
+    override CREALFLAGS += -DSECURE_BUILD -fsanitize=undefined -fstack-protector
+else
+    override CREALFLAGS += -fno-stack-protector
+endif
+ifeq ($(LIMINE_EARLYCONSOLE), yes)
+    override CREALFLAGS += -DLIMINE_EARLYCONSOLE
+endif
 
 # Find all the source code
 override KERNEL_SOURCE := $(shell find $(SOURCE_DIR)/generic $(SOURCE_DIR)/lib $(SOURCE_DIR)/vm $(SOURCE_DIR)/fs -name '*.c')
@@ -71,6 +82,7 @@ endif
 .PHONY: all clean distclean maintainer-clean
 all: $(KERNEL)
 
+# Targets for compiling the kernel
 %.o: %.c
 	@$(COOL_PROMPT) " CC " $<
 	$(CC) $(CREALFLAGS) -c -o $@ $<
@@ -85,6 +97,14 @@ $(ARCH_LIB): $(ARCH_OBJECTS)
 	$(COOL_PROMPT) "LIB " $@
 	$(AR) rcs $@ $(ARCH_OBJECTS)
 endif
+
+$(LAI_LIB): $(LAI_OBJECTS)
+	$(COOL_PROMPT) "LIB " $@
+	$(AR) rcs $@ $(LAI_OBJECTS)
+
+$(KERNEL): $(LAI_LIB) $(ARCH_LIB) $(OBJECTS)
+	$(COOL_PROMPT) "LINK" $@
+	$(LD) $(LDREALFLAGS) -T $(ARCH_DIR)/kernel.ld -o $@ $(OBJECTS) $(LAI_LIB) $(ARCH_LIB)
 
 # Cleaning targets
 clean:
@@ -128,22 +148,13 @@ $(IMAGE): $(KERNEL)
 	@$(ECHFS) -m -p0 $(IMAGE) import @srcdir@/misc/limine.cfg /boot/limine.cfg
 	@$(ECHFS) -m -p0 $(IMAGE) import @srcdir@/third_party/limine/limine.sys \
 				           /boot/limine.sys
-	third_party/limine/limine-s2deploy $(IMAGE)
+	third_party/limine/limine-deploy $(IMAGE)
 
 .PHONY: run run-kvm
-override QEMU_BASE_FLAGS ?= -m 2G -M q35 --drive id=disk,file=$(IMAGE),if=none -device ahci,id=ahci -device ide-hd,drive=disk,bus=ahci.0 -debugcon stdio
+override QEMU_BASE_FLAGS += -m 2G -M q35 -drive file=$(IMAGE),if=none,id=nvm -device nvme,serial=deadbeef,drive=nvm -debugcon stdio
 run: $(IMAGE)
 	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu max
 run-kvm: $(IMAGE)
 	qemu-system-x86_64 $(QEMU_BASE_FLAGS) --enable-kvm -cpu host,+smep,check
 
-
-# Remaining targets for compiling libraries/the kernel
-$(LAI_LIB): $(LAI_OBJECTS)
-	$(COOL_PROMPT) "LIB " $@
-	$(AR) rcs $@ $(LAI_OBJECTS)
-
-$(KERNEL): $(LAI_LIB) $(ARCH_LIB) $(OBJECTS)
-	$(COOL_PROMPT) "LINK" $@
-	$(LD) $(LDREALFLAGS) -T $(ARCH_DIR)/kernel.ld -o $@ $(OBJECTS) $(LAI_LIB) $(ARCH_LIB)
 

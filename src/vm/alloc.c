@@ -1,5 +1,5 @@
 #include <lib/lock.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
 
@@ -185,23 +185,23 @@ liballoc_dump()
   struct liballoc_minor* min = NULL;
 #endif
 
-  log("liballoc: Dumping Memory Data... ");
-  log("    System memory allocated: %u bytes", l_allocated);
-  log("    Memory in used (malloc'ed): %u bytes", l_inuse);
-  log("    Warning count: %u", l_warningCount);
-  log("    Error count: %u", l_errorCount);
-  log("    Possible overruns: %u", l_possibleOverruns);
+  klog("liballoc: Dumping Memory Data... ");
+  klog("    System memory allocated: %u bytes", l_allocated);
+  klog("    Memory in used (malloc'ed): %u bytes", l_inuse);
+  klog("    Warning count: %u", l_warningCount);
+  klog("    Error count: %u", l_errorCount);
+  klog("    Possible overruns: %u", l_possibleOverruns);
 
 #ifdef DEBUG
   while (maj != NULL) {
-    log("liballoc: (0x%lx, major) total = %u, used = %u",
+    klog("liballoc: (0x%lx, major) total = %u, used = %u",
         maj,
         maj->size,
         maj->usage);
 
     min = maj->first;
     while (min != NULL) {
-      log("liballoc: (0x%lx, minor) %u bytes", min, min->size);
+      klog("liballoc: (0x%lx, minor) %u bytes", min, min->size);
       min = min->next;
     }
 
@@ -238,7 +238,7 @@ allocate_new_page(unsigned int size)
   if (maj == NULL) {
     l_warningCount += 1;
 #if defined DEBUG || defined INFO
-    log("liballoc: liballoc_alloc( %u ) returned NULL\n", st);
+    klog("liballoc: liballoc_alloc( %u ) returned NULL\n", st);
 #endif
     return NULL; // uh oh, we ran out of memory.
   }
@@ -253,12 +253,12 @@ allocate_new_page(unsigned int size)
   l_allocated += maj->size;
 
 #ifdef DEBUG
-  log("liballoc: Resource allocated 0x%lx of %d pages (%d bytes) for %d size.",
+  klog("liballoc: Resource allocated 0x%lx of %d pages (%d bytes) for %d size.",
       maj,
       st,
       maj->size,
       size);
-  log("liballoc: Total memory usage = %d KB", (int)((l_allocated / (1024))));
+  klog("liballoc: Total memory usage = %d KB", (int)((l_allocated / (1024))));
 #endif
 
   return maj;
@@ -288,7 +288,7 @@ PREFIX(malloc)(size_t req_size)
   if (size == 0) {
     l_warningCount += 1;
 #if defined DEBUG || defined INFO
-    log("liballoc: alloc( 0 ) called from 0x%lx", __builtin_return_address(0));
+    klog("liballoc: alloc( 0 ) called from 0x%lx", __builtin_return_address(0));
 #endif
     liballoc_unlock();
     return PREFIX(malloc)(1);
@@ -297,7 +297,7 @@ PREFIX(malloc)(size_t req_size)
   if (l_memRoot == NULL) {
 #if defined DEBUG || defined INFO
 #ifdef DEBUG
-    log("liballoc: Initialization of liballoc " VERSION);
+    klog("liballoc: Initialization of liballoc " VERSION);
 #endif
     liballoc_dump();
 #endif
@@ -307,18 +307,18 @@ PREFIX(malloc)(size_t req_size)
     if (l_memRoot == NULL) {
       liballoc_unlock();
 #ifdef DEBUG
-      log("liballoc: Initial l_memRoot setup failed!");
+      klog("liballoc: Initial l_memRoot setup failed!");
 #endif
       return NULL;
     }
 
 #ifdef DEBUG
-    log("liballoc: first major memory chunk is at 0x%lx", l_memRoot);
+    klog("liballoc: first major memory chunk is at 0x%lx", l_memRoot);
 #endif
   }
 
 #ifdef DEBUG
-  log("liballoc: 0x%lx kmalloc( %d ): ", __builtin_return_address(0), size);
+  klog("liballoc: 0x%lx kmalloc( %d ): ", __builtin_return_address(0), size);
 #endif
 
   // Now we need to bounce through every major and find enough space....
@@ -565,7 +565,7 @@ PREFIX(malloc)(size_t req_size)
 // printf(KPRN_ERR, "LIBALLOC", "All cases exhausted. No memory available.\n");
 #endif
 #if defined DEBUG || defined INFO
-  log("liballoc: WARNING: PREFIX(malloc)( %u ) returning NULL.", size);
+  klog("liballoc: WARNING: PREFIX(malloc)( %u ) returning NULL.", size);
   liballoc_dump();
 #endif
   return NULL;
@@ -580,7 +580,7 @@ PREFIX(free)(void* ptr)
   if (ptr == NULL) {
     l_warningCount += 1;
 #if defined DEBUG || defined INFO
-    log("liballoc: PREFIX(free)( NULL ) called from 0x%lx",
+    klog("liballoc: PREFIX(free)( NULL ) called from 0x%lx",
         __builtin_return_address(0));
 #endif
     return;
@@ -610,7 +610,7 @@ PREFIX(free)(void* ptr)
 
     if (min->magic == LIBALLOC_DEAD) {
 #if defined DEBUG || defined INFO
-      log("liballoc: double free attempt on 0x%lx from 0x%lx!",
+      klog("liballoc: double free attempt on 0x%lx from 0x%lx!",
           ptr,
           __builtin_return_address(0));
 #endif

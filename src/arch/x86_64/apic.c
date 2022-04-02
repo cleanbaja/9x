@@ -1,7 +1,8 @@
 #include <generic/acpi.h>
+#include <generic/smp.h>
 #include <arch/asm.h>
 #include <arch/cpuid.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <arch/apic.h>
 #include <arch/tables.h>
 #include <arch/timer.h>
@@ -86,7 +87,7 @@ generate_flags(enum ipi_mode md)
       to_return |= (1 << 19) | (1 << 14);  // One time only, Send to all including self
       break;
     default:
-      log("apic: Unknown IPI mode %d", md);
+      klog("apic: Unknown IPI mode %d", md);
       break;
   }
 
@@ -157,7 +158,7 @@ apic_enable()
   asm_write_cr8(0);
 
   if (apic_msr & (1 << 8))
-    log("apic: enabled in %s mode (base: 0x%lx)",
+    klog("apic: enabled in %s mode (base: 0x%lx)",
         use_x2apic ? "x2APIC" : "xAPIC",
         xapic_base);
 }
@@ -219,7 +220,7 @@ apic_redirect_irq(uint8_t lapic_id, uint8_t vec, uint8_t irq, bool masked)
 {
   for (size_t i = 0; i < madt_isos.length; i++) {
     if (madt_isos.data[i]->irq_source == irq) {
-      log("apic: IRQ %u used by override.", irq);
+      klog("apic: IRQ %u used by override.", irq);
       apic_redirect_gsi(lapic_id,
                         vec,
                         madt_isos.data[i]->gsi,

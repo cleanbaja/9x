@@ -1,7 +1,7 @@
 #include <arch/asm.h>
 #include <arch/hat.h>
 #include <lib/builtin.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <lib/stivale2.h>
 
 #include <vm/phys.h>

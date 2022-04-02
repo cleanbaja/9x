@@ -3,7 +3,7 @@
 #include <arch/cpu.h>
 #include <arch/tables.h>
 #include <lib/lock.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
 
@@ -40,9 +40,9 @@ static void detect_cpu_features() {
     extern enum { VM_5LV_PAGING, VM_4LV_PAGING } paging_mode;
     paging_mode  = VM_5LV_PAGING;
 
-    log("cpu: la57 detected!");
+    klog("cpu: la57 detected!");
   }
-  
+ 
   cpuid_subleaf(0x80000007, 0x0, &eax, &ebx, &ecx, &edx);
   if (edx & CPUID_EDX_INVARIANT) {
     cpu_features |= CPU_FEAT_INVARIANT;
@@ -52,7 +52,7 @@ static void detect_cpu_features() {
   if (ecx & CPUID_ECX_TCE) {
     cpu_features |= CPU_FEAT_TCE;
   }
-  
+ 
   // Set the last bit so that we don't run this function more than once
   cpu_features |= (1ull << 63ull);
 }
@@ -60,7 +60,7 @@ static void detect_cpu_features() {
 void fpu_save(uint8_t* zone) {
   // Align the pointer if needed
   if (((uintptr_t)zone % fpu_save_align) != 0) {
-    log("fpu: save area isn't aligned!!!");
+    klog("fpu: save area isn't aligned!!!");
   }
 
   // Then save the context...
@@ -76,7 +76,7 @@ void fpu_save(uint8_t* zone) {
 void fpu_restore(uint8_t* zone) {
   // Align the pointer if needed
   if (((uintptr_t)zone % fpu_save_align) != 0) {
-    log("fpu: save area isn't aligned!!!");
+    klog("fpu: save area isn't aligned!!!");
   }
 
   // Then restore the context...
@@ -95,7 +95,7 @@ static void fpu_init() {
   if (CPU_CHECK(CPU_FEAT_XSAVE)) {
     // Enable XSAVE and XRSTOR, along with xgetbv/xsetbv
     asm_write_cr4(asm_read_cr4() | (1 << 18));  
-    log("fpu: using extended FPU save/restore");
+    klog("fpu: using extended FPU save/restore");
 
     uint64_t xcr0 = 0;
     xcr0 |= (1 << 0) | // Save x87 state with x{save,rstor}, required
@@ -103,7 +103,7 @@ static void fpu_init() {
 
     if (c & CPUID_ECX_AVX) {
       xcr0 |= (1 << 2);
-      log("fpu: saving AVX state with XSAVE");
+      klog("fpu: saving AVX state with XSAVE");
     }
 
     cpuid_subleaf(0x7, 0, &a, &b, &c, &d);
@@ -111,12 +111,12 @@ static void fpu_init() {
       xcr0 |= (1 << 5) | // Enable AVX-512 foundation
               (1 << 6) | // Enable the lower 15 ZMM registers
               (1 << 7);  // Enable the higher 15 ZMM registers
-      log("fpu: saving AVX-512 state with XSAVE");
+      klog("fpu: saving AVX-512 state with XSAVE");
     }
     
     if (c & CPUID_ECX_PKE) {
       xcr0 |= (1 << 9); // Enable management of the PKRU register
-      log("fpu: saving PKU (Protection Keys for Userspace) state with XSAVE");
+      klog("fpu: saving PKU (Protection Keys for Userspace) state with XSAVE");
     }
 
     asm_wrxcr(0, xcr0);
@@ -126,7 +126,7 @@ static void fpu_init() {
   } else {
     fpu_save_size = 512;
     fpu_save_align = 16;
-    log("fpu: using legacy FXSAVE/FXRSTOR");
+    klog("fpu: using legacy FXSAVE/FXRSTOR");
   }
 }
 
@@ -191,7 +191,7 @@ void cpu_early_init() {
     efer |= (1 << 15);
   asm_wrmsr(IA32_EFER, efer);
 
-  // Finally, setup syscall
+  // Setup syscall instruction
   asm_wrmsr(IA32_STAR, 0x13ull << 48 | 0x8ull << 32);
   asm_wrmsr(IA32_LSTAR, (uintptr_t)asm_syscall_entry);
   asm_wrmsr(IA32_SFMASK, ~(uint32_t)2);

@@ -1,6 +1,6 @@
 #include <generic/acpi.h>
 #include <lib/cmdline.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <arch/apic.h>
 #include <arch/tables.h>
 #include <vm/phys.h>
@@ -33,7 +33,7 @@ acpi_query(const char* signature, int index)
       ptr = (acpi_header_t*)((size_t)xsdt->tables[i] + VM_MEM_OFFSET);
       if (!memcmp(ptr->signature, signature, 4)) {
         if (cnt++ == index) {
-          // log("acpi: Found \"%s\" at 0x%lx", signature, (size_t)ptr);
+          // klog("acpi: Found \"%s\" at 0x%lx", signature, (size_t)ptr);
           return (void*)ptr;
         }
       }
@@ -44,14 +44,14 @@ acpi_query(const char* signature, int index)
       ptr = (acpi_header_t*)((size_t)rsdt->tables[i] + VM_MEM_OFFSET);
       if (!memcmp(ptr->signature, signature, 4)) {
         if (cnt++ == index) {
-          // log("acpi: Found \"%s\" at 0x%lx", signature, (size_t)ptr);
+          // klog("acpi: Found \"%s\" at 0x%lx", signature, (size_t)ptr);
           return (void*)ptr;
         }
       }
     }
   }
 
-  // log("acpi: \"%s\" not found", signature);
+  // klog("acpi: \"%s\" not found", signature);
   return NULL;
 }
 
@@ -98,7 +98,7 @@ void madt_init() {
         }
   }
 
-  log("acpi: Detected %u ISOs, %u I/O APICs, and %u NMIs", madt_isos.length, madt_ioapics.length, madt_nmis.length);
+  klog("acpi: Detected %u ISOs, %u I/O APICs, and %u NMIs", madt_isos.length, madt_ioapics.length, madt_nmis.length);
 }
 
 void
@@ -146,7 +146,7 @@ sci_handler(struct cpu_context* context, void* arg)
   if (ev & ACPI_WAKE)
     ev_name = "sleep wake up";
 
-  log("acpi: a SCI event has occured: 0x%x (%s)", ev, ev_name);
+  klog("acpi: a SCI event has occured: 0x%x (%s)", ev, ev_name);
 
   if (ev & ACPI_POWER_BUTTON) {
     lai_enter_sleep(5); // Good Night!
@@ -193,8 +193,8 @@ acpi_init(struct stivale2_struct_tag_rsdp* rk)
   size_t header_len = (xsdt_found) ? xsdt->header.length : rsdt->header.length;
   size_t entry_count =
     ((header_len - sizeof(acpi_header_t))) / ((xsdp->revision > 0) ? 8 : 4);
-  log("acpi: dumping %u entries... (revision: %u)", entry_count, xsdp->revision);
-  log("    %-8s %-s %-6s  %-11s", "Signature", "Rev", "OEMID", "Address");
+  klog("acpi: dumping %u entries... (revision: %u)", entry_count, xsdp->revision);
+  klog("    %-8s %-s %-6s  %-11s", "Signature", "Rev", "OEMID", "Address");
 
   for (size_t i = 0; i < entry_count; i++) {
     uint64_t table_addr =
@@ -202,7 +202,7 @@ acpi_init(struct stivale2_struct_tag_rsdp* rk)
 
     // TODO: Map ACPI tables (current func is broken)
     acpi_header_t* c = (acpi_header_t*)(table_addr + VM_MEM_OFFSET);
-    log("    %-c%c%c%c %6d %3c%c%c%c%c%c  %#0lx",
+    klog("    %-c%c%c%c %6d %3c%c%c%c%c%c  %#0lx",
         c->signature[0],
         c->signature[1],
         c->signature[2],

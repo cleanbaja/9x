@@ -1,6 +1,6 @@
 #include <lib/cmdline.h>
 #include <lib/builtin.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 
 static char* cmdline_raw = NULL;
 static size_t npairs = 0;
@@ -9,7 +9,7 @@ void cmdline_load(char* str) {
   if (cmdline_raw != NULL || str == NULL)
     return; // We already have a cmdline, or the arg is NULL!
 
-  log("Kernel Command Line -> %s", str);  
+  klog("Kernel Command Line -> %s", str);  
 
   size_t len = strlen(str);
   for (size_t i = 0; i < len; i++) {

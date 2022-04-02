@@ -1,7 +1,7 @@
 #include <fs/vfs.h>
 #include <lib/builtin.h>
 #include <lib/cmdline.h>
-#include <lib/log.h>
+#include <lib/kcon.h>
 #include <vm/vm.h>
 
 struct ustar_header {
@@ -58,7 +58,7 @@ void initramfs_load(struct stivale2_struct_tag_modules* mods) {
 
   uint64_t initramfs_base = mods->modules[0].begin;
   uint64_t initramfs_size = mods->modules[0].end - mods->modules[0].begin;
-  log("initramfs: initrd found at 0x%lx with %u bytes", initramfs_base, initramfs_size);
+  klog("initramfs: initrd found at 0x%lx with %u bytes", initramfs_base, initramfs_size);
 
   struct ustar_header* hdr = (struct ustar_header*)initramfs_base;
   while (true) {
