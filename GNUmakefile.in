@@ -131,7 +131,7 @@ dist:
 	mkdir -p "ninex-$(VERSION)"
 	cp -r @srcdir@/.git "ninex-$(VERSION)"/
 	cd "ninex-$(VERSION)" && git checkout .
-	cd "ninex-$(VERSION)" && NOCONFIGURE=yes ../autogen.sh
+	cd "ninex-$(VERSION)" && NOCONFIGURE=yes ./autogen.sh
 	rm -rf "ninex-$(VERSION)/.git"
 	rm -rf "ninex-$(VERSION)/autom4te.cache"
 	tar -zcf "ninex-$(VERSION).tar.gz" "ninex-$(VERSION)"
@@ -151,10 +151,10 @@ $(IMAGE): $(KERNEL)
 	third_party/limine/limine-deploy $(IMAGE)
 
 .PHONY: run run-kvm
-override QEMU_BASE_FLAGS += -m 2G -M q35 -drive file=$(IMAGE),if=none,id=nvm -device nvme,serial=deadbeef,drive=nvm -debugcon stdio
+override QEMU_BASE_FLAGS += -smp 2 -m 1G -M q35 -drive file=$(IMAGE),if=none,id=nvm -device nvme,serial=deadbeef,drive=nvm -debugcon stdio
 run: $(IMAGE)
-	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu max
+	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu qemu64,+smep
 run-kvm: $(IMAGE)
-	qemu-system-x86_64 $(QEMU_BASE_FLAGS) --enable-kvm -cpu host,+smep,check
+	qemu-system-x86_64 $(QEMU_BASE_FLAGS) --enable-kvm -cpu max,+invtsc
 
 

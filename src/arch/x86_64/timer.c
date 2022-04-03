@@ -43,7 +43,7 @@ static void hpet_init() {
 
 void tsc_calibrate() {
   // Make sure that we can proceed with the callibration
-  if (hpet_base == 0x0) hpet_init();
+  if (hpet_base == 0x0) { hpet_init(); }
   if (!CPU_CHECK(CPU_FEAT_INVARIANT)) {
     if (is_bsp())
       klog("tsc: Invariant TSC is not supported!");
@@ -86,7 +86,7 @@ void tsc_calibrate() {
   }
 
 outro:
-  if (!CPU_CHECK(CPU_FEAT_DEADLINE)) { apic_calibrate(); }
+  if (!CPU_CHECK(CPU_FEAT_DEADLINE) || !CPU_CHECK(CPU_FEAT_INVARIANT)) { apic_calibrate(); }
 }
 
 

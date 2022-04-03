@@ -51,8 +51,6 @@ static percpu_t* generate_percpu(struct stivale2_smp_info* rinfo) {
 }
 
 void ap_entry(struct stivale2_smp_info* sm) {
-  // Pad the SMP info, and get us ready...
-  sm = (void*)((uintptr_t)sm + VM_MEM_OFFSET);
   spinlock_acquire(&smp_lock);
 
   // Get the CPU into a working state...

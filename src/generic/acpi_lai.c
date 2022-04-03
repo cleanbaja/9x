@@ -88,28 +88,37 @@ uint32_t laihost_ind(uint16_t port) {
     return asm_ind(port);
 }
 
-void laihost_pci_writeb(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t function, uint16_t offset, uint8_t data) {
-    return;
+uint8_t laihost_pci_readb(uint16_t seg, uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset) {
+    asm_outd(0xCF8, (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfffc) | 0x80000000);
+    uint8_t v = asm_inb(0xCFC + (offset & 3));
+    return v;
 }
 
-uint8_t laihost_pci_readb(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t function, uint16_t offset) {
-    return 0;
+void laihost_pci_writeb(uint16_t seg, uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset, uint8_t value) {
+    asm_outd(0xCF8, (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfffc) | 0x80000000);
+    asm_outb(0xCFC + (offset & 3), value);
 }
 
-void laihost_pci_writew(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t function, uint16_t offset, uint16_t data) {
-    return;
+uint16_t laihost_pci_readw(uint16_t seg, uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset) {
+    asm_outd(0xCF8, (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfffc) | 0x80000000);
+    uint16_t v = asm_inw(0xCFC + (offset & 2));
+    return v;
 }
 
-uint16_t laihost_pci_readw(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t function, uint16_t offset) {
-    return 0;
+void laihost_pci_writew(uint16_t seg, uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset, uint16_t value) {
+    asm_outd(0xCF8, (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfffc) | 0x80000000);
+    asm_outw(0xCFC + (offset & 2), value);
 }
 
-void laihost_pci_writed(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t function, uint16_t offset, uint32_t data) {
-    return;
+uint32_t laihost_pci_readd(uint16_t seg, uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset) {
+    asm_outd(0xCF8, (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfffc) | 0x80000000);
+    uint32_t v = asm_ind(0xCFC);
+    return v;
 }
 
-uint32_t laihost_pci_readd(uint16_t segment, uint8_t bus, uint8_t slot, uint8_t function, uint16_t offset) {
-    return 0;
+void laihost_pci_writed(uint16_t seg, uint8_t bus, uint8_t slot, uint8_t func, uint16_t offset, uint32_t value) {
+    asm_outd(0xCF8, (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfffc) | 0x80000000);
+    asm_outd(0xCFC, value);
 }
 
 // TODO: Actually sleep (with HPET?)
