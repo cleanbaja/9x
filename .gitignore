@@ -9,6 +9,9 @@ config.h
 install-sh
 config.status
 
+# third-party software/libraries
+third_party
+
 # clang intellisense
 .clang
 

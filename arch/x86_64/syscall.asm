@@ -4,6 +4,8 @@ nr_syscalls equ ((jump_table.end - jump_table) / 8)
 
 align 16
 jump_table:
+  extern syscall_debuglog
+  dq syscall_debuglog
   extern syscall_archctl
   dq syscall_archctl
 .end:
@@ -19,13 +21,13 @@ asm_syscall_entry:
 
   ; First off, swap stacks before we do anything else
   swapgs
-  mov [gs:24], rsp       ; gs.user_stack = rsp
-  mov rsp, [gs:16]       ; rsp = gs.kernel_stack 
+  mov [gs:56], rsp       ; gs.user_stack = rsp
+  mov rsp, [gs:48]       ; rsp = gs.kernel_stack 
   sti
 
   ; Create a dummy interrupt frame
   push qword 0x1b         ; user data segment
-  push qword [gs:24]      ; saved stack
+  push qword [gs:56]      ; saved stack
   push r11                ; saved rflags
   push qword 0x23         ; user code segment 
   push rcx                ; instruction pointer
@@ -74,8 +76,8 @@ asm_syscall_entry:
 
   ; Disable interrupts, before restoring the remaining context
   cli
-  mov rdx, qword [gs:32]
-  mov rsp, qword [gs:24]
+  mov rdx, qword [gs:40] ; rdx = gs.errno
+  mov rsp, qword [gs:16]  ; rsp = gs.user_stack
   swapgs
   o64 sysret
 

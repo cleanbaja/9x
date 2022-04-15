@@ -140,7 +140,13 @@ static inline void asm_outd(uint16_t port, uint32_t data) {
 // A quick way to get the current CPUs number
 static inline uint32_t __get_cpunum() {
   uint32_t ret;
+  asm volatile("mov %%gs:8, %0" : "=r"(ret));
+  return ret;
+}
+static inline uintptr_t __get_selfptr() {
+  uintptr_t ret;
   asm volatile("mov %%gs:0, %0" : "=r"(ret));
   return ret;
 }
+
 #endif // INTERNAL_ASM_H

@@ -24,9 +24,11 @@ apic_redirect_gsi(uint8_t lapic_id,
 void
 apic_redirect_irq(uint8_t lapic_id, uint8_t vec, uint8_t irq, bool masked);
 void
-apic_oneshot(uint8_t vec, uint64_t us);
-void
 apic_calibrate();
+
+// Timer stuff
+void apic_timer_stop();
+void apic_timer_oneshot(uint8_t vec, uint64_t ms);
 
 enum ipi_mode
 {
@@ -36,8 +38,9 @@ enum ipi_mode
   IPI_EVERYONE
 };
 
-#define IPI_HALT 254
-#define IPI_INVL_TLB 253
+#define IPI_HALT        254
+#define IPI_INVL_TLB    253
+#define IPI_SCHED_YIELD 252
 
 void
 apic_send_ipi(uint8_t vec, uint32_t cpu, enum ipi_mode mode);

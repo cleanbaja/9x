@@ -1,4 +1,4 @@
-AC_INIT(9x, 0.0.1, https://github.com/cleanbaja/CrecentOS/issues, ninex)
+AC_INIT(9x, 0.0.2, https://github.com/cleanbaja/CrecentOS/issues, ninex)
 AC_COPYRIGHT([Copyright (c) 2022 cleanbaja, All Rights Reserved.])
 
 # Search for the programs we need...
@@ -9,13 +9,6 @@ if ! test "x$NASM_LOCATED" = "xyes"; then
 fi
 
 # Kernel features that can be enabled/disabled
-#----------------------------------------------#
-AC_ARG_ENABLE(hardened-kernel,
-    AS_HELP_STRING([--enable-hardened-kernel], [enables kernel security features like UBSAN/STK Protector]),
-    HARDENED_BUILD="$enableval")
-AC_SUBST(HARDENED_BUILD, [$HARDENED_BUILD])
-echo configure: hardened-build is $HARDENED_BUILD
-
 #----------------------------------------------#
 AC_ARG_ENABLE(earlyconsole,
     AS_HELP_STRING([--disable-earlyconsole], [disables the use of the stivale2 terminal as a early logging output, required if not using limine]),
@@ -30,7 +23,6 @@ if test "x$LIMINE_EARLYCONSOLE" = "xno"; then
 else
     LIMINE_EARLYCONSOLE="yes"
 fi
-
 AC_SUBST(LIMINE_EARLYCONSOLE, [$LIMINE_EARLYCONSOLE])
 
 #----------------------------------------------#

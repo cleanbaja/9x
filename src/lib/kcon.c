@@ -1,8 +1,9 @@
 #include <lib/kcon.h>
 #include <lib/builtin.h>
 #include <lib/lock.h>
-#include <generic/smp.h>
+#include <ninex/smp.h>
 #include <arch/irq.h>
+#include <arch/apic.h>
 #include <vm/vm.h>
 
 #ifdef LIMINE_EARLYCONSOLE
@@ -138,6 +139,9 @@ void panic(void* frame, char* fmt, ...) {
     in_panic = 1; 
   }
  
+  // Shootdown all other CPUs
+  apic_send_ipi(IPI_HALT, 0, IPI_OTHERS);
+
   // Log all the information possible
   // klog_unlocked("\nKERNEL PANIC on CPU #%d\n", cpunum());
   if (fmt) {
@@ -246,4 +250,10 @@ void klog_unlocked(char* fmt, ...) {
   memset64(format_buf, 0, 512);
 }
 
+
+#include <arch/irq.h>
+void syscall_debuglog(cpu_ctx_t* context) {
+  char* msg = (char*)context->rdi;
+  klog("%s", msg);
+}
 

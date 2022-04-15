@@ -1,9 +1,11 @@
 #include <arch/cpuid.h>
 #include <arch/apic.h>
+#include <arch/irq.h>
 #include <arch/cpu.h>
 #include <arch/tables.h>
-#include <lib/lock.h>
 #include <lib/kcon.h>
+#include <ninex/proc.h>
+#include <ninex/smp.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
 
@@ -58,7 +60,7 @@ static void detect_cpu_features() {
 }
 
 void fpu_save(uint8_t* zone) {
-  // Align the pointer if needed
+  // Check if the pointer is aligned!
   if (((uintptr_t)zone % fpu_save_align) != 0) {
     klog("fpu: save area isn't aligned!!!");
   }
@@ -74,7 +76,7 @@ void fpu_save(uint8_t* zone) {
 }
 
 void fpu_restore(uint8_t* zone) {
-  // Align the pointer if needed
+  // Check if the pointer is aligned!
   if (((uintptr_t)zone % fpu_save_align) != 0) {
     klog("fpu: save area isn't aligned!!!");
   }
@@ -153,10 +155,10 @@ void cpu_early_init() {
   // Then enable all possible features
   uint64_t cr4 = asm_read_cr4();
   cr4 |= (1 << 2)  | // Stop userspace from reading the TSC
-	 (1 << 7)  | // Enables Global Pages
+	       (1 << 7)  | // Enables Global Pages
          (1 << 9)  | // Allows for fxsave/fxrstor, along with SSE
-	 (1 << 10) | // Allows for unmasked SSE exceptions
-	 (1 << 20);  // Enables Supervisor Mode Execution Prevention
+	       (1 << 10) | // Allows for unmasked SSE exceptions
+	       (1 << 20);  // Enables Supervisor Mode Execution Prevention
   asm_write_cr4(cr4);
 
   uint64_t efer = asm_rdmsr(IA32_EFER);
@@ -192,9 +194,32 @@ void cpu_early_init() {
   asm_wrmsr(IA32_EFER, efer);
 
   // Setup syscall instruction
-  asm_wrmsr(IA32_STAR, 0x13ull << 48 | 0x8ull << 32);
+  asm_wrmsr(IA32_STAR, 0x13ull << 48 | ((uint64_t)GDT_KERNEL_CODE) << 32);
   asm_wrmsr(IA32_LSTAR, (uintptr_t)asm_syscall_entry);
   asm_wrmsr(IA32_SFMASK, ~(uint32_t)2);
+}
+
+
+void cpu_create_context(void* thr, uintptr_t stack, uintptr_t entry, int user) {
+  if (user)
+    klog("cpu: (TODO) support the creation of usermode contexts");
+  
+  thread_t* thread   = (thread_t*)thr;
+  cpu_ctx_t* context = &thread->context;
+
+  context->rip    = entry;
+  context->rsp    = stack;
+  context->cs     = GDT_KERNEL_CODE;
+  context->ss     = GDT_KERNEL_DATA;
+  context->rflags = 0x202;
+  context->rip    = entry;
+
+  if (fpu_save_size > 4096) {
+    // TODO: Fix memory leak introduced here!
+    thread->fpu_save_area = vm_phys_alloc(2, VM_ALLOC_ZERO) + VM_MEM_OFFSET;
+  } else {
+    thread->fpu_save_area = vm_phys_alloc(1, VM_ALLOC_ZERO) + VM_MEM_OFFSET;
+  }
 }
 
 #define ARCHCTL_WRITE_FS  0xB0
@@ -205,6 +230,7 @@ void syscall_archctl(cpu_ctx_t* context) {
   switch (context->rdi) {
   case ARCHCTL_WRITE_FS:
     asm_wrmsr(IA32_FS_BASE, context->rsi);
+    per_cpu(cur_thread)->percpu_base = context->rsi;
     break;
   case ARCHCTL_READ_MSR:
     context->rax = asm_rdmsr(context->rsi);

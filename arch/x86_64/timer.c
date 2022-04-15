@@ -1,8 +1,8 @@
-#include <generic/acpi.h>
+#include <ninex/acpi.h>
 #include <arch/timer.h>
 #include <arch/cpu.h>
 #include <lib/kcon.h>
-#include <generic/smp.h>
+#include <ninex/smp.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
 

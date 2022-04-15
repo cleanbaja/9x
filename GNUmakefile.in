@@ -2,7 +2,7 @@
 override COOL_PROMPT := printf '[\e[1;31m%s\e[m] \e[1;32m%s\e[m\n'
 override SOURCE_DIR  := @srcdir@/src
 override INCLUDE_DIR := @srcdir@/include
-override ARCH_DIR    := $(SOURCE_DIR)/arch/@ARCH@
+override ARCH_DIR    := @srcdir@/arch/@ARCH@
 override LAI_DIR     := @srcdir@/third_party/lai
 override VERSION     := @PACKAGE_VERSION@
 override ECHFS       := @srcdir@/third_party/echfs/echfs-utils
@@ -28,9 +28,9 @@ DESTDIR ?=
 # Set compiler flags
 override CREALFLAGS := $(KERNEL_CFLAGS)           \
                        -ffreestanding             \
-	               -fpic                      \
-	               -mno-red-zone              \
-	               -fno-omit-frame-pointer    \
+	            	   -fpic                      \
+	                   -mno-red-zone              \
+	                   -fno-omit-frame-pointer    \
                        -fplan9-extensions 
 
 override LDREALFLAGS := $(KERNEL_LDFLAGS) -zmax-page-size=0x1000 -nostdlib -pie
@@ -50,7 +50,7 @@ ifeq ($(LIMINE_EARLYCONSOLE), yes)
 endif
 
 # Find all the source code
-override KERNEL_SOURCE := $(shell find $(SOURCE_DIR)/generic $(SOURCE_DIR)/lib $(SOURCE_DIR)/vm $(SOURCE_DIR)/fs -name '*.c')
+override KERNEL_SOURCE := $(shell find $(SOURCE_DIR)/kern $(SOURCE_DIR)/lib $(SOURCE_DIR)/vm $(SOURCE_DIR)/fs -name '*.c')
 override LAI_SOURCE    := $(shell find $(LAI_DIR) -name '*.c')
 override ARCH_SOURCE   := $(shell find $(ARCH_DIR) -name '*.c')
 ifeq ($(ARCH), x86_64)
@@ -91,7 +91,7 @@ ifeq ($(ARCH), x86_64)
 %.o: %.asm
 	$(COOL_PROMPT) "ASM " $<
 	@
-	nasm -f elf64 -o $@ $<
+	nasm -f elf64 -i @srcdir@ -o $@ $<
 
 $(ARCH_LIB): $(ARCH_OBJECTS)
 	$(COOL_PROMPT) "LIB " $@

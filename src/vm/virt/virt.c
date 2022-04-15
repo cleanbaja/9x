@@ -68,9 +68,6 @@ vm_virt_unmap(vm_space_t* spc, uintptr_t virt)
   bool was_active = (pte == NULL) ? false : (*pte & (1 << 7));
   if (pte != NULL)
     *pte = 0;
-
-  if (spc->active && was_active)
-    vm_invl_addr(spc, virt);
 }
 
 void
@@ -88,9 +85,6 @@ vm_virt_fragment(vm_space_t* spc, uintptr_t virt, int flags)
   for (size_t i = aligned_address; i < (aligned_address + 0x200000); i += 0x1000) {
     vm_virt_map(spc, aligned_address - VM_MEM_OFFSET, aligned_address, flags);
   }
-
-  // Then update the TLB
-  vm_invl_range(spc, aligned_address, aligned_address + 0x200000);
 }
 
 void

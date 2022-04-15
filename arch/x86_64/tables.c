@@ -94,8 +94,8 @@ load_tss(uintptr_t address)
 
   // Update the IDT to become TSS aware
   entries[2] = make_idt_entry(asm_dispatch_table[2], 1);
-  entries[8] = make_idt_entry(asm_dispatch_table[8], 2);
-  entries[14] = make_idt_entry(asm_dispatch_table[14], 3);
+  entries[8] = make_idt_entry(asm_dispatch_table[8], 3);
+  entries[14] = make_idt_entry(asm_dispatch_table[14], 2);
   entries[18] = make_idt_entry(asm_dispatch_table[18], 4);
   
   // Then reload it

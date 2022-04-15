@@ -1,5 +1,5 @@
-#include <generic/acpi.h>
-#include <generic/smp.h>
+#include <ninex/acpi.h>
+#include <ninex/smp.h>
 #include <arch/asm.h>
 #include <arch/cpuid.h>
 #include <lib/kcon.h>
@@ -15,6 +15,7 @@
 #define LAPIC_EOI      0x0b0
 #define LAPIC_ESR      0x280
 #define LAPIC_ERR_CTL  0x370
+#define LAPIC_SELF_IPI 0x3F0
 
 #define LAPIC_TIMER_LVT  0x320
 #define LAPIC_TIMER_CNT  0x390
@@ -70,51 +71,27 @@ apic_eoi()
   apic_write(LAPIC_EOI, 0);
 }
 
-static uint32_t
-generate_flags(enum ipi_mode md)
-{
-  uint32_t to_return = 0;
-
-  switch (md) {
-    case IPI_OTHERS:
-      to_return |=
-        (1 << 18) | (1 << 19) | (1 << 14); // One time only, All excluding self
-      break;
-    case IPI_SPECIFIC:
-      to_return |= (1 << 14);              // One time only, Use CPU num in destination field
-      break;
-    case IPI_EVERYONE:
-      to_return |= (1 << 19) | (1 << 14);  // One time only, Send to all including self
-      break;
-    default:
-      klog("apic: Unknown IPI mode %d", md);
-      break;
-  }
-
-  return to_return;
-}
-
 void
 apic_send_ipi(uint8_t vec, uint32_t cpu, enum ipi_mode mode)
 {
-  uint32_t icr_low  = 0;
-  uint32_t icr_high = 0;
+  uint32_t icr_low = 0;
 
-  // Check for self IPIs, since they're handled diffrently
-  if (mode == IPI_SELF) {
-    if (use_x2apic) {
-      asm_wrmsr(0x83F, vec); 
-    } else {
-      apic_write(LAPIC_ICR1, 0);
-      apic_write(LAPIC_ICR0, vec | (1 << 14));
-    }
+  // Use the x2APIC self IPI MSR, if possible
+  if (mode == IPI_SELF && use_x2apic)
+    apic_write(LAPIC_SELF_IPI, vec);
 
-    return;
-  }
-
-  // Generate the flags for the specific IPI mode
-  icr_low = generate_flags(mode);
+  // Encode the vector and deal with the rest of the IPI modes
   icr_low |= vec;
+  switch (mode) {
+    case IPI_OTHERS:
+      icr_low |= (1 << 18) | (1 << 19);
+      break;
+    case IPI_EVERYONE:
+      icr_low |= (1 << 19);
+      break;
+    case IPI_SELF:
+      cpu = 0;
+  }
 
   // Encode and send the IPI...
   if (use_x2apic) {
@@ -130,6 +107,7 @@ apic_send_ipi(uint8_t vec, uint32_t cpu, enum ipi_mode mode)
 void
 apic_enable()
 {
+  // Check for the x2APIC
   if (!use_x2apic) {
     uint32_t eax, ebx, ecx, edx;
     cpuid_subleaf(0x1, 0, &eax, &ebx, &ecx, &edx); 
@@ -139,11 +117,13 @@ apic_enable()
     }
   }
 
+  // Enable the APIC (hardware level)
   uint64_t apic_msr = asm_rdmsr(IA32_APIC);
   apic_msr |= (use_x2apic << 10); // Set x2apic (if available)
   apic_msr |= (1 << 11);          // Enable the APIC
   asm_wrmsr(IA32_APIC, apic_msr);
 
+  // Map the APIC into memory
   if (!use_x2apic && xapic_base == 0x0) {
     xapic_base = asm_rdmsr(IA32_APIC) & 0xfffff000;
     vm_virt_fragment(&kernel_space, xapic_base + VM_MEM_OFFSET, VM_PERM_READ | VM_PERM_WRITE);
@@ -153,7 +133,7 @@ apic_enable()
                 VM_PERM_READ | VM_PERM_WRITE | VM_CACHE_UNCACHED);
   }
 
-  // Commence the reciving of interrupts...
+  // Enable the APIC (software level) and interrupts
   apic_write(LAPIC_SPURIOUS, apic_read(LAPIC_SPURIOUS) | (1 << 8) | 0xFF);
   asm_write_cr8(0);
 
@@ -248,7 +228,7 @@ void apic_calibrate() {
 }
 
 void
-apic_oneshot(uint8_t vec, uint64_t ms)
+apic_timer_oneshot(uint8_t vec, uint64_t ms)
 {
   if (CPU_CHECK(CPU_FEAT_INVARIANT) && CPU_CHECK(CPU_FEAT_DEADLINE)) {
     apic_write(LAPIC_TIMER_LVT, (0b10 << 17) | vec);
@@ -274,3 +254,8 @@ apic_oneshot(uint8_t vec, uint64_t ms)
   }
 }
 
+void
+apic_timer_stop() {
+  apic_write(LAPIC_TIMER_INIT, 0);
+  apic_write(LAPIC_TIMER_LVT, apic_read(LAPIC_TIMER_LVT) | (1 << 16));
+}

@@ -54,11 +54,6 @@ vm_create_space();
 void
 percpu_init_vm();
 
-// Invalidation related functions
-void vm_invl_addr(vm_space_t* spc, uintptr_t address);
-void vm_invl_range(vm_space_t* spc, uintptr_t address, uintptr_t len); 
-void vm_invl_asid(vm_space_t* spc, uint32_t asid); 
-
 // The kernel's space, which all others inherit from
 extern vm_space_t kernel_space;
 

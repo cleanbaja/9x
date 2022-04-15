@@ -24,6 +24,9 @@ extern uint64_t fpu_save_size;
 void fpu_save(uint8_t* zone);    // Must be 16 or 64-byte aligned
 void fpu_restore(uint8_t* zone);
 
+// Context related functions
+void cpu_create_context(void* thr, uintptr_t stack, uintptr_t entry, int user);
+
 // Tell if we're BSP
 static inline bool is_bsp() {
   return (asm_rdmsr(0x1B) & (1 << 8));

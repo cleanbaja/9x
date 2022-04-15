@@ -1,6 +1,5 @@
-#include <generic/acpi.h>
-#include <generic/sched.h>
-#include <generic/smp.h>
+#include <ninex/acpi.h>
+#include <ninex/smp.h>
 #include <lib/cmdline.h>
 #include <lib/kcon.h>
 #include <lib/kcon.h>
@@ -8,7 +7,6 @@
 #include <arch/tables.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
-#include <fs/vfs.h>
 
 #include "config.h"
 
@@ -100,22 +98,6 @@ early_init()
   cmdline_load((char*)(cmdline_tag->cmdline));
 }
 
-static void
-main_thread(uint64_t arg)
-{
-  (void)arg;
-  __asm__ volatile("cli");
-
-  // Chill for now...
-  klog("init: Startup complete, halting all cores!");
-  apic_send_ipi(IPI_HALT, 0, IPI_OTHERS);
-  sched_kill_thread(per_cpu(cur_thread));
-
-  for (;;) {
-    __asm__ volatile("sti; hlt");
-  }
-}
-
 void
 kern_entry(struct stivale2_struct* bootinfo)
 {
@@ -136,11 +118,8 @@ kern_entry(struct stivale2_struct* bootinfo)
   smp_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_SMP_ID));
   PERCPU_FIXUP();
 
-  // Initialize the scheduler on the BSP, and create the init thread
-  sched_init();
-  proc_create_kthread((uint64_t)main_thread, 0);
-
-  // DON'T PUT ANYTHING ELSE HERE, PUT IN MAIN THREAD!
+  klog("init: Startup complete, halting all cores!");
+  apic_send_ipi(IPI_HALT, 0, IPI_OTHERS);
   for (;;) {
     __asm__ volatile("sti; hlt");
   }

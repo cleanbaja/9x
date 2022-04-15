@@ -1,4 +1,4 @@
-#include <generic/acpi.h>
+#include <ninex/acpi.h>
 #include <arch/asm.h>
 #include <lai/core.h>
 #include <lib/kcon.h>
