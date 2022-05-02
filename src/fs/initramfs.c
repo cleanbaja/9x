@@ -51,9 +51,10 @@ static uint64_t parse_octal(const char* str) {
   return res;
 }
 
-void initramfs_load(struct stivale2_struct_tag_modules* mods) {
+void initramfs_populate(struct stivale2_struct_tag_modules* mods) {
   if (mods->module_count < 1) {
-    PANIC(NULL, "initramfs module missing!\n");
+    klog("vfs: initramfs missing, kernel might fail on real hardware!");
+    return;
   }
 
   uint64_t initramfs_base = mods->modules[0].begin;
@@ -61,32 +62,40 @@ void initramfs_load(struct stivale2_struct_tag_modules* mods) {
   klog("initramfs: initrd found at 0x%lx with %u bytes", initramfs_base, initramfs_size);
 
   struct ustar_header* hdr = (struct ustar_header*)initramfs_base;
+  struct backing* file = NULL;
   while (true) {
     if (memcmp(hdr->signature, "ustar", 5) != 0)
 	break; // Invalid magic!
    
+    // Create the file
     uint64_t filesize = parse_octal(hdr->size);
     switch (hdr->type) {
-      case USTAR_DIRECTORY:
+      case USTAR_DIRECTORY: {
         vfs_mkdir(root_node, hdr->name, parse_octal(hdr->mode));
+	struct vfs_resolved_node result = vfs_resolve(NULL, hdr->name, 0);
+	kfree(result.raw_string);
+	file = result.target->backing;
 	break;
+      }
       case USTAR_FILE: {
-	struct backing* bck = vfs_open(root_node, hdr->name, true, parse_octal(hdr->mode));
+	file = vfs_open(root_node, hdr->name, true, parse_octal(hdr->mode));
 	void* buffer = (void*)((uintptr_t)hdr + 512);
-	bck->write(bck, buffer, 0, filesize);
+	file->write(file, buffer, 0, filesize);
+	file->close(file);
 	break;
       }
     }
 
+    // Update the stats of the file/dir
+    file->st.st_uid = parse_octal(hdr->uid);
+    file->st.st_gid = parse_octal(hdr->gid);
+    file->st.st_size = parse_octal(hdr->size);
+    file->st.st_mode = parse_octal(hdr->mode);
+
+    // Move onto the next file
     hdr = (void*)((uint64_t)hdr + 512 + TAR_ALIGN(filesize, 512));
     if ((uintptr_t)hdr >= initramfs_base + initramfs_size)
 	break; // Out of bounds!
   }
-
-  // Read the cmdline, and print it
-  struct backing* bc = vfs_open(NULL, "/boot/cmdline", false, 0);
-  char* buffer = (char*)kmalloc(bc->st.st_size);
-  bc->read(bc, buffer, 0, bc->st.st_size);
-  cmdline_load(buffer);
 }
 

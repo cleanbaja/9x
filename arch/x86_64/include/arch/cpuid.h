@@ -32,6 +32,7 @@
 #define CPUID_ECX_OSXSAVE (1U << 27U)
 #define CPUID_ECX_TCE     (1U << 17U)
 #define CPUID_ECX_AVX (1U << 28U)
+#define CPUID_ECX_RDRAND (1U << 30U)
 #define CPUID_ECX_HV (1U << 31U)
 #define CPUID_EDX_FPU (1U << 0U)
 #define CPUID_EDX_VME (1U << 1U)
@@ -131,7 +132,8 @@
 #define CPUID_EDX_XD_BIT_AVIL (1U << 20U)
 /* CPUID.80000007H.EDX.INVARIANT_TSC */
 #define CPUID_EDX_INVARIANT (1U << 8U)
-
+/* CPUID.07H:EBX.RDSEED*/
+#define CPUID_EBX_RDSEED (1U << 18U)
 
 /* CPUID source operands */
 #define CPUID_VENDORSTRING 0U

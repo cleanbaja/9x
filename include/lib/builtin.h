@@ -26,8 +26,15 @@ int
 strcmp(const char* s1, const char* s2);
 int
 snprintf(char* buffer, size_t count, const char* format, ...);
+char* 
+strtok_r(char* s, const char* del, char** m);
+char*
+strchr(const char* s, int n);
+char* 
+strdup(const char* s);
 int
 vsnprintf(char* buffer, size_t count, const char* format, va_list va);
+
 
 // Bitwise functions
 #define BIT_SET(bitmap, __bit) (bitmap[(__bit) / 8] |= (1 << ((__bit) % 8)))

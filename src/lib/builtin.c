@@ -1,4 +1,5 @@
 #include <lib/builtin.h>
+#include <vm/vm.h>
 
 void
 memset64(void* ptr, uint64_t val, int len)
@@ -85,4 +86,60 @@ strcmp(const char* s1, const char* s2)
     return *(const unsigned char*)s1 - *(const unsigned char*)s2;
 }
 
+char* strdup(const char* s) {
+  char* str = kmalloc(strlen(s));
+  memcpy(str, s, strlen(s));
+  return str;
+}
+
+char* strchr(const char *s, int c) {
+  size_t i = 0;
+  while(s[i]) {
+    if(s[i] == c)
+      return (char*)&s[i];
+    
+    i++;
+  }
+
+  if(c == 0)
+    return (char*)&s[i];
+
+  return NULL;
+}
+
+// Stolen from mlibc...
+char *strtok_r(char *s, const char *del, char **m) {
+  // We use *m = null to memorize that the entire string was consumed.
+  char *tok;
+  if(s) {
+    tok = s;
+  } else if(*m) {
+    tok = *m;
+  } else {
+    return NULL;
+  }
+
+  // Skip initial delimiters.
+  // After this loop: *tok is non-null iff we return a token.
+  while(*tok && strchr(del, *tok))
+    tok++;
+
+  // Replace the following delimiter by a null-terminator.
+  // After this loop: *p is null iff we reached the end of the string.
+  char* p = tok;
+  while(*p && !strchr(del, *p))
+    p++;
+
+  if(*p) {
+    *p = 0;
+    *m = p + 1;
+  } else {
+    *m = NULL;
+  }
+
+  if(p == tok)
+    return NULL;
+
+  return tok;
+}
 

@@ -1,21 +1,21 @@
 #include <fs/vfs.h>
+#include <fs/devtmpfs.h>
 #include <lib/builtin.h>
 #include <lib/kcon.h>
 #include <vm/vm.h>
 
 struct vfs_node* root_node = NULL;
 vec_t(struct filesystem*) fs_list;
-extern void initramfs_load(struct stivale2_struct_tag_modules* mods);
+extern void initramfs_populate(struct stivale2_struct_tag_modules* mods);
+static CREATE_SPINLOCK(vfs_lock);
 
 void
-vfs_register_fs(struct filesystem* fs)
-{
+vfs_register_fs(struct filesystem* fs) {
   vec_push(&fs_list, fs);
 }
 
 static struct filesystem*
-find_fs(const char* name)
-{
+find_fs(const char* name) {
   int i;
   struct filesystem* cur;
   vec_foreach(&fs_list, cur, i)
@@ -28,276 +28,217 @@ find_fs(const char* name)
   return NULL;
 }
 
-struct vfs_node*
-create_node(const char* name,
-            struct filesystem* filesystem,
-            struct vfs_node* parent)
-{
-  struct vfs_node* vnode = (struct vfs_node*)kmalloc(sizeof(struct vfs_node));
-  vnode->fs = filesystem;
-  vnode->parent = parent;
-  memcpy(vnode->name, name, (strlen(name) >= 256) ? 255 : strlen(name));
-
-  return vnode;
+struct vfs_node* vfs_create_node(const char* basename, struct vfs_node* parent) {
+  struct vfs_node* nd = kmalloc(sizeof(struct vfs_node));
+  memcpy(nd->name, basename, strlen(basename));
+  nd->parent = parent;
+  nd->fs = parent->fs;
+  
+  return nd;
 }
 
-static struct vfs_node*
-search_for_node(struct vfs_node* dir, char* name, bool should_be_file)
-{
-  if (dir == NULL || name == NULL || dir->children.length == 0)
+static inline struct vfs_node* simplify_node(struct vfs_node* nd) {
+  if (nd->mountpoint) {
+    return nd->mountpoint;
+  } else if (nd->symlink_target && S_ISLNK(nd->backing->st.st_mode)) {
+    klog("vfs: (TODO) add support for symlinks!");
+  } else {
+    return nd;
+  }
+}
+
+static struct vfs_node* search_relative(struct vfs_node* parent, char* name, int flags) {
+  if (!parent || !name)
     return NULL;
 
-  int i;
-  struct vfs_node* cur;
-  vec_foreach(&dir->children, cur, i)
-  {
-    if ((memcmp(cur->name, name, strlen(name)) == 0) &&
-        (strlen(name) == strlen(cur->name))) {
-      // TODO: Add and implment filetype checks
-      if (cur->mountpoint != NULL)
-        return cur->mountpoint;
-      else if (cur->redir != NULL)
-        return cur->redir;
-      else
-        return cur;
+  struct vfs_node* cur; int cnt;
+  vec_foreach(&parent->children, cur, cnt) {
+    if (memcmp(name, cur->name, strlen(name)) == 0)
+      return simplify_node(cur);
+  }
+
+  // Check for . and ..
+  if (strlen(name) > 1 && (memcmp(name, "..", 2) == 0)) {
+    return parent->parent;
+  } else if (strlen(name) == 1 && (memcmp(name, ".", 1) == 0)) {
+    return parent;
+  } else {
+    return NULL;
+  }
+}
+
+struct vfs_resolved_node vfs_resolve(struct vfs_node* root, char* path, int flags) {
+  struct vfs_resolved_node result = {0};
+  char* token = NULL;
+  spinlock_acquire(&vfs_lock);
+
+  // Setup the enviorment, so that we may parse the path
+  if (root == NULL)
+    result.parent = simplify_node(root_node);
+  else
+    result.parent = simplify_node(root);
+  result.target = result.parent;
+
+  // Make sure the path is sane
+  if (strlen(path) == 1) {
+    if (*path == '/') {
+      result.target   = simplify_node(root_node);
+      result.basename = "/";
+      result.success  = true;
+    }
+
+    klog("vfs: support parsing single character paths!");
+    spinlock_release(&vfs_lock);
+    return result;
+  } else if (path == NULL) {
+    klog("vfs: NULL path was passed to vfs_resolve!");
+  }
+  char* real_str = strdup(path);
+  char* context = real_str;
+  token = strtok_r(context, "/", &context);
+
+  // Use strtok to tokenize the path, and decent the node tree
+  while (token) {
+    result.basename = token;
+    result.parent = result.target;
+    result.target = search_relative(result.parent, token, flags);
+
+    token = strtok_r(context, "/", &context);
+    if (!token && !result.target && (flags & RESOLVE_CREATE_SHALLOW)) {
+      // Create the final node, if needed
+      result.target = vfs_create_node(result.basename, result.parent);
+      vec_push(&result.parent->children, result.target);
+      flags &= ~(RESOLVE_FAIL_IF_EXISTS);
+    } else if (!result.target) {
+      result.success = false;
+      spinlock_release(&vfs_lock);
+      return result;
     }
   }
 
-  return NULL;
+  if ((flags & RESOLVE_FAIL_IF_EXISTS) && result.target) {
+    result.success = false;
+  } else {
+    result.success = true;
+  }
+
+  spinlock_release(&vfs_lock);
+  return result;
 }
 
-#define RESOLVE_CREATE_NODE 0x10
-
-static struct vfs_node*
-resolve_path_ex(struct vfs_node* parent,
-                struct vfs_node** real_parent,
-                char* path,
-                char** basename,
-                int flags)
-{
-  struct vfs_node* cur_node = parent;
-  struct vfs_node* old_node = NULL;
-  char* basename_ret = NULL;
-  char* testbuf = (char*)kmalloc(strlen(path));
-
-  // Non-Relative paths aren't supported, nor are NULL parents...
-  if (parent == NULL) {
-    klog("vfs: resolve_path() doesn't know where to start!");
-    return NULL;
+void vfs_mount(char* source, char* dest, char* fs) {
+  struct filesystem* filesystem = find_fs(fs);
+  if (!filesystem) {
+    klog("vfs: unknown filesystem '%s'", fs);
+    return;
   }
 
-  // See if the root is getting requested
-  if (path == NULL || (*path == '/' && path[1] == '\0')) {
-    if (basename != NULL)
-      *basename = "/";
-
-    if (real_parent != NULL)
-      *real_parent = root_node;
-
-    return root_node;
+  // We don't support physical filesystems at the moment...
+  if (filesystem->needs_backing) {
+    klog("vfs: (TODO) support filesystems that need physical backings!");
+    return;
   }
 
-  // Finally, get rid of trailing slashes and uneeded characters
-  if (*path == '/' || *path == '~')
-    path++;
-  if (path[strlen(path) - 1] == '/')
-    path[strlen(path) - 1] = '\0';
+  struct vfs_resolved_node data = vfs_resolve(NULL, dest, 0);
+  if (!data.success) {
+    klog("vfs: non-existent mount destination '%s'!", dest);
+    return;
+  } else if (!S_ISDIR(data.target->backing->st.st_mode)) {
+    klog("vfs: '%s' is not a valid mountpoint!", dest);
+    return;
+  } else {
+    data.target->mountpoint = filesystem->mount(data.basename, data.parent);
+    struct vfs_node* new_point = data.target->mountpoint;
+    new_point->backing = filesystem->mkdir(new_point, 0667);
+    kfree(data.raw_string);
 
-  while (true) {
-    size_t i;
-    bool final = false;
-    memset(testbuf, 0, strlen(path));
-    for (i = 0; *path != '/'; path++) {
-      if (*path == '\0') {
-        final = true;
-        break;
-      }
-
-      testbuf[i++] = *path;
-    }
-
-    testbuf[i] = '\0';
-    path++;
-    
- 
-    if (final) {
-      if (strlen(testbuf) != 0) {
-        old_node = cur_node;
-        cur_node = search_for_node(cur_node, testbuf, true);
-        basename_ret = testbuf;
-
-        if (cur_node == NULL && flags & RESOLVE_CREATE_NODE) {
-          cur_node = create_node(testbuf, old_node->fs, old_node);
-          vec_push(&old_node->children, cur_node);
-        }
-        goto out;
-      }
+    if (filesystem->needs_backing) {
+      klog("vfs: Mounted '%s' to '%s' using filesystem '%s'", source, dest, filesystem->name);
     } else {
-      old_node = cur_node;
-      cur_node = search_for_node(cur_node, testbuf, false);
-      basename_ret = testbuf;
-      if (cur_node == NULL)
-        goto out;
+      klog("vfs: Mounted '%s' to '%s'", filesystem->name, dest);  
     }
   }
-
-out:
-  // Return the basename, if wanted...
-  if (basename_ret != NULL && basename != NULL) {
-    char* new_basename = (char*)kmalloc(strlen(basename_ret) + 1);
-    memcpy(new_basename, basename_ret, strlen(basename_ret) + 1);
-    *basename = basename_ret;
-  }
-
-  // Return the parent of the final node, if wanted...
-  if (real_parent != NULL && (old_node != NULL || cur_node == root_node)) {
-    if (cur_node == root_node)
-      *real_parent = root_node;
-    else
-      *real_parent = old_node;
-  }
-
-  kfree(testbuf);
-  return cur_node;
 }
 
-// A simpler version, for those who don't care about the extra information...
-static struct vfs_node*
-resolve_path(struct vfs_node* parent, char* path, int flags)
-{
-  return resolve_path_ex(parent, NULL, path, NULL, flags);
+void vfs_mkdir(struct vfs_node* parent, char* path, mode_t mode) {
+  struct vfs_resolved_node res = vfs_resolve(parent, path, 0);
+  if (res.success)
+    return; // Directory already exists
+  else if (res.basename == NULL || res.parent == NULL)
+    return; // Mysterious error :-(
+
+  // Create the directory and insert it into the node space
+  struct vfs_node* new_dir = vfs_create_node(res.basename, res.parent);
+  new_dir->backing = new_dir->fs->mkdir(new_dir, mode);
+  vec_push(&res.parent->children, new_dir);
+  kfree(res.raw_string);
 }
 
-static void
-create_dotentries(struct vfs_node* nd, struct vfs_node* parent)
-{
-  struct vfs_node* dot = create_node(".", nd->fs, nd);
-  struct vfs_node* dotdot = create_node("..", nd->fs, nd);
+void vfs_symlink(struct vfs_node* root, char* target, char* source) {
+  int resolve_flags = RESOLVE_CREATE_SHALLOW | RESOLVE_FAIL_IF_EXISTS;
+  struct vfs_resolved_node res = vfs_resolve(root, target, resolve_flags);
+  if (!res.success)
+    klog("ERROR!!!");
 
-  // Set the redir entries and add the nodes
-  dot->redir = nd;
-  dotdot->redir = parent;
-  vec_push(&nd->children, dot);
-  vec_push(&nd->children, dotdot);
+  memcpy(res.target->name, res.basename, strlen(res.basename));
+  res.target->symlink_target = strdup(source);
+  res.target->backing = res.target->fs->link(res.target, 0777);
 }
 
-void
-vfs_mkdir(struct vfs_node* parent, char* path, mode_t mode)
-{
-  char* basename; struct vfs_node* real_parent;
-  struct vfs_node* old_node = resolve_path_ex(parent, &real_parent, path, &basename, 0);
-  if (old_node != NULL || basename == NULL) {
-    return; // Directory already exists!
-  }
-
-  struct vfs_node* new_dir = create_node(basename, parent->fs, real_parent);
-  create_dotentries(new_dir, real_parent);
-  new_dir->backing =
-    parent->fs->mkdir(new_dir, mode); // TODO: Add proper permissions
-  vec_push(&real_parent->children, new_dir);
-  kfree(basename);
-}
-
-struct backing*
-vfs_open(struct vfs_node* parent,
-         const char* path,
-         bool create,
-         mode_t creat_mode)
-{
-  if (path == NULL)
+struct backing* vfs_open(struct vfs_node* root, char* path, bool create, mode_t creat_mode) {
+  // TODO: Return EEXISTS if (creat_mode == (O_CREAT | O_EXCEL))
+  struct vfs_resolved_node res = vfs_resolve(root, path, ((create) ? RESOLVE_CREATE_SHALLOW : 0));
+  if (!res.success)
     return NULL;
 
-  if (parent == NULL || *path == '/') {
-    parent = root_node;
-    path++;
-  }
-
-  struct vfs_node* real_parent = NULL;
-  struct vfs_node* nd =
-    resolve_path_ex(parent, &real_parent, (char*)path, NULL, (create) ? RESOLVE_CREATE_NODE : 0);
-  if (nd == NULL || real_parent == NULL)
-    return NULL;
-
-  if (nd->backing == NULL) {
-    nd->backing = nd->fs->open(nd, create, creat_mode);
-  } else if (nd->backing != NULL && create)
-    create = false;
-
-  // Refcount is already set to one by the FS driver, so don't increment it
-  if (create)
-    vec_push(&real_parent->children, nd);
-
-  return nd->backing;
+  if (res.target->backing == NULL && create)
+    res.target->backing = res.parent->fs->open(res.target, true, creat_mode);
+  
+  res.target->refcount++;
+  return res.target->backing;
 }
 
-bool
-vfs_mount(struct vfs_node* parent, char* source, char* target, char* filesystem)
-{
-  struct filesystem* fs = find_fs(filesystem);
-  if (fs == NULL)
-    return false;
-
-  struct vfs_node* source_node = NULL;
-  if (fs->needs_backing) {
-    source_node = resolve_path(parent, source, 0);
-    if (source_node == NULL || S_ISDIR(source_node->backing->st.st_mode)) {
-      return false;
-    }
-  }
-
-  char* basename = NULL;
-  bool mounting_root = false;
-  struct vfs_node* parent_of_target = NULL;
-  struct vfs_node* target_node =
-    resolve_path_ex(parent, &parent_of_target, target, &basename, 0);
-
-  // Run some complex checks on the target, to make sure its suitable for
-  // mounting
-  if (target_node != NULL && target_node != root_node) {
-    if (!S_ISDIR(target_node->backing->st.st_mode)) {
-      return false;
-    }
+/* A simple funciton I use for debugging the VFS tree...
+static void dump_all_nodes(struct vfs_node* node, int depth) {
+  if (node->mountpoint) {
+    return dump_all_nodes(node->mountpoint, depth);
+  } else if (node->symlink_target) { 
+    klog("%*s%s -| (link)", depth, "", node->name);
+    return;
   } else {
-    if (target_node == root_node) {
-      mounting_root = true;
-    } else {
-      return false;
+    klog("%*s%s -|", depth, "", node->name);
+  }
+  
+  if (S_ISDIR(node->backing->st.st_mode)) {  
+    struct vfs_node* cur; int cnt;
+    vec_foreach(&node->children, cur, cnt) {
+      dump_all_nodes(cur, depth+1);
     }
-  }
-
-  struct vfs_node* mount_node =
-    fs->mount(source_node, basename, parent_of_target);
-  if (!mounting_root) {
-    target_node->mountpoint = mount_node;
-    create_dotentries(mount_node, parent_of_target);
-  } else {
-    // Prepare the mount node for its role as root_node
-    create_dotentries(mount_node, mount_node);
-    mount_node->parent = mount_node;
-    kfree(root_node);
-    root_node = mount_node;
-    *root_node->name = '/';
-  }
-
-  if (source_node == NULL) {
-    klog("vfs: mounted a %s instance to `%s`", filesystem, target);
-  } else {
-    klog("vfs: mounted `%s` to `%s` (type: %s)", source, target, filesystem);
+    return;
   }
 }
+*/
 
-void
-vfs_init(struct stivale2_struct_tag_modules* md)
-{
-  // Create the root node
-  root_node = create_node("/", NULL, NULL);
-  create_dotentries(root_node, NULL);
+void vfs_init(struct stivale2_struct_tag_modules* mods) {
+  // Create the root node...
+  root_node = kmalloc(sizeof(struct vfs_node));
+  memcpy(root_node->name, "/", 1);
+  root_node->parent = root_node;
+  root_node->backing = create_backing(0);
+  root_node->backing->st.st_mode |= S_IFDIR;
 
-  // Register and mount the tmpfs
+  // Mount tmpfs to the VFS root
   vfs_register_fs(&tmpfs);
-  vfs_mount(root_node, NULL, "/", "tmpfs");
+  vfs_mount(NULL, "/", "tmpfs");
 
-  // Load the initramfs
-  initramfs_load(md);
+  // Then mount the devfs to /dev
+  vfs_register_fs(&devtmpfs);
+  vfs_mkdir(NULL, "/dev", 0775);
+  vfs_mount(NULL, "/dev", "devtmpfs");
+
+  // Populate the tmpfs, via the initramfs, and the devtmpfs
+  initramfs_populate(mods);
+  setup_unix_streams();
+  setup_random_streams();
 }
 

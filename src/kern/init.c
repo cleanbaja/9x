@@ -5,6 +5,7 @@
 #include <lib/kcon.h>
 #include <arch/apic.h>
 #include <arch/tables.h>
+#include <fs/vfs.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
 
@@ -117,6 +118,9 @@ kern_entry(struct stivale2_struct* bootinfo)
   // Initialize other CPUs and fix the percpu structure
   smp_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_SMP_ID));
   PERCPU_FIXUP();
+
+  // Initialize the VFS
+  vfs_init(stivale2_find_tag(STIVALE2_STRUCT_TAG_MODULES_ID));
 
   klog("init: Startup complete, halting all cores!");
   apic_send_ipi(IPI_HALT, 0, IPI_OTHERS);

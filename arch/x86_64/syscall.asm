@@ -1,5 +1,5 @@
 [bits 64]
-section .rodata
+section .data
 nr_syscalls equ ((jump_table.end - jump_table) / 8)
 
 align 16
