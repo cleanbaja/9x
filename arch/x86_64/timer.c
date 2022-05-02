@@ -41,7 +41,7 @@ static void hpet_init() {
   hpet_write(HPET_REG_CONF, hpet_read(HPET_REG_CONF) | (1 << 0));
 }
 
-void tsc_calibrate() {
+void timer_calibrate_tsc() {
   // Make sure that we can proceed with the callibration
   if (hpet_base == 0x0) { hpet_init(); }
   if (!CPU_CHECK(CPU_FEAT_INVARIANT)) {
@@ -86,7 +86,7 @@ void tsc_calibrate() {
   }
 
 outro:
-  if (!CPU_CHECK(CPU_FEAT_DEADLINE) || !CPU_CHECK(CPU_FEAT_INVARIANT)) { apic_calibrate(); }
+  if (!CPU_CHECK(CPU_FEAT_DEADLINE) || !CPU_CHECK(CPU_FEAT_INVARIANT)) { ic_timer_calibrate(); }
 }
 
 

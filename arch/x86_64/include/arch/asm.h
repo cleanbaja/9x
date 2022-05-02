@@ -4,6 +4,10 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifndef ARCH_INTERNAL
+#error "Attempt to include internal code in a generic code file"
+#endif
+
 // General asm routines
 #define asm_halt()                                                             \
   ({                                                                           \
@@ -12,15 +16,8 @@
       __asm__ volatile("hlt");                                                 \
     }                                                                          \
   })
-
 #define asm_invlpg(k) ({ __asm__ volatile("invlpg %0" ::"m"(k) : "memory"); })
 #define asm_swapgs()  ({__asm__ volatile("swapgs" ::: "memory");})
-
-// GDT/IDT asm routines
-extern void* asm_dispatch_table[256];
-extern void
-asm_load_gdt(void* g, uint16_t codeseg, uint16_t dataseg);
-#define asm_load_idt(ptr) __asm__ volatile("lidt %0" ::"m"(ptr))
 
 // CR0-4 & MSR asm routines
 #define ASM_MAKE_CRN(N)                                                        \
@@ -94,9 +91,6 @@ static inline void asm_wrxcr(uint32_t reg, uint64_t value) {
                   : "a" (eax), "d" (edx), "c" (reg)
                   : "memory");
 }
-
-// Syscall entrypoint
-extern void asm_syscall_entry();
 
 // Reading of the TSC
 static inline uint64_t asm_rdtsc() {

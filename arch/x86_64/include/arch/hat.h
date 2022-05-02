@@ -1,5 +1,5 @@
-#ifndef SYS_HAT_H
-#define SYS_HAT_H
+#ifndef ARCH_HAT_H
+#define ARCH_HAT_H
 
 #include <stdint.h>
 
@@ -18,5 +18,5 @@ uint64_t* hat_resolve_addr(uintptr_t root, uintptr_t virt);
 #define INVL_ENTIRE_TLB  0x12
 void hat_invl(uintptr_t root, uintptr_t virt, uint32_t asid, int mode);
 
-#endif // SYS_HAT_H
+#endif // ARCH_HAT_H
 

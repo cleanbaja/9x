@@ -83,6 +83,10 @@ endif
 all: $(KERNEL)
 
 # Targets for compiling the kernel
+arch/%.o: arch/%.c
+	@$(COOL_PROMPT) " CC " $<
+	$(CC) $(CREALFLAGS) -D ARCH_INTERNAL -c -o $@ $<
+
 %.o: %.c
 	@$(COOL_PROMPT) " CC " $<
 	$(CC) $(CREALFLAGS) -c -o $@ $<

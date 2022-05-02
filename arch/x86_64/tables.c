@@ -4,7 +4,10 @@
 
 static struct gdt main_gdt = { 0 };
 static struct idt_entry entries[256] = { 0 };
+extern void* asm_dispatch_table[256];
 static CREATE_SPINLOCK(table_lock);
+extern void  asm_load_gdt(void* g, uint16_t codeseg, uint16_t dataseg);
+#define asm_load_idt(ptr) __asm__ volatile("lidt %0" ::"m"(ptr))
 
 static struct idt_entry
 make_idt_entry(void* handler, uint8_t ist)
@@ -105,5 +108,100 @@ load_tss(uintptr_t address)
   asm_load_idt(idt_pointer);
 
   spinlock_release(&table_lock);
+}
+
+/*
+ * A list of execption messages stolen from the osdev wiki
+ * NOTE: I removed some execptions that were obsolete
+ */
+static char* exc_table[] = { [0] = "Division by Zero",
+                             [1] = "Debug",
+                             [2] = "Non Maskable Interrupt",
+                             [3] = "Breakpoint",
+                             [4] = "Overflow",
+                             [5] = "Out of Bounds",
+                             [6] = "Invalid Opcode",
+                             [8] = "Double Fault",
+                             [10] = "Invalid TSS",
+                             [11] = "Segment not present",
+                             [12] = "Stack Exception",
+                             [13] = "General Protection fault",
+                             [14] = "Page fault",
+                             [16] = "x87 Floating Point Exception",
+                             [17] = "Alignment check",
+                             [18] = "Machine check",
+                             [19] = "SIMD floating point Exception",
+                             [20] = "Virtualization Exception",
+                             [30] = "Security Exception" };
+
+void
+dump_context(cpu_ctx_t* regs)
+{
+  klog_unlocked("Exception #%d (%s)\n", regs->int_no, exc_table[regs->int_no]);
+  klog_unlocked("    Error Code: 0x%08lx, RIP: 0x%08lx, RSP: 0x%08lx\n",
+          regs->ec,
+          regs->rip,
+          regs->rsp);
+  klog_unlocked("    RAX: 0x%08lx, RBX: 0x%08lx, RCX: 0x%08lx, RDX: 0x%08lx\n",
+          regs->rax,
+          regs->rbx,
+          regs->rcx,
+          regs->rbx);
+  klog_unlocked("    RSI: 0x%08lx, RDI: 0x%08lx, RSP: 0x%08lx, RBP: 0x%08lx\n",
+          regs->rsi,
+          regs->rdi,
+          regs->rsp,
+          regs->rbp);
+  klog_unlocked("    R8:  0x%08lx, R9:  0x%08lx, R10: 0x%08lx, R11: 0x%08lx\n",
+          regs->r8,
+          regs->r9,
+          regs->r10,
+          regs->r11);
+  klog_unlocked("    R12: 0x%08lx, R12: 0x%08lx, R13: 0x%08lx, R14: 0x%08lx\n",
+          regs->r12,
+          regs->r13,
+          regs->r13,
+          regs->r14);
+  klog_unlocked("    R15: 0x%08lx, CS:  0x%08lx, SS:  0x%08lx\n\n",
+          regs->r15,
+          regs->cs,
+          regs->ss);
+
+  if (regs->int_no == 14) {
+    // Print extra information in the case of a page fault
+    uint64_t cr2_val = asm_read_cr2();
+    klog_unlocked("Linear Address: 0x%lx\nConditions:\n", cr2_val);
+
+    // See Intel x86 SDM Volume 3a Chapter 4.7
+    uint64_t error_code = regs->ec;
+    if (((error_code) & (1 << (0))))
+      klog_unlocked("    - Page level protection violation\n");
+    else
+      klog_unlocked("    - Non-present page\n");
+
+    if (((error_code) & (1 << (1))))
+      klog_unlocked("    - Write\n");
+    else
+      klog_unlocked("    - Read\n");
+
+    if (((error_code) & (1 << (2))))
+      klog_unlocked("    - User access\n");
+    else
+      klog_unlocked("    - Supervisor access\n");
+
+    if (((error_code) & (1 << (3))))
+      klog_unlocked("    - Reserved bit set\n");
+
+    if (((error_code) & (1 << (4))))
+      klog_unlocked("    - Instruction fetch\n");
+
+    if (((error_code) & (1 << (5))))
+      klog_unlocked("    - Protection key violation\n");
+
+    if (((error_code) & (1 << (15))))
+      klog_unlocked("    - SGX violation\n");
+
+    klog_unlocked("\n");
+  }
 }
 

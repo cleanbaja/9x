@@ -1,5 +1,11 @@
-#ifndef SYS_CPU_H
-#define SYS_CPU_H
+#ifndef ARCH_CPU_H
+#define ARCH_CPU_H
+
+// Define ARCH_INTERNAL if needed, since this code
+// could be imported from generic code
+#ifndef ARCH_INTERNAL
+#define ARCH_INTERNAL
+#endif // ARCH_INTERNAL
 
 #include <arch/asm.h>
 
@@ -24,13 +30,10 @@ extern uint64_t fpu_save_size;
 void fpu_save(uint8_t* zone);    // Must be 16 or 64-byte aligned
 void fpu_restore(uint8_t* zone);
 
-// Context related functions
-void cpu_create_context(void* thr, uintptr_t stack, uintptr_t entry, int user);
-
 // Tell if we're BSP
 static inline bool is_bsp() {
   return (asm_rdmsr(0x1B) & (1 << 8));
 }
 
-#endif // SYS_CPU_H
+#endif // ARCH_CPU_H
 

@@ -1,4 +1,3 @@
-#include <arch/asm.h>
 #include <arch/hat.h>
 #include <lib/builtin.h>
 #include <lib/kcon.h>
@@ -7,6 +6,9 @@
 #include <vm/phys.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
+
+#define ARCH_INTERNAL
+#include <arch/asm.h>
 
 vm_space_t kernel_space;
 uint32_t asid_bitmap[VM_ASID_MAX / 8] = {0};

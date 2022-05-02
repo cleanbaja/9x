@@ -1,5 +1,5 @@
 #include <arch/cpuid.h>
-#include <arch/apic.h>
+#include <arch/ic.h>
 #include <arch/irq.h>
 #include <arch/cpu.h>
 #include <arch/tables.h>
@@ -12,6 +12,7 @@
 uint64_t cpu_features = 0;
 uint64_t fpu_save_size = 0;
 uint64_t fpu_save_align = 0;
+extern void asm_syscall_entry();
 
 static void detect_cpu_features() {
   uint32_t eax, ebx, ecx, edx;

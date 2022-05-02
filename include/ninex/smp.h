@@ -1,11 +1,13 @@
 #ifndef PROC_SMP_H
 #define PROC_SMP_H
 
-#include <arch/asm.h>
 #include <ninex/proc.h>
 #include <arch/tables.h>
 #include <lib/vec.h>
 #include <vm/virt.h>
+
+#define ARCH_INTERNAL
+#include <arch/asm.h>
 
 // We mark this as packed, since its accessed in assembly, which can't put up with that.
 typedef struct __attribute__((packed)) {

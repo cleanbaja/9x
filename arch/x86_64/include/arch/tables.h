@@ -1,8 +1,12 @@
-#ifndef SYS_TABLES_H
-#define SYS_TABLES_H
+#ifndef ARCH_TABLES_H
+#define ARCH_TABLES_H
 
 #include "arch/irq.h"
 #include <stdbool.h>
+
+#ifndef ARCH_INTERNAL
+#error "Attempt to include internal code in a generic code file"
+#endif
 
 struct __attribute__((packed)) table_ptr
 {
@@ -46,6 +50,7 @@ struct __attribute__((packed)) gdt
   uint64_t null_entry;
 
 #ifdef LIMINE_EARLYCONSOLE
+
   // 16-bit kernel code/data
   uint64_t ocode_entry;
   uint64_t odata_entry;
@@ -53,6 +58,7 @@ struct __attribute__((packed)) gdt
   // 32-bit kernel code/data
   uint64_t lcode_entry;
   uint64_t ldata_entry;
+
 #endif // LIMINE_EARLYCONSOLE
 
   // 64-bit kernel code/data
@@ -97,14 +103,12 @@ struct __attribute__((packed)) tss
   uint16_t iopb;
 };
 
-// Functions to reload/init the CPU tables
-void
-init_tables();
-void
-reload_tables();
+// Functions to reload/init the CPU tables (aka the GDT and IDT)
+void init_tables();
+void reload_tables();
 
-// TSS loading helper
-void
-load_tss(uintptr_t address);
+// Helpers for loading the TSS and dumping CPU context
+void load_tss(uintptr_t address);
+void dump_context(struct cpu_context* regs);
 
-#endif // SYS_TABLES_H
+#endif // ARCH_TABLES_H

@@ -1,14 +1,16 @@
-#include <arch/cpuid.h>
 #include <lib/lock.h>
 #include <lib/kcon.h>
 #include <lib/builtin.h>
 #include <ninex/smp.h>
-#include <arch/apic.h>
+#include <vm/phys.h>
+#include <vm/vm.h>
+
+#define ARCH_INTERNAL
+#include <arch/cpuid.h>
+#include <arch/ic.h>
 #include <arch/cpu.h>
 #include <arch/tables.h>
 #include <arch/timer.h>
-#include <vm/phys.h>
-#include <vm/vm.h>
 
 percpu_vec_t cpu_locals;
 uint64_t total_cpus = 0;
@@ -58,11 +60,11 @@ void ap_entry(struct stivale2_smp_info* sm) {
     reload_tables();
     cpu_early_init();
     percpu_init_vm();
-    apic_enable();
+    ic_enable();
 
     WRITE_PERCPU(sm->extra_argument, sm->processor_id);
     load_tss((uintptr_t)&per_cpu(tss));
-    tsc_calibrate();
+    timer_calibrate_tsc();
   }
 
   // Release the CPU lock, and tell the BSP we're done!
@@ -78,8 +80,9 @@ void smp_init(struct stivale2_struct_tag_smp *smp_tag) {
   // Set the handler for Halt IPIs
   struct irq_handler h = { .should_return = false,
                            .is_irq = true,
-                           .hnd = ipi_halt };
-  register_irq_handler(IPI_HALT, h);
+                           .hnd = ipi_halt,
+ 			   .name = "Halt IPI" };
+  *get_handler(IPI_HALT) = h;
   total_cpus = smp_tag->cpu_count + 1;
 
   // Wakeup all the waiting CPUs
@@ -89,8 +92,8 @@ void smp_init(struct stivale2_struct_tag_smp *smp_tag) {
       percpu_t* p = setup_cpulocal(sp);
       WRITE_PERCPU(p, sp->processor_id);
       load_tss((uintptr_t)&per_cpu(tss));
-      apic_enable();
-      tsc_calibrate();
+      ic_enable();
+      timer_calibrate_tsc();
 
       continue;
     }

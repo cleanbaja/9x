@@ -3,7 +3,7 @@
 #include <arch/asm.h>
 #include <arch/cpuid.h>
 #include <lib/kcon.h>
-#include <arch/apic.h>
+#include <arch/ic.h>
 #include <arch/tables.h>
 #include <arch/timer.h>
 #include <vm/virt.h>
@@ -65,14 +65,12 @@ ioapic_write(size_t ioapic_num, uint32_t reg, uint32_t data)
   *(base + 4) = data;
 }
 
-void
-apic_eoi()
+void ic_eoi()
 {
   apic_write(LAPIC_EOI, 0);
 }
 
-void
-apic_send_ipi(uint8_t vec, uint32_t cpu, enum ipi_mode mode)
+void ic_send_ipi(uint8_t vec, uint32_t cpu, enum ipi_mode mode)
 {
   uint32_t icr_low = 0;
 
@@ -104,8 +102,7 @@ apic_send_ipi(uint8_t vec, uint32_t cpu, enum ipi_mode mode)
   }
 }
 
-void
-apic_enable()
+void ic_enable()
 {
   // Check for the x2APIC
   if (!use_x2apic) {
@@ -143,76 +140,69 @@ apic_enable()
         xapic_base);
 }
 
-static uint32_t
-ioapic_max_redirects(size_t ioapic_num)
+static uint32_t get_max_redirects(size_t ioapic_num)
 {
   return (ioapic_read(ioapic_num, 1) & 0xff0000) >> 16;
 }
 
 // Return the index of the I/O APIC that handles this redirect
-static int64_t
-get_ioapic(uint32_t gsi)
-{
+static int64_t get_ioapic(uint32_t gsi) {
   for (size_t i = 0; i < madt_ioapics.length; i++) {
     if (madt_ioapics.data[i]->gsib <= gsi &&
-        madt_ioapics.data[i]->gsib + ioapic_max_redirects(i) > gsi)
+        madt_ioapics.data[i]->gsib + get_max_redirects(i) > gsi)
       return i;
   }
 
   return -1;
 }
 
-void
-apic_redirect_gsi(uint8_t lapic_id,
-                  uint8_t vec,
-                  uint32_t gsi,
-                  uint16_t flags,
-                  bool masked)
-{
-  size_t io_apic = get_ioapic(gsi);
-  uint64_t redirect = vec;
+void ic_mask_irq(uint16_t slot, bool status) {
+  size_t   cur_apic = get_ioapic(slot);
+  uint32_t ioredtbl = (slot - madt_ioapics.data[cur_apic]->gsib) * 2 + 16;
+  uint32_t old_val  = ioapic_read(cur_apic, ioredtbl);
 
-  // Active high(0) or low(1)
-  if (flags & 2) {
-    redirect |= (1 << 13);
-  }
-
-  // Edge(0) or level(1) triggered
-  if (flags & 8) {
-    redirect |= (1 << 15);
-  }
-
-  if (masked) {
-    // Set mask bit
-    redirect |= (1 << 16);
-  }
-
-  // Set target APIC ID
-  redirect |= ((uint64_t)lapic_id) << 56;
-  uint32_t ioredtbl = (gsi - madt_ioapics.data[io_apic]->gsib) * 2 + 16;
-
-  ioapic_write(io_apic, ioredtbl + 0, (uint32_t)redirect);
-  ioapic_write(io_apic, ioredtbl + 1, (uint32_t)(redirect >> 32));
+  if (status)
+    ioapic_write(cur_apic, ioredtbl, old_val | (1 << 16));
+  else
+    ioapic_write(cur_apic, ioredtbl, old_val & (1 << 16));
 }
 
-void
-apic_redirect_irq(uint8_t lapic_id, uint8_t vec, uint8_t irq, bool masked)
+void ic_create_redirect(uint8_t lapic_id, 
+		        uint8_t vec, 
+			uint16_t slot, 
+			bool legacy)
 {
-  for (size_t i = 0; i < madt_isos.length; i++) {
-    if (madt_isos.data[i]->irq_source == irq) {
-      klog("apic: IRQ %u used by override.", irq);
-      apic_redirect_gsi(lapic_id,
-                        vec,
-                        madt_isos.data[i]->gsi,
-                        madt_isos.data[i]->flags,
-                        masked);
-      return;
+  // We only support Active High and Edge Triggered interrupts
+  // so don't set any mode-related bits...
+  size_t cur_apic = get_ioapic(slot);
+  uint64_t redir_entry = vec;
+  uint32_t real_gsi = slot;
+
+  if (legacy) {
+    for (size_t i = 0; i < madt_isos.length; i++) {
+      if (madt_isos.data[i]->irq_source == slot) {
+        klog("apic: IRQ %u used by override.", slot);
+
+	real_gsi = madt_isos.data[i]->gsi;
+	if (madt_isos.data[i]->flags & 2)
+          redir_entry |= (1 << 13);    // Active low
+        if (madt_isos.data[i]->flags & 8)
+          redir_entry |= (1 << 15);    // Level triggered
+      }
     }
   }
-  apic_redirect_gsi(lapic_id, vec, irq, 0, masked);
+
+  // Allow for tracebacks of the GSI, by wiring it into the handler
+  get_handler(vec)->gsi = real_gsi;
+
+  // Set the target CPU, then complete the redirection of the IRQ
+  redir_entry |= ((uint64_t)lapic_id) << 56;
+  uint32_t ioredtbl = (real_gsi - madt_ioapics.data[cur_apic]->gsib) * 2 + 16;
+  ioapic_write(cur_apic, ioredtbl, (uint32_t)redir_entry);
+  ioapic_write(cur_apic, ioredtbl + 1, (uint32_t)(redir_entry >> 32));
 }
 
-void apic_calibrate() {
+void ic_timer_calibrate() {
   // Setup the calibration, with divisor set to 16 (0x3)
   apic_write(LAPIC_TIMER_DIV, 0x3);
   apic_write(LAPIC_TIMER_LVT, 0xFF | (1 << 16));
@@ -228,7 +218,7 @@ void apic_calibrate() {
 }
 
 void
-apic_timer_oneshot(uint8_t vec, uint64_t ms)
+ic_timer_oneshot(uint8_t vec, uint64_t ms)
 {
   if (CPU_CHECK(CPU_FEAT_INVARIANT) && CPU_CHECK(CPU_FEAT_DEADLINE)) {
     apic_write(LAPIC_TIMER_LVT, (0b10 << 17) | vec);
@@ -255,7 +245,8 @@ apic_timer_oneshot(uint8_t vec, uint64_t ms)
 }
 
 void
-apic_timer_stop() {
+ic_timer_stop() {
   apic_write(LAPIC_TIMER_INIT, 0);
   apic_write(LAPIC_TIMER_LVT, apic_read(LAPIC_TIMER_LVT) | (1 << 16));
 }
+

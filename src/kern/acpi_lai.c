@@ -1,10 +1,12 @@
 #include <ninex/acpi.h>
-#include <arch/asm.h>
 #include <lai/core.h>
 #include <lib/kcon.h>
 #include <vm/phys.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
+
+#define ARCH_INTERNAL
+#include <arch/asm.h>
 
 void *laihost_malloc(size_t size) {
     return kmalloc(size);

@@ -1,6 +1,11 @@
 #ifndef LIB_LOCK_H
 #define LIB_LOCK_H
 
+// Export internal arch code
+#ifndef ARCH_INTERNAL
+#define ARCH_INTERNAL
+#endif // ARCH_INTERNAL
+
 #include <arch/asm.h>
 #include <arch/cpu.h>
 

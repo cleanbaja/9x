@@ -1,8 +1,8 @@
 #include <ninex/acpi.h>
 #include <lib/cmdline.h>
 #include <lib/kcon.h>
-#include <arch/apic.h>
-#include <arch/tables.h>
+#include <arch/ic.h>
+#include <arch/irq.h>
 #include <vm/phys.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
@@ -161,17 +161,14 @@ setup_sci(void)
   acpi_madt_t* madt = acpi_query("APIC", 0);
 
   // Register the handler
-  struct irq_handler hnd = { .should_return = true,
-                             .is_irq = true,
-                             .hnd = sci_handler };
-  int slot = find_irq_slot(hnd);
+  int slot;
+  struct irq_handler* hnd = request_irq("acpi_sci", &slot);
+  hnd->should_return = true;
+  hnd->is_irq = true;
+  hnd->hnd    = sci_handler;
 
   // Redirect the IRQ to the proper CPU
-  if (madt->flags & 1) {
-    apic_redirect_irq(0, slot, fadt->sci_irq, false);
-  } else {
-    apic_redirect_gsi(0, slot, fadt->sci_irq, 0, false);
-  }
+  ic_create_redirect(0, slot, fadt->sci_irq, (madt->flags & 1));
 
   // Enable Interrupts
   __asm__ volatile("sti");

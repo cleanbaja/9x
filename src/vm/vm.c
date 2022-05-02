@@ -1,5 +1,5 @@
 #include <lib/kcon.h>
-#include <arch/apic.h>
+#include <arch/ic.h>
 #include <arch/irq.h>
 #include <vm/phys.h>
 #include <vm/virt.h>

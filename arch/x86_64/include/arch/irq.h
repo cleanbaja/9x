@@ -1,5 +1,5 @@
-#ifndef SYS_IRQ_H
-#define SYS_IRQ_H
+#ifndef ARCH_IRQ_H
+#define ARCH_IRQ_H
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -19,20 +19,15 @@ struct irq_handler
 {
   HandlerFunc hnd;
   void* extra_arg;
-  bool is_irq;
-  bool should_return;
+  char* name;
+  uint32_t gsi;
+  bool is_irq, should_return;
 };
 
-void
-dump_context(cpu_ctx_t* regs);
-void
-register_irq_handler(int vec, struct irq_handler h);
-int
-find_irq_slot(
-  struct irq_handler h); // Just like above, but finds a empty slot for the IRQ
+struct irq_handler* request_irq(char* desc, int* slot);
+struct irq_handler* get_handler(int slot);
 
-// Allocates a IDT vector, for reciving IRQs
-int
-alloc_irq_vec();
+// Allocates a raw IDT vector, for reciving IRQs
+int alloc_irq_vec();
 
-#endif // SYS_IRQ_H
+#endif // ARCH_IRQ_H

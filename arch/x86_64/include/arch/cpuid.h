@@ -1,7 +1,11 @@
-#ifndef INTERNAL_CPUID_H
-#define INTERNAL_CPUID_H
+#ifndef ARCH_CPUID_H
+#define ARCH_CPUID_H
 
 #include <stdint.h>
+
+#ifndef ARCH_INTERNAL
+#error "Attempt to include internal code in a generic code file"
+#endif
 
 /* CPUID bit definitions */
 #define CPUID_ECX_SSE3 (1U << 0U)
@@ -166,4 +170,4 @@ cpuid_subleaf(uint32_t leaf,
                    : "memory");
 }
 
-#endif // INTERNAL_CPUID_H
+#endif // ARCH_CPUID_H

@@ -1,10 +1,9 @@
-#ifndef SYS_TSC_H
-#define SYS_TSC_H
+#ifndef ARCH_TIMER_H
+#define ARCH_TIMER_H
 
-#include <arch/apic.h>
+#include <arch/ic.h>
 #include <acpispec/tables.h>
 
-/* Although the files are called tsc.{c,h}, they contain code for the HPET as well */
 typedef struct acpi_hpet_t {
     acpi_header_t header;
     
@@ -36,7 +35,7 @@ void timer_msleep(uint64_t ms);
  */
 #define TSC_CALI_CYCLES 5
 
-void tsc_calibrate();
+void timer_calibrate_tsc();
 
-#endif // SYS_TSC_H
+#endif // ARCH_TIMER_H
 

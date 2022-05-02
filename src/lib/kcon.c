@@ -3,7 +3,7 @@
 #include <lib/lock.h>
 #include <ninex/smp.h>
 #include <arch/irq.h>
-#include <arch/apic.h>
+#include <arch/ic.h>
 #include <vm/vm.h>
 
 #ifdef LIMINE_EARLYCONSOLE
@@ -140,7 +140,7 @@ void panic(void* frame, char* fmt, ...) {
   }
  
   // Shootdown all other CPUs
-  apic_send_ipi(IPI_HALT, 0, IPI_OTHERS);
+  ic_send_ipi(IPI_HALT, 0, IPI_OTHERS);
 
   // Log all the information possible
   // klog_unlocked("\nKERNEL PANIC on CPU #%d\n", cpunum());
