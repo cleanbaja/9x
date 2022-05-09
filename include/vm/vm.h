@@ -2,6 +2,7 @@
 #define VM_H
 
 #include <lib/stivale2.h>
+#include <ninex/init.h>
 #include <stddef.h>
 
 // Hard-coded kernel virtual/physical memory constants for x86_64
@@ -11,9 +12,9 @@
 extern uintptr_t kernel_vma;
 #define VM_MEM_OFFSET kernel_vma
 
-// Bootstraps the entire VM, including allocators and Virtual Memory
-void
-vm_init(struct stivale2_struct_tag_memmap* mm_tag);
+// Bootstraps the entire VM, except Virtual Memory
+EXPORT_STAGE(vm_stage);
+EXPORT_STAGE(vm_phys_stage);
 
 // Liballoc (aka kmalloc) defs
 #define PREFIX(func) k##func

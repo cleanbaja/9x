@@ -12,6 +12,7 @@
 
 vm_space_t kernel_space;
 uint32_t asid_bitmap[VM_ASID_MAX / 8] = {0};
+CREATE_STAGE(vm_stage, vm_virt_init, 0, { vm_phys_stage })
 
 static uint32_t alloc_asid() {
   for (uint32_t i = 0; i < VM_ASID_MAX; i++) {
@@ -127,9 +128,10 @@ percpu_init_vm()
   hat_invl(kernel_space.root, 0, 0, INVL_ENTIRE_TLB);
 }
 
-void
-vm_init_virt(struct stivale2_struct_tag_memmap* mmap)
+static void vm_virt_init()
 {
+  struct stivale2_struct_tag_memmap* mmap = stivale2_find_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID);
+
   // Setup the kernel pagemap
   kernel_space.root   = 1;
   kernel_space.active = false;

@@ -9,6 +9,8 @@ static CREATE_SPINLOCK(table_lock);
 extern void  asm_load_gdt(void* g, uint16_t codeseg, uint16_t dataseg);
 #define asm_load_idt(ptr) __asm__ volatile("lidt %0" ::"m"(ptr))
 
+CREATE_STAGE(tables_setup_stage, tables_callback, 0, {});
+
 static struct idt_entry
 make_idt_entry(void* handler, uint8_t ist)
 {
@@ -22,8 +24,25 @@ make_idt_entry(void* handler, uint8_t ist)
                              .reserved = 0 };
 }
 
-void
-init_tables()
+static void reload_tables()
+{
+  struct table_ptr table_pointer;
+  spinlock_acquire(&table_lock);
+
+  // Reload the GDT
+  table_pointer.base = (uint64_t)&main_gdt;
+  table_pointer.limit = sizeof(struct gdt) - 1;
+  asm_load_gdt(&table_pointer, GDT_KERNEL_CODE, GDT_KERNEL_DATA);
+
+  // Reload the IDT
+  table_pointer.base = (uint64_t)entries;
+  table_pointer.limit = sizeof(entries) - 1;
+  asm_load_idt(table_pointer);
+
+  spinlock_release(&table_lock);
+}
+
+static void init_tables()
 {
   // Setup the GDT
   main_gdt.null_entry = 0;
@@ -61,23 +80,11 @@ init_tables()
   reload_tables();
 }
 
-void
-reload_tables()
-{
-  struct table_ptr table_pointer;
-  spinlock_acquire(&table_lock);
-
-  // Reload the GDT
-  table_pointer.base = (uint64_t)&main_gdt;
-  table_pointer.limit = sizeof(struct gdt) - 1;
-  asm_load_gdt(&table_pointer, GDT_KERNEL_CODE, GDT_KERNEL_DATA);
-
-  // Reload the IDT
-  table_pointer.base = (uint64_t)entries;
-  table_pointer.limit = sizeof(entries) - 1;
-  asm_load_idt(table_pointer);
-
-  spinlock_release(&table_lock);
+static void tables_callback() {
+  if (main_gdt.kcode_entry == 0)
+    init_tables();
+  else
+    reload_tables();
 }
 
 void

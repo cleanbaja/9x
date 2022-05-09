@@ -2,11 +2,14 @@
 #define PROC_SMP_H
 
 #include <ninex/proc.h>
+#include <ninex/init.h>
 #include <arch/tables.h>
 #include <lib/vec.h>
 #include <vm/virt.h>
 
+#ifndef ARCH_INTERNAL
 #define ARCH_INTERNAL
+#endif // ARCH_INTERNAL
 #include <arch/asm.h>
 
 // We mark this as packed, since its accessed in assembly, which can't put up with that.
@@ -46,7 +49,7 @@ extern uint64_t total_cpus;
 
 #endif
 
-void smp_init(struct stivale2_struct_tag_smp *smp_tag);
+EXPORT_STAGE(smp_stage);
 
 #endif // PROC_SMP_H
 

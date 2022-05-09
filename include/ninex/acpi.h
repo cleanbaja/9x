@@ -4,6 +4,7 @@
 #include <acpispec/tables.h>
 #include <lib/stivale2.h>
 #include <lib/vec.h>
+#include <ninex/init.h>
 
 typedef struct acpi_madt_t {
     acpi_header_t header;
@@ -56,8 +57,7 @@ extern vec_ioapic_t madt_ioapics;
 extern vec_iso_t    madt_isos;
 extern vec_nmi_t    madt_nmis;
 
-void
-acpi_init(struct stivale2_struct_tag_rsdp* rk);
+EXPORT_STAGE(acpi_stage);
 
 void*
 acpi_query(const char* signature, int index);

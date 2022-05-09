@@ -66,6 +66,8 @@ void laihost_unmap(void *base, size_t length) {
     (void) length;
 } 
 
+#ifdef __x86_64__
+
 void laihost_outb(uint16_t port, uint8_t data) {
     asm_outb(port, data);
 }
@@ -123,6 +125,8 @@ void laihost_pci_writed(uint16_t seg, uint8_t bus, uint8_t slot, uint8_t func, u
     asm_outd(0xCFC, value);
 }
 
+#endif // __x86_64__
+
 // TODO: Actually sleep (with HPET?)
 void laihost_sleep(uint64_t ms) {
     for (size_t i = 0; i < 1000 * ms; i++) {
@@ -151,3 +155,4 @@ void laihost_sync_wake(struct lai_sync_state *ctx) {
   STUB_CALLED();
   return;
 }
+

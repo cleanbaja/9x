@@ -6,6 +6,8 @@
 #include <arch/ic.h>
 #include <vm/vm.h>
 
+#include "config.h"
+
 #ifdef LIMINE_EARLYCONSOLE
 #include <lib/stivale2.h>
 #include <arch/asm.h>
@@ -99,6 +101,7 @@ static struct kcon_sink bxdbg_term_sink = {
 static CREATE_SPINLOCK(kcon_lock);
 static uint16_t num_sinks;
 static struct kcon_sink* sinks[MAX_KCON_SINKS];
+CREATE_STAGE(kcon_stage, kcon_init, 0, {});
 
 void kcon_register_sink(struct kcon_sink* sink) {
   spinlock_acquire(&kcon_lock);
@@ -124,6 +127,13 @@ void kcon_init() {
       sinks[i]->setup(NULL);
     }
   }
+
+  // Print the 9x banner
+  struct stivale2_struct* info = stivale2_find_tag(1);
+  klog("9x (%s) (%s) - A project by cleanbaja", NINEX_VERSION, NINEX_ARCH);
+  klog("Bootloader: %s [%s]",
+       info->bootloader_brand,
+       info->bootloader_version);
 }
 
 void panic(void* frame, char* fmt, ...) {
@@ -176,12 +186,14 @@ void panic(void* frame, char* fmt, ...) {
 static uint8_t initial_buffer[4096];
 static bool console_locked = false;
 uint64_t kcon_cursor = 0, kcon_size = 4096;
-char* log_buf = (char*)&initial_buffer;
+char* log_buf = (char*)initial_buffer;
 static char format_buf[512], big_buf[512];
 
 static void __buf_grow() {
-  if (log_buf = initial_buffer) {
-    log_buf = kmalloc(8192);
+  if ((uintptr_t)log_buf == (uintptr_t)initial_buffer) {
+    void* new_buf = kmalloc(8192);
+    memcpy(new_buf, log_buf, 4096);
+    log_buf = new_buf;
     kcon_size = 8192;
   } else {
     log_buf = krealloc(log_buf, kcon_size * 2);

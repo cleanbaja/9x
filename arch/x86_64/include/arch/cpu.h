@@ -1,6 +1,8 @@
 #ifndef ARCH_CPU_H
 #define ARCH_CPU_H
 
+#include <ninex/init.h>
+
 // Define ARCH_INTERNAL if needed, since this code
 // could be imported from generic code
 #ifndef ARCH_INTERNAL
@@ -22,7 +24,7 @@
 extern uint64_t cpu_features;
 
 // CPU related functions/decls
-void cpu_early_init();
+EXPORT_STAGE(cpu_init_stage);
 void calibrate_tsc();
 
 // FPU releated functions

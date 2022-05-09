@@ -6,6 +6,7 @@
 #include <vm/vm.h>
 
 extern void ipi_invl(cpu_ctx_t*, void*);
+CREATE_STAGE(vm_phys_stage, vm_callback, 0, {})
 
 static char*
 mem_to_str(int mem_type)
@@ -41,9 +42,10 @@ mem_to_str(int mem_type)
   }
 }
 
-void
-vm_init(struct stivale2_struct_tag_memmap* mm_tag)
+static void vm_callback()
 {
+  struct stivale2_struct_tag_memmap* mm_tag = stivale2_find_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID);
+
   // Dump all memmap entries
   if (mm_tag->entries > 20) {
     klog("vm/phys: a total of %d entries in memmap!", mm_tag->entries);
@@ -67,10 +69,8 @@ vm_init(struct stivale2_struct_tag_memmap* mm_tag)
   }
 
   // Check to make sure we have at least one possible zone we can use
-  if (head_zone == NULL)
+  if (head_zone == NULL) {
     PANIC(NULL, "No suitable memory zones!\n");
-
-  // Then init the virtual memory subsystem
-  vm_init_virt(mm_tag);
   }
+}
 

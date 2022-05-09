@@ -44,8 +44,6 @@ virt2pte(vm_space_t* spc, uintptr_t virt);
 
 // Misc virt functions...
 void
-vm_init_virt(struct stivale2_struct_tag_memmap* mmap);
-void
 vm_invl(vm_space_t* spc, uintptr_t addr);
 void
 vm_load_space(vm_space_t* spc);

@@ -4,6 +4,7 @@
 #include <fs/backing.h>
 #include <lib/vec.h>
 #include <lib/stivale2.h>
+#include <ninex/init.h>
 
 #define MAX_NAME_LEN 256
 
@@ -62,5 +63,8 @@ extern struct vfs_node* root_node;
 // Kernel provided filesystems
 extern struct filesystem tmpfs;
 extern struct filesystem devtmpfs;
+
+// Kernel VFS init stage
+EXPORT_STAGE(vfs_stage);
 
 #endif // FS_VFS_H

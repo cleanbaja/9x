@@ -2,48 +2,126 @@
 #include <lib/builtin.h>
 #include <lib/kcon.h>
 
-static char* cmdline_raw = NULL;
-static size_t npairs = 0;
+#define CMDLINE_BUF_SZ 4096
+char __kernel_cmdline[CMDLINE_BUF_SZ];
+unsigned __kernel_cmdline_size;
+unsigned __kernel_cmdline_count;
 
-void cmdline_load(char* str) {
-  if (cmdline_raw != NULL || str == NULL)
-    return; // We already have a cmdline, or the arg is NULL!
+// Simple command-line parser I stole from zircon
+// https://fuchsia.googlesource.com/
+void cmdline_load(const char* data) {
+    unsigned i = __kernel_cmdline_size;
+    unsigned max = CMDLINE_BUF_SZ - 2;
 
-  klog("Kernel Command Line -> %s", str);  
+    // Stivale2 can give us a NULL cmdline, so be ready...
+    if (data == NULL)
+      return;
 
-  size_t len = strlen(str);
-  for (size_t i = 0; i < len; i++) {
-    if (str[i] == ' ' || str[i] == '\0') {
-      str[i] = '\0';
-      npairs++;
+    bool found_equal = false;
+    while (i < max) {
+        unsigned c = *data++;
+        if (c == 0) {
+            if (found_equal) { //last option was null delimited
+                ++__kernel_cmdline_count;
+            }
+            break;
+        }
+        if (c == '=') {
+            found_equal = true;
+        }
+        if ((c < ' ') || (c > 127)) {
+            if ((c == '\n') || (c == '\r') || (c == '\t')) {
+                c = ' ';
+            } else {
+                c = '.';
+            }
+        }
+        if (c == ' ') {
+            // spaces become \0's, but do not double up
+            if ((i == 0) || (__kernel_cmdline[i - 1] == 0)) {
+                continue;
+            } else {
+                if (!found_equal && i < max) {
+                    __kernel_cmdline[i++] = '=';
+                }
+                c = 0;
+                found_equal = false;
+                ++__kernel_cmdline_count;
+            }
+        }
+        __kernel_cmdline[i++] = c;
     }
-  }
+    if (!found_equal && i > 0 && __kernel_cmdline[i - 1] != '\0' && i < max) {
+        __kernel_cmdline[i++] = '=';
+        ++__kernel_cmdline_count;
+    }
 
-  if (len != 0) npairs++;
-  cmdline_raw = str;
+    // ensure a double-\0 terminator
+    __kernel_cmdline[i++] = 0;
+    __kernel_cmdline[i] = 0;
+    __kernel_cmdline_size = i;
 }
 
-bool cmdline_is_present(const char* key) {
-  char* index = cmdline_raw;
-  for (size_t i = 0; i < npairs; i++) {
-    if (strcmp(index, key) == 0)
-      return true;
+const char* cmdline_get(const char* key) {
+    if (!key)
+        return __kernel_cmdline;
 
-    index += strlen(index) + 1;
-  }
-
-  return false;
+    unsigned sz = strlen(key);
+    const char* ptr = __kernel_cmdline;
+    for (;;) {
+        if (!strcmp(ptr, key) && (ptr[sz] == '=' || ptr[sz] == '\0')) {
+            break;
+        }
+        ptr = strchr(ptr, 0) + 1;
+        if (*ptr == 0) {
+            return NULL;
+        }
+    }
+    
+    ptr += sz;
+    if (*ptr == '=')
+        ptr++;
+    
+    return ptr;
 }
 
-char* cmdline_get_str(const char* key) {
- char* index = cmdline_raw;
-  for (size_t i = 0; i < npairs; i++) {
-    if (strcmp(index, key) == 0)
-      return index + strlen(key) + 1; // Skip the equals sign
+bool cmdline_get_bool(const char* key, bool expected) {
+    const char* value = cmdline_get(key);
+    if (value == NULL)
+        return expected;
 
-    index += strlen(index) + 1;
-  }
+    if ((strcmp(value, "0") == 0) ||
+        (strcmp(value, "false") == 0) ||
+        (strcmp(value, "off") == 0)) {
+        return false;
+    }
 
-  return NULL;
+    return true;
+}
+
+uint32_t cmdline_get32(const char* key, uint32_t expected) {
+    const char* value_str = cmdline_get(key);
+    if (value_str == NULL || *value_str == '\0')
+        return expected;
+
+    char* end;
+    long int value = strtol(value_str, &end, 0);
+    if (*end != '\0')
+        return expected;
+    
+    return value;
+}
+
+uint64_t cmdline_get64(const char* key, uint64_t expected) {
+    const char* value_str = cmdline_get(key);
+    if (value_str == NULL || *value_str == '\0')
+        return expected;
+
+    char* end;
+    long long value = strtoll(value_str, &end, 0);
+    if (*end != '\0')
+        return expected;
+    
+    return value;
 }
 

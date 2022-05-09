@@ -14,6 +14,8 @@ uint64_t fpu_save_size = 0;
 uint64_t fpu_save_align = 0;
 extern void asm_syscall_entry();
 
+CREATE_STAGE(cpu_init_stage, cpu_early_init, 0, {});
+
 static void detect_cpu_features() {
   uint32_t eax, ebx, ecx, edx;
 
@@ -102,7 +104,8 @@ static void fpu_init() {
 
     uint64_t xcr0 = 0;
     xcr0 |= (1 << 0) | // Save x87 state with x{save,rstor}, required
-            (1 << 1);  // Save SSE state with x{save,rstor}
+            (1 << 1);  // Save SSE state with x{save,rstor}, also required
+    klog("fpu: saving x87 & SSE state with XSAVE");
 
     if (c & CPUID_ECX_AVX) {
       xcr0 |= (1 << 2);
@@ -156,10 +159,10 @@ void cpu_early_init() {
   // Then enable all possible features
   uint64_t cr4 = asm_read_cr4();
   cr4 |= (1 << 2)  | // Stop userspace from reading the TSC
-	       (1 << 7)  | // Enables Global Pages
+	 (1 << 7)  | // Enables Global Pages
          (1 << 9)  | // Allows for fxsave/fxrstor, along with SSE
-	       (1 << 10) | // Allows for unmasked SSE exceptions
-	       (1 << 20);  // Enables Supervisor Mode Execution Prevention
+	 (1 << 10) | // Allows for unmasked SSE exceptions
+	 (1 << 20);  // Enables Supervisor Mode Execution Prevention
   asm_write_cr4(cr4);
 
   uint64_t efer = asm_rdmsr(IA32_EFER);
@@ -199,7 +202,6 @@ void cpu_early_init() {
   asm_wrmsr(IA32_LSTAR, (uintptr_t)asm_syscall_entry);
   asm_wrmsr(IA32_SFMASK, ~(uint32_t)2);
 }
-
 
 void cpu_create_context(void* thr, uintptr_t stack, uintptr_t entry, int user) {
   if (user)

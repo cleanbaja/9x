@@ -174,9 +174,11 @@ setup_sci(void)
   __asm__ volatile("sti");
 }
 
-void
-acpi_init(struct stivale2_struct_tag_rsdp* rk)
+
+CREATE_STAGE(acpi_stage, acpi_init, 0, {})
+static void acpi_init()
 {
+  struct stivale2_struct_tag_rsdp* rk = stivale2_find_tag(STIVALE2_STRUCT_TAG_RSDP_ID);
   acpi_xsdp_t* xsdp = (acpi_xsdp_t*)rk->rsdp;
 
   if (xsdp->revision >= 2 && xsdp->xsdt) {
@@ -218,7 +220,7 @@ acpi_init(struct stivale2_struct_tag_rsdp* rk)
   madt_init();
 
   // Enable ACPI (make it a choice, since some ACPI impls are buggy/unsupported upstream)
-  if (!cmdline_is_present("noacpi")) {
+  if (!cmdline_get_bool("acpi", true)) {
     // Init the ACPI OSL
     lai_set_acpi_revision(xsdp->revision);
     lai_create_namespace();

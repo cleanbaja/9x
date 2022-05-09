@@ -2,7 +2,7 @@
 #define ARCH_TABLES_H
 
 #include "arch/irq.h"
-#include <stdbool.h>
+#include <ninex/init.h>
 
 #ifndef ARCH_INTERNAL
 #error "Attempt to include internal code in a generic code file"
@@ -103,9 +103,8 @@ struct __attribute__((packed)) tss
   uint16_t iopb;
 };
 
-// Functions to reload/init the CPU tables (aka the GDT and IDT)
-void init_tables();
-void reload_tables();
+// Stage to create the CPU tables (aka the GDT and IDT)
+EXPORT_STAGE(tables_setup_stage);
 
 // Helpers for loading the TSS and dumping CPU context
 void load_tss(uintptr_t address);

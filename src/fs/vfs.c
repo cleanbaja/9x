@@ -9,6 +9,8 @@ vec_t(struct filesystem*) fs_list;
 extern void initramfs_populate(struct stivale2_struct_tag_modules* mods);
 static CREATE_SPINLOCK(vfs_lock);
 
+CREATE_STAGE(vfs_stage, vfs_callback, 0, {}) 
+
 void
 vfs_register_fs(struct filesystem* fs) {
   vec_push(&fs_list, fs);
@@ -219,7 +221,7 @@ static void dump_all_nodes(struct vfs_node* node, int depth) {
 }
 */
 
-void vfs_init(struct stivale2_struct_tag_modules* mods) {
+static void vfs_callback(struct stivale2_struct_tag_modules* mods) {
   // Create the root node...
   root_node = kmalloc(sizeof(struct vfs_node));
   memcpy(root_node->name, "/", 1);

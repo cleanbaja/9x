@@ -1,7 +1,7 @@
 #ifndef LIB_KCON_H
 #define LIB_KCON_H
 
-#include <stdint.h>
+#include <ninex/init.h>
 
 struct kcon_sink {
   void (*setup)(const char* initial_buffer);
@@ -10,7 +10,7 @@ struct kcon_sink {
 };
 
 // Sets up the kernel buffers and the default sinks
-void kcon_init();
+EXPORT_STAGE(kcon_stage);
 
 void kcon_disable();
 void kcon_register_sink(struct kcon_sink* sink);
