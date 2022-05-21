@@ -142,7 +142,7 @@ dist:
 	rm -rf "ninex-$(VERSION)"
 
 # Kernel testing/running targets
-$(IMAGE): $(KERNEL)
+$(IMAGE): $(KERNEL) misc/limine.cfg
 	$(COOL_PROMPT) "GEN " $@
 	dd if=/dev/zero of=$(IMAGE) bs=1M count=32
 	parted -s $(IMAGE) mklabel msdos
@@ -157,8 +157,7 @@ $(IMAGE): $(KERNEL)
 .PHONY: run run-kvm
 override QEMU_BASE_FLAGS += -smp 2 -m 1G -M q35 -drive file=$(IMAGE),if=none,id=nvm -device nvme,serial=deadbeef,drive=nvm -debugcon stdio
 run: $(IMAGE)
-	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu qemu64,+smep
+	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu qemu64,+smep,+la57
 run-kvm: $(IMAGE)
 	qemu-system-x86_64 $(QEMU_BASE_FLAGS) --enable-kvm -cpu max,+invtsc
-
 

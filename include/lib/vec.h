@@ -24,11 +24,7 @@
 #define vec_init(v)\
   memset((v), 0, sizeof(*(v)))
 
-
-#define vec_deinit(v)\
-  ( free((v)->data),\
-    vec_init(v) ) 
-
+#define vec_deinit(v) (kfree((v)->data), vec_init(v))
 
 #define vec_push(v, val)\
   ( vec_expand_(vec_unpack_(v)) ? -1 :\

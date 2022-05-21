@@ -3,7 +3,7 @@
 #include <vm/phys.h>
 #include <vm/vm.h>
 
-struct vm_zone *head_zone, *tail_zone = NULL;
+struct vm_zone* head_zone = NULL;
 
 bool
 vm_zone_possible(uintptr_t base, uint64_t len)
@@ -45,7 +45,7 @@ vm_create_zone(uintptr_t base, uint64_t len)
   aligned_base = (aligned_base + 0x1FFFFF) & ~(0x1FFFFF);
 
   // Fill in the zone, and clear the bitmap
-  zone->prev = zone->next = NULL;
+  zone->next = NULL;
   zone->domain = 0;
   zone->base = aligned_base;
   zone->limit = limit;
@@ -55,16 +55,16 @@ vm_create_zone(uintptr_t base, uint64_t len)
   // Insert the zone into the list
   if (head_zone == NULL) {
     head_zone = zone;
-    tail_zone = zone;
   } else {
-    tail_zone->next = zone;
-    zone->prev = head_zone;
+    struct vm_zone* last_zone = head_zone;
+    while (last_zone->next != NULL)
+      last_zone = last_zone->next;
+
+    last_zone->next = zone;
   }
 
-  klog("vm/zone: created zone [0x%lx - 0x%lx] (%u KiB)",
-      aligned_base,
-      zone->limit,
-      zone->bitmap_len / 1000);
+  klog("vm/zone: created zone [0x%lx - 0x%lx] (%u MiB)", aligned_base,
+       zone->limit, (zone->limit - aligned_base) / 1000 / 1000);
 }
 
 void*

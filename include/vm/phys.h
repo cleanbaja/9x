@@ -6,14 +6,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-// Helpful division macro, for rounding to page size
-#define DIV_ROUNDUP(A, B)                                                      \
-  ({                                                                           \
-    typeof(A) _a_ = A;                                                         \
-    typeof(B) _b_ = B;                                                         \
-    (_a_ + (_b_ - 1)) / _b_;                                                   \
-  })
-
 // The kernel physical memory allocator is underpinned
 // by a zone-based allocation scheme, in which every free part
 // of the memory map is converted into a zone. This not only
@@ -23,7 +15,7 @@
 // clang-format off
 struct vm_zone
 {
-  struct vm_zone *prev, *next;       // VM zones are stored as linked lists, to make traveling easier
+  struct vm_zone *next;              // VM zones are stored as a singly-linked list
   struct spinlock lck;               // Spinlock for protecting bitmap
 
   uintptr_t base, limit, bitmap_len; // Length of bitmap, along with position of the zone in memory

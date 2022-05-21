@@ -41,8 +41,6 @@ cpu_ctx_t* sys_dispatch_isr(cpu_ctx_t* context)
 {
   uint32_t vec = context->int_no;
 
-  klog("got IRQ #%d", vec);
-
   // Check to see if a handler is missing, then take appropriate action
   if (!handlers[vec].hnd) {
     if (vec < 32) {
@@ -50,7 +48,7 @@ cpu_ctx_t* sys_dispatch_isr(cpu_ctx_t* context)
     } else {
       klog("x86/irq: Unhandled IRQ #%d, which maps to IO-APIC GSI #%d", vec, handlers[vec].gsi);
       if (handlers[vec].gsi)
-        ic_mask_irq(handlers[vec].gsi, true); // Otherwise, mask the IRQ
+        ic_mask_irq(handlers[vec].gsi, true);  // Otherwise, mask the IRQ
     }
 
     return context;

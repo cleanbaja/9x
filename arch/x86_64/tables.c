@@ -1,10 +1,12 @@
-#include <lib/lock.h>
 #include <arch/asm.h>
 #include <arch/tables.h>
+#include <lib/kcon.h>
+#include <lib/lock.h>
 
 static struct gdt main_gdt = { 0 };
 static struct idt_entry entries[256] = { 0 };
 extern void* asm_dispatch_table[256];
+
 static CREATE_SPINLOCK(table_lock);
 extern void  asm_load_gdt(void* g, uint16_t codeseg, uint16_t dataseg);
 #define asm_load_idt(ptr) __asm__ volatile("lidt %0" ::"m"(ptr))
@@ -24,8 +26,7 @@ make_idt_entry(void* handler, uint8_t ist)
                              .reserved = 0 };
 }
 
-static void reload_tables()
-{
+static void reload_tables() {
   struct table_ptr table_pointer;
   spinlock_acquire(&table_lock);
 
@@ -42,8 +43,7 @@ static void reload_tables()
   spinlock_release(&table_lock);
 }
 
-static void init_tables()
-{
+static void init_tables() {
   // Setup the GDT
   main_gdt.null_entry = 0;
 
@@ -173,42 +173,5 @@ dump_context(cpu_ctx_t* regs)
           regs->r15,
           regs->cs,
           regs->ss);
-
-  if (regs->int_no == 14) {
-    // Print extra information in the case of a page fault
-    uint64_t cr2_val = asm_read_cr2();
-    klog_unlocked("Linear Address: 0x%lx\nConditions:\n", cr2_val);
-
-    // See Intel x86 SDM Volume 3a Chapter 4.7
-    uint64_t error_code = regs->ec;
-    if (((error_code) & (1 << (0))))
-      klog_unlocked("    - Page level protection violation\n");
-    else
-      klog_unlocked("    - Non-present page\n");
-
-    if (((error_code) & (1 << (1))))
-      klog_unlocked("    - Write\n");
-    else
-      klog_unlocked("    - Read\n");
-
-    if (((error_code) & (1 << (2))))
-      klog_unlocked("    - User access\n");
-    else
-      klog_unlocked("    - Supervisor access\n");
-
-    if (((error_code) & (1 << (3))))
-      klog_unlocked("    - Reserved bit set\n");
-
-    if (((error_code) & (1 << (4))))
-      klog_unlocked("    - Instruction fetch\n");
-
-    if (((error_code) & (1 << (5))))
-      klog_unlocked("    - Protection key violation\n");
-
-    if (((error_code) & (1 << (15))))
-      klog_unlocked("    - SGX violation\n");
-
-    klog_unlocked("\n");
-  }
 }
 

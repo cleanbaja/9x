@@ -24,11 +24,11 @@ static void hpet_init() {
   acpi_hpet_t* h = acpi_query("HPET", 0);
   if (h == NULL)
     PANIC(NULL, "Unable to find HPET on this system!\n");
- 
-  // Map the HPET into memory (as device mem)
+
+  // NOTE: Once again, it is the responsibility of the
+  // loader/firmware to map the HPET into memory, with
+  // the proper permissions/attributes
   hpet_base = (void*)(h->base.base + VM_MEM_OFFSET);
-  vm_virt_fragment(&kernel_space, (uintptr_t)hpet_base, VM_PERM_READ | VM_PERM_WRITE);
-  vm_virt_map(&kernel_space, h->base.base, (uintptr_t)hpet_base, VM_PERM_READ | VM_PERM_WRITE | VM_CACHE_UNCACHED);
   
   // Make sure the HPET isn't bogus
   uint32_t reg_count = ((hpet_read(HPET_REG_CAP) >> 8) & 0x1F) + 1;

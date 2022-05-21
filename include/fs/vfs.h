@@ -2,8 +2,8 @@
 #define FS_VFS_H
 
 #include <fs/backing.h>
-#include <lib/vec.h>
 #include <lib/stivale2.h>
+#include <lib/vec.h>
 #include <ninex/init.h>
 
 #define MAX_NAME_LEN 256

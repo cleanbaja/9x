@@ -36,8 +36,8 @@ int
 vsnprintf(char* buffer, size_t count, const char* format, va_list va);
 
 // Conversion functions
-uint32_t strtol(const char *nptr, char **endptr, int base);
-uint64_t strtoll(const char *nptr, char **endptr, int base);
+uint32_t strtol(const char* nptr, char** endptr, int base);
+uint64_t strtoll(const char* nptr, char** endptr, int base);
 
 // Bitwise functions
 #define BIT_SET(bitmap, __bit) (bitmap[(__bit) / 8] |= (1 << ((__bit) % 8)))
@@ -49,6 +49,26 @@ uint64_t strtoll(const char *nptr, char **endptr, int base);
 #define isdigit(_c) (_c > 47 && _c < 58)
 #define isspace(_c) ((_c > 8 && _c < 14) || (_c == 32))
 #define isupper(_c) (_c > 64 && _c < 91)
+
+// Rounding-related functions
+#define DIV_ROUNDUP(A, B)    \
+  ({                         \
+    typeof(A) _a_ = A;       \
+    typeof(B) _b_ = B;       \
+    (_a_ + (_b_ - 1)) / _b_; \
+  })
+#define ALIGN_UP(A, B)              \
+  ({                                \
+    typeof(A) _a__ = A;             \
+    typeof(B) _b__ = B;             \
+    DIV_ROUNDUP(_a__, _b__) * _b__; \
+  })
+#define ALIGN_DOWN(A, B) \
+  ({                     \
+    typeof(A) _a_ = A;   \
+    typeof(B) _b_ = B;   \
+    (_a_ / _b_) * _b_;   \
+  })
 
 // Stack tracing functions
 void

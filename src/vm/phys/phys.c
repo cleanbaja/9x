@@ -3,21 +3,23 @@
 #include <vm/phys.h>
 #include <vm/vm.h>
 
+static CREATE_SPINLOCK(pmm_lock);
+
 static struct vm_zone*
 find_zone(uintptr_t addr)
 {
-  // Borrow the lock of the last zone
-  spinlock_acquire(&tail_zone->lck);
+  // Borrow the lock of the first zone
+  spinlock_acquire(&pmm_lock);
 
   // Look for the zone that encompasses this address
   for (struct vm_zone* zn = head_zone; zn->next != NULL; zn = zn->next) {
     if ((zn->base < addr) && (addr < zn->limit)) {
-      spinlock_release(&tail_zone->lck);
+      spinlock_release(&pmm_lock);
       return zn;
     }
   }
 
-  spinlock_release(&tail_zone->lck);
+  spinlock_release(&pmm_lock);
   return NULL;
 }
 

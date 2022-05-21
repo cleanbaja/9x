@@ -1,9 +1,9 @@
-#include <ninex/init.h>
-#include <ninex/acpi.h>
 #include <arch/arch.h>
 #include <arch/ic.h>
-#include <lib/kcon.h>
 #include <fs/vfs.h>
+#include <lib/kcon.h>
+#include <ninex/acpi.h>
+#include <ninex/init.h>
 #include <vm/vm.h>
 
 static uint16_t _kstack[8192];
@@ -50,76 +50,74 @@ __attribute__((section(".stivale2hdr"),
 };
 
 // Root kernel stage!
-CREATE_STAGE(root_stage, DUMMY_CALLBACK, 0, {
-  arch_early_stage, 
-  vm_stage,
-  acpi_stage,
-  vfs_stage
-})
+CREATE_STAGE(root_stage,
+             DUMMY_CALLBACK,
+             0,
+             {arch_early_stage, vm_stage, acpi_stage, vfs_stage})
 
 struct init_stage* stage_resolve(struct init_stage* entry) {
-    struct init_stage *head, *tail, *stack;
-    entry->next_resolve = NULL;
-    head = tail = NULL;
-    stack = entry;
+  struct init_stage *head, *tail, *stack;
+  entry->next_resolve = NULL;
+  head = tail = NULL;
+  stack = entry;
 
-    // Loop through the initgraph, fixing up dependencies and such
-    while (stack != NULL) {
-        struct init_stage *cur = stack;
-        
-        // Check if this target is completed
-        if (cur->depth == cur->count) {
-            stack = stack->next_resolve;
-            cur->completed = true;
-            cur->next = NULL;
-            if (head == NULL) {
-                head = cur;
-                tail = cur;
-            } else {
-                tail->next = cur;
-                tail = cur;
-            }
-        } else {
-            struct init_stage *dependency = cur->deps[cur->depth++];
-            if (dependency->completed) {
-                continue;
-            }
-            if (dependency->depth != 0) {
-                PANIC(NULL, "CIRCULAR DEPENDENCY!!!\n");
-            }
-            
-            dependency->next_resolve = stack;
-            stack = dependency;
-        }
+  // Loop through the initgraph, fixing up dependencies and such
+  while (stack != NULL) {
+    struct init_stage* cur = stack;
+
+    // Check if this target is completed
+    if (cur->depth == cur->count) {
+      stack = stack->next_resolve;
+      cur->completed = true;
+      cur->next = NULL;
+      if (head == NULL) {
+        head = cur;
+        tail = cur;
+      } else {
+        tail->next = cur;
+        tail = cur;
+      }
+    } else {
+      struct init_stage* dependency = cur->deps[cur->depth++];
+      if (dependency->completed) {
+        continue;
+      }
+      if (dependency->depth != 0) {
+        PANIC(NULL, "CIRCULAR DEPENDENCY!!!\n");
+      }
+
+      dependency->next_resolve = stack;
+      stack = dependency;
     }
-    return head;
+  }
+  return head;
 }
- 
+
 int stage_run(struct init_stage* entry, bool smp) {
-    int n_targets = 0;
-    while(entry != NULL) {
-        if (entry->flags & INIT_COMPLETE) {
-          klog("init: (WARN) attempting to run already ran target %s", entry->name);
-        } else {
-          if (smp) {
-              // Run only SMP compatible entries
-              if (!(entry->flags & INIT_SMP_READY)) {
-                entry = entry->next;
-                continue;
-              }
-              
-              entry->func();
-          } else {
-            entry->func();
-            entry->flags |= INIT_COMPLETE;
-	  }
+  int n_targets = 0;
+  while (entry != NULL) {
+    if (entry->flags & INIT_COMPLETE) {
+      klog("init: (WARN) attempting to run already ran target %s", entry->name);
+    } else {
+      if (smp) {
+        // Run only SMP compatible entries
+        if (!(entry->flags & INIT_SMP_READY)) {
+          entry = entry->next;
+          continue;
         }
-        
-	n_targets++;
-        entry = entry->next;
+
+        entry->func();
+      } else {
+        entry->func();
+        entry->flags |= INIT_COMPLETE;
+      }
     }
 
-    return n_targets;
+    n_targets++;
+    entry = entry->next;
+  }
+
+  return n_targets;
 }
 
 void*
@@ -152,9 +150,10 @@ kern_entry(struct stivale2_struct* bootinfo)
 
   // Generate the initgraph and run it
   struct init_stage* resolved_stages = stage_resolve(root_stage);
-  klog("init: completed %d targets, going to rest!", stage_run(resolved_stages, false));
- 
-  // Wait for ACPI power interrupts... 
+  klog("init: completed %d targets, going to rest!",
+       stage_run(resolved_stages, false));
+
+  // Wait for ACPI power interrupts...
   ic_send_ipi(IPI_HALT, 0, IPI_OTHERS);
   for (;;) {
     __asm__ volatile("sti; hlt");

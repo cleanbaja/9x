@@ -1,8 +1,8 @@
 #ifndef ARCH_TABLES_H
 #define ARCH_TABLES_H
 
-#include "arch/irq.h"
 #include <ninex/init.h>
+#include "arch/irq.h"
 
 #ifndef ARCH_INTERNAL
 #error "Attempt to include internal code in a generic code file"

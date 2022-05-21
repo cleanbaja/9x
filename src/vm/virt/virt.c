@@ -7,12 +7,13 @@
 #include <vm/virt.h>
 #include <vm/vm.h>
 
-#define ARCH_INTERNAL
-#include <arch/asm.h>
-
 vm_space_t kernel_space;
+CREATE_STAGE(vm_stage, vm_virt_init, 0, {hat_init_stage, vm_phys_stage})
+
+//////////////////////////
+//   ASID Management
+//////////////////////////
 uint32_t asid_bitmap[VM_ASID_MAX / 8] = {0};
-CREATE_STAGE(vm_stage, vm_virt_init, 0, { vm_phys_stage })
 
 static uint32_t alloc_asid() {
   for (uint32_t i = 0; i < VM_ASID_MAX; i++) {
@@ -25,7 +26,6 @@ static uint32_t alloc_asid() {
   PANIC(NULL, "vm/virt: Out of ASIDs");
   return 0;
 }
-
 static void free_asid(uint32_t asid) {
   if (asid > VM_ASID_MAX)
     return;
@@ -33,138 +33,127 @@ static void free_asid(uint32_t asid) {
   BIT_CLEAR(asid_bitmap, asid);
 }
 
+//////////////////////////
+//    Range Functions
+//////////////////////////
+void vm_map_range(vm_space_t* space,
+                  uintptr_t phys,
+                  uintptr_t virt,
+                  size_t len,
+                  int flags) {
+  struct vm_config* cfg = cur_config;
 
-vm_space_t* vm_create_space() {
+  // Perform necissary alignments
+  if ((virt % cfg->page_size) != 0)
+    ALIGN_DOWN(virt, cfg->page_size);
+  if ((phys % cfg->page_size) != 0)
+    ALIGN_DOWN(phys, cfg->page_size);
+  if ((len % cfg->page_size) != 0)
+    ALIGN_UP(len, cfg->page_size);
+
+  // Use a huge mapping if we can
+  if ((virt % cfg->huge_page_size) == 0)
+    flags |= VM_PAGE_HUGE;
+
+  int mode =
+      (flags & VM_PAGE_HUGE) ? TRANSLATE_DEPTH_HUGE : TRANSLATE_DEPTH_NORM;
+  size_t inc_size =
+      (flags & VM_PAGE_HUGE) ? cfg->huge_page_size : cfg->page_size;
+
+  for (uintptr_t start_phys = phys, start_virt = virt;
+       start_virt < (virt + len);
+       start_virt += inc_size, start_phys += inc_size) {
+    uint64_t* pte = hat_translate_addr(space->root, start_virt, true, mode);
+    if (pte == NULL)
+      return;  // OOM has occured!
+
+    *pte = hat_create_pte(flags, start_phys,
+                          (flags & VM_PAGE_HUGE) ? true : false);
+  }
+}
+
+void vm_unmap_range(vm_space_t* space, uintptr_t virt, size_t len) {
+  struct vm_config* cfg = cur_config;
+
+  // Perform necissary alignments
+  if ((virt % cfg->page_size) != 0)
+    ALIGN_DOWN(virt, cfg->page_size);
+  if ((len % cfg->page_size) != 0)
+    ALIGN_UP(len, cfg->page_size);
+
+  for (uintptr_t start = virt; start < (virt + len);) {
+    uint64_t* pte = hat_translate_addr(space->root, start, false, 0);
+    if (pte == NULL) {
+      start += cfg->page_size;
+#ifdef __x86_64__
+    } else if (*pte & (1 << 7)) {
+      *pte = 0;
+      start += cfg->huge_page_size;
+#endif
+    } else {
+      *pte = 0;
+      start += cfg->huge_page_size;
+    }
+  }
+
+  // Update the TLB
+  vm_invl(space, virt, len);
+}
+
+void vm_space_destroy(vm_space_t* s) {
+  free_asid(s->asid);
+  hat_scrub_pde(s->root, cur_config->levels);
+  for (int i = 0; i < s->mappings.length; i++) {
+    vm_destroy_seg(s->mappings.data[i]);
+  }
+
+  kfree(s);
+}
+
+//////////////////////////
+//   Space Management
+//////////////////////////
+vm_space_t* vm_space_create() {
   vm_space_t* trt = (vm_space_t*)kmalloc(sizeof(vm_space_t));
-  trt->asid = (uint16_t)alloc_asid();
+  trt->asid = alloc_asid();
   trt->root = (uint64_t)vm_phys_alloc(1, VM_ALLOC_ZERO);
 
   // Copy over the higher half from the kernel space
-  uint64_t* pml4 = (uint64_t*)trt->root;
+  uint64_t* pml4 = (uint64_t*)(trt->root + VM_MEM_OFFSET);
   for (int i = 256; i < 512; i++) {
-    pml4[i] = ((uint64_t*)kernel_space.root)[i];
-  } 
+    pml4[i] = ((uint64_t*)(kernel_space.root + VM_MEM_OFFSET))[i];
+  }
 
   return trt;
 }
 
-void
-vm_virt_map(vm_space_t* spc, uintptr_t phys, uintptr_t virt, int flags)
-{
-  if (flags & VM_PAGE_HUGE) {
-    hat_map_huge_page(spc->root, phys, virt, flags);
-  } else {
-    hat_map_page(spc->root, phys, virt, flags);
+void vm_invl(vm_space_t* spc, uintptr_t addr, size_t len) {
+  if (addr == (uintptr_t)-1)
+    hat_invl(spc->root, 0, spc->asid, INVL_SINGLE_ASID);
+
+  for (uintptr_t index = addr; index < (addr + len);
+       index += cur_config->page_size) {
+    hat_invl(spc->root, index, spc->asid, INVL_SINGLE_ADDR);
   }
 }
 
-uint64_t*
-virt2pte(vm_space_t* spc, uintptr_t virt)
-{
-  return hat_resolve_addr(spc->root, virt);
-}
+#ifdef __x86_64__
+static void vm_virt_init() {
+  // Setup the kernel space
+  kernel_space.root = (uintptr_t)vm_phys_alloc(1, VM_ALLOC_ZERO);
+  kernel_space.asid = 0;
+  kernel_space.active = true;
 
-void
-vm_virt_unmap(vm_space_t* spc, uintptr_t virt)
-{
-  uint64_t* pte   = hat_resolve_addr(spc->root, virt);
-  bool was_active = (pte == NULL) ? false : (*pte & (1 << 7));
-  if (pte != NULL)
-    *pte = 0;
-}
-
-void
-vm_virt_fragment(vm_space_t* spc, uintptr_t virt, int flags)
-{
-  // Check to see if fragmentation is required in the first place
-  uint64_t* pte = virt2pte(spc, virt);
-  if ((pte == NULL) || !(*pte & (1 << 7)))
-    return;
-
-  // Turn a 2MB mapping to a much smaller 4KB mapping
-  uintptr_t aligned_address = (virt / (VM_PAGE_SIZE * 0x200)) * (VM_PAGE_SIZE * 0x200);
-  vm_virt_unmap(spc, aligned_address);
-
-  for (size_t i = aligned_address; i < (aligned_address + 0x200000); i += 0x1000) {
-    vm_virt_map(spc, aligned_address - VM_MEM_OFFSET, aligned_address, flags);
-  }
-}
-
-void
-vm_load_space(vm_space_t* spc)
-{
-  uint64_t cr3_val = spc->root;
-
-  if (CPU_CHECK(CPU_FEAT_PCID)) {
-    if (spc->asid >= VM_ASID_MAX) {
-      PANIC(NULL, "PCID %u is larger than VM_ASID_MAX (%d), resuling in a overflow!\n", spc->asid, VM_ASID_MAX);
-    } else {
-      // Set bit 63, to prevent flushing and set the PCID
-      cr3_val |= (uint16_t)spc->asid | (1ull << 63);
-    }
+  // Copy in the higher half...
+  uint64_t* bootloader_cr3 = (uint64_t*)asm_read_cr3();
+  for (int i = 256; i < 512; i++) {
+    ((uint64_t*)kernel_space.root)[i] = bootloader_cr3[i];
   }
 
-  asm_write_cr3(cr3_val);
-  spc->active = true;
-}
+  // Load in the kernel space
+  vm_space_load(&kernel_space);
 
-struct stivale2_struct_tag_framebuffer* d;
-
-void
-percpu_init_vm()
-{
-  // Load the kernel VM space
-  vm_load_space(&kernel_space);
-
-  // Load the PAT with our custom value, which changes 2 registers.
-  //   PA6 => Formerly UC-, now Write Protect
-  //   PA7 => Formerly UC, now Write Combining
-  //
-  // NOTE: The rest remain at the default, see AMD Programmer's Manual Volume 2,
-  // Section 7.8.2
-  asm_wrmsr(0x277, 0x105040600070406);
-
-  // Clear the entire CPU TLB
+  // Scrub the TLB
   hat_invl(kernel_space.root, 0, 0, INVL_ENTIRE_TLB);
 }
-
-static void vm_virt_init()
-{
-  struct stivale2_struct_tag_memmap* mmap = stivale2_find_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID);
-
-  // Setup the kernel pagemap
-  kernel_space.root   = 1;
-  kernel_space.active = false;
-  kernel_space.root   = (uintptr_t)vm_phys_alloc(1, VM_ALLOC_ZERO);
-
-  // Map some memory...
-  for(size_t i = 0, phys = 0; i < 0x400; i++, phys += 0x200000) {
-    vm_virt_map(&kernel_space, phys, phys + VM_KERN_OFFSET, VM_PERM_READ | VM_PERM_WRITE | VM_PERM_EXEC | VM_PAGE_HUGE);
-  }
-  for(size_t i = 0, phys = 0; i < 0x800; i++, phys += 0x200000) {
-    vm_virt_map(&kernel_space, phys, phys + VM_MEM_OFFSET, VM_PERM_READ | VM_PERM_WRITE | VM_PAGE_HUGE);
-  }
-
-  // Map the remaining parts of memory
-  for(size_t i = 0, phys = 0; i < mmap->entries; i++) {
-    phys = (mmap->memmap[i].base / 0x200000) * 0x200000;
-    for(size_t j = 0; j < DIV_ROUNDUP(mmap->memmap[i].length, 0x200000); j++) {
-      vm_virt_map(&kernel_space, phys, phys + VM_MEM_OFFSET, VM_PERM_READ | VM_PERM_WRITE | VM_PAGE_HUGE);
-      phys += 0x200000;
-    }
-  }
-
-  // Map the stivale2-provided framebuffer
-  struct stivale2_struct_tag_framebuffer* d;
-  d = (struct stivale2_struct_tag_framebuffer*)stivale2_find_tag(STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
-  uintptr_t real_base = (((uintptr_t)d->framebuffer_addr - VM_MEM_OFFSET) / (0x200000)) * (0x200000);
-  uintptr_t real_size = DIV_ROUNDUP((d->framebuffer_height * d->framebuffer_pitch), 0x200000);
-
-  for (uintptr_t i = real_base; i < real_size; i += 0x200000) {
-    vm_virt_map(&kernel_space, real_base, real_base + VM_MEM_OFFSET, VM_PERM_READ | VM_PERM_WRITE | VM_PAGE_HUGE | VM_CACHE_WRITE_COMBINING);
-  }
-
-  // Finally, finish bootstraping the VM
-  percpu_init_vm();
-}
-
+#endif  // __x86_64__

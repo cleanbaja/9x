@@ -174,11 +174,10 @@ setup_sci(void)
   __asm__ volatile("sti");
 }
 
-
 CREATE_STAGE(acpi_stage, acpi_init, 0, {})
-static void acpi_init()
-{
-  struct stivale2_struct_tag_rsdp* rk = stivale2_find_tag(STIVALE2_STRUCT_TAG_RSDP_ID);
+static void acpi_init() {
+  struct stivale2_struct_tag_rsdp* rk =
+      stivale2_find_tag(STIVALE2_STRUCT_TAG_RSDP_ID);
   acpi_xsdp_t* xsdp = (acpi_xsdp_t*)rk->rsdp;
 
   if (xsdp->revision >= 2 && xsdp->xsdt) {
@@ -231,4 +230,3 @@ static void acpi_init()
     setup_sci();
   }
 }
-

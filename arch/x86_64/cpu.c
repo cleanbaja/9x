@@ -40,13 +40,6 @@ static void detect_cpu_features() {
   if (ebx & CPUID_EBX_INVPCID) {
     cpu_features |= CPU_FEAT_INVPCID;
   }
-  if (ecx & (1 << 16)) {
-    kernel_vma = 0xFF00000000000000;
-    extern enum { VM_5LV_PAGING, VM_4LV_PAGING } paging_mode;
-    paging_mode  = VM_5LV_PAGING;
-
-    klog("cpu: la57 detected!");
-  }
  
   cpuid_subleaf(0x80000007, 0x0, &eax, &ebx, &ecx, &edx);
   if (edx & CPUID_EDX_INVARIANT) {
@@ -103,8 +96,8 @@ static void fpu_init() {
     klog("fpu: using extended FPU save/restore");
 
     uint64_t xcr0 = 0;
-    xcr0 |= (1 << 0) | // Save x87 state with x{save,rstor}, required
-            (1 << 1);  // Save SSE state with x{save,rstor}, also required
+    xcr0 |= (1 << 0) |  // Save x87 state with x{save,rstor}, required
+            (1 << 1);   // Save SSE state with x{save,rstor}, also required
     klog("fpu: saving x87 & SSE state with XSAVE");
 
     if (c & CPUID_ECX_AVX) {
@@ -158,11 +151,11 @@ void cpu_early_init() {
   
   // Then enable all possible features
   uint64_t cr4 = asm_read_cr4();
-  cr4 |= (1 << 2)  | // Stop userspace from reading the TSC
-	 (1 << 7)  | // Enables Global Pages
-         (1 << 9)  | // Allows for fxsave/fxrstor, along with SSE
-	 (1 << 10) | // Allows for unmasked SSE exceptions
-	 (1 << 20);  // Enables Supervisor Mode Execution Prevention
+  cr4 |= (1 << 2) |   // Stop userspace from reading the TSC
+         (1 << 7) |   // Enables Global Pages
+         (1 << 9) |   // Allows for fxsave/fxrstor, along with SSE
+         (1 << 10) |  // Allows for unmasked SSE exceptions
+         (1 << 20);   // Enables Supervisor Mode Execution Prevention
   asm_write_cr4(cr4);
 
   uint64_t efer = asm_rdmsr(IA32_EFER);

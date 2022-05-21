@@ -120,15 +120,10 @@ void ic_enable()
   apic_msr |= (1 << 11);          // Enable the APIC
   asm_wrmsr(IA32_APIC, apic_msr);
 
-  // Map the APIC into memory
-  if (!use_x2apic && xapic_base == 0x0) {
+  // NOTE: We no longer map the APIC into memory, since
+  // we assume the host loader/firmware has done so already
+  if (!use_x2apic && xapic_base == 0x0)
     xapic_base = asm_rdmsr(IA32_APIC) & 0xfffff000;
-    vm_virt_fragment(&kernel_space, xapic_base + VM_MEM_OFFSET, VM_PERM_READ | VM_PERM_WRITE);
-    vm_virt_map(&kernel_space,
-                xapic_base,
-                xapic_base + VM_MEM_OFFSET,
-                VM_PERM_READ | VM_PERM_WRITE | VM_CACHE_UNCACHED);
-  }
 
   // Enable the APIC (software level) and interrupts
   apic_write(LAPIC_SPURIOUS, apic_read(LAPIC_SPURIOUS) | (1 << 8) | 0xFF);

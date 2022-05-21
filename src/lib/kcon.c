@@ -131,9 +131,7 @@ void kcon_init() {
   // Print the 9x banner
   struct stivale2_struct* info = stivale2_find_tag(1);
   klog("9x (%s) (%s) - A project by cleanbaja", NINEX_VERSION, NINEX_ARCH);
-  klog("Bootloader: %s [%s]",
-       info->bootloader_brand,
-       info->bootloader_version);
+  klog("Bootloader: %s [%s]", info->bootloader_brand, info->bootloader_version);
 }
 
 void panic(void* frame, char* fmt, ...) {
@@ -148,9 +146,9 @@ void panic(void* frame, char* fmt, ...) {
   } else {
     in_panic = 1; 
   }
- 
+
   // Shootdown all other CPUs
-  ic_send_ipi(IPI_HALT, 0, IPI_OTHERS);
+  // ic_send_ipi(IPI_HALT, 0, IPI_OTHERS);
 
   // Log all the information possible
   // klog_unlocked("\nKERNEL PANIC on CPU #%d\n", cpunum());

@@ -6,5 +6,4 @@
 EXPORT_STAGE(arch_early_stage);
 EXPORT_STAGE(arch_stage);
 
-#endif // ARCH_ARCH_H
-
+#endif  // ARCH_ARCH_H

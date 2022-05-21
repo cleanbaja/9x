@@ -1,11 +1,12 @@
-#include <lib/kcon.h>
+#include <arch/hat.h>
 #include <arch/ic.h>
 #include <arch/irq.h>
+#include <lib/cmdline.h>
+#include <lib/kcon.h>
 #include <vm/phys.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
 
-extern void ipi_invl(cpu_ctx_t*, void*);
 CREATE_STAGE(vm_phys_stage, vm_callback, 0, {})
 
 static char*
@@ -42,14 +43,12 @@ mem_to_str(int mem_type)
   }
 }
 
-static void vm_callback()
-{
-  struct stivale2_struct_tag_memmap* mm_tag = stivale2_find_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID);
+static void vm_callback() {
+  struct stivale2_struct_tag_memmap* mm_tag =
+      stivale2_find_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID);
 
   // Dump all memmap entries
-  if (mm_tag->entries > 20) {
-    klog("vm/phys: a total of %d entries in memmap!", mm_tag->entries);
-  } else {
+  if (!(mm_tag->entries > 25) || cmdline_get_bool("verbose", false)) {
     klog("vm/phys: Dumping memory map (entries: %d):", mm_tag->entries);
     for (int i = 0; i < mm_tag->entries; i++) {
       struct stivale2_mmap_entry entry = mm_tag->memmap[i];
@@ -73,4 +72,3 @@ static void vm_callback()
     PANIC(NULL, "No suitable memory zones!\n");
   }
 }
-

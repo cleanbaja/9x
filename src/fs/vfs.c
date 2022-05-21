@@ -9,7 +9,7 @@ vec_t(struct filesystem*) fs_list;
 extern void initramfs_populate(struct stivale2_struct_tag_modules* mods);
 static CREATE_SPINLOCK(vfs_lock);
 
-CREATE_STAGE(vfs_stage, vfs_callback, 0, {}) 
+CREATE_STAGE(vfs_stage, vfs_callback, 0, {})
 
 void
 vfs_register_fs(struct filesystem* fs) {
@@ -243,4 +243,3 @@ static void vfs_callback(struct stivale2_struct_tag_modules* mods) {
   setup_unix_streams();
   setup_random_streams();
 }
-
