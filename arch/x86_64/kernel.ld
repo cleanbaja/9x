@@ -4,10 +4,10 @@ ENTRY(kern_entry)
 PHDRS
 {
     null    PT_NULL    FLAGS(0) ;                   /* Null segment */
-    text    PT_LOAD    FLAGS((1 << 0) | (1 << 2)) ; /* Execute + Read */
-    rodata  PT_LOAD    FLAGS((1 << 2)) ;            /* Read only */
-    data    PT_LOAD    FLAGS((1 << 1) | (1 << 2)) ; /* Write + Read */
-    dynamic PT_DYNAMIC FLAGS((1 << 1) | (1 << 2)) ; /* Dynamic segment needed for PIE */
+    text    PT_LOAD    FLAGS(5) ;                   /* Execute + Read */
+    rodata  PT_LOAD    FLAGS(4) ;                   /* Read only */
+    data    PT_LOAD    FLAGS(6) ;                   /* Write + Read */
+    dynamic PT_DYNAMIC FLAGS(6) ;                   /* Dynamic segment needed for PIE */
 }
 
 SECTIONS {

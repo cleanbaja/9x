@@ -1,13 +1,15 @@
 # generated things
 *.o
+*.a
 *.elf
+*.cache
 ninex.hdd
 GNUmakefile
 configure
-*.cache
 config.h
-install-sh
+config.log
 config.status
+install_sh
 
 # third-party software/libraries
 third_party

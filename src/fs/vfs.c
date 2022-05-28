@@ -44,6 +44,7 @@ static inline struct vfs_node* simplify_node(struct vfs_node* nd) {
     return nd->mountpoint;
   } else if (nd->symlink_target && S_ISLNK(nd->backing->st.st_mode)) {
     klog("vfs: (TODO) add support for symlinks!");
+    return NULL;
   } else {
     return nd;
   }
@@ -221,7 +222,7 @@ static void dump_all_nodes(struct vfs_node* node, int depth) {
 }
 */
 
-static void vfs_callback(struct stivale2_struct_tag_modules* mods) {
+static void vfs_callback() {
   // Create the root node...
   root_node = kmalloc(sizeof(struct vfs_node));
   memcpy(root_node->name, "/", 1);
@@ -238,7 +239,9 @@ static void vfs_callback(struct stivale2_struct_tag_modules* mods) {
   vfs_mkdir(NULL, "/dev", 0775);
   vfs_mount(NULL, "/dev", "devtmpfs");
 
-  // Populate the tmpfs, via the initramfs, and the devtmpfs
+  // Populate the tmpfs (via the initramfs) and the devtmpfs
+  struct stivale2_struct_tag_modules* mods =
+      stivale2_find_tag(STIVALE2_STRUCT_TAG_MODULES_ID);
   initramfs_populate(mods);
   setup_unix_streams();
   setup_random_streams();

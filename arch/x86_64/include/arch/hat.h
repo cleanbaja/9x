@@ -1,6 +1,7 @@
 #ifndef ARCH_HAT_H
 #define ARCH_HAT_H
 
+#include <arch/irqchip.h>
 #include <ninex/init.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
@@ -25,7 +26,10 @@ uint64_t* hat_translate_addr(uintptr_t root,
                              bool create,
                              int depth);
 
-// Sets up handlers, and does some information gathering...
+// Handles all pagefaults
+void handle_pf(cpu_ctx_t* context);
+
+// Does some information gathering, and bootstraps the PAT MSR...
 EXPORT_STAGE(hat_init_stage);
 
 #endif  // ARCH_HAT_H

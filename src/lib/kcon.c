@@ -1,9 +1,8 @@
-#include <lib/kcon.h>
+#include <arch/irqchip.h>
 #include <lib/builtin.h>
+#include <lib/kcon.h>
 #include <lib/lock.h>
 #include <ninex/smp.h>
-#include <arch/irq.h>
-#include <arch/ic.h>
 #include <vm/vm.h>
 
 #include "config.h"
@@ -32,13 +31,11 @@ void stivale2_console_setup(const char* initial_buffer) {
   void *term_write_ptr = (void *)term_str_tag->term_write;
   stivale2_term_write = term_write_ptr;
 
-  // Clear the terminal and print the initial buffer if needed
-  stivale2_term_write(NULL, STIVALE2_TERM_FULL_REFRESH);
+  // Load Limine's CR3 and print the initial buffer if needed
+  limine_pagemap = asm_read_cr3();
   if (initial_buffer != NULL) {
     stivale2_term_write(initial_buffer, strlen(initial_buffer));
   }
-
-  limine_pagemap = asm_read_cr3();
 }
 
 void stivale2_console_write(const char* message) {
@@ -79,11 +76,8 @@ void bxdbg_console_flush() {
 }
 
 void bxdbg_console_setup(const char* initial_buffer) {
-  // Clear the terminal and print the initial buffer if needed
-  bxdbg_console_write("\033[2J");
-  if (initial_buffer != NULL) {
-    bxdbg_console_write(initial_buffer);
-  }
+  // Not needed for BOCHS debug console
+  return;
 }
 
 static struct kcon_sink bxdbg_term_sink = {
@@ -260,8 +254,7 @@ void klog_unlocked(char* fmt, ...) {
   memset64(format_buf, 0, 512);
 }
 
-
-#include <arch/irq.h>
+#include <arch/irqchip.h>
 void syscall_debuglog(cpu_ctx_t* context) {
   char* msg = (char*)context->rdi;
   klog("%s", msg);

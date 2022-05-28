@@ -1,7 +1,6 @@
-#include <arch/cpuid.h>
-#include <arch/ic.h>
-#include <arch/irq.h>
 #include <arch/cpu.h>
+#include <arch/cpuid.h>
+#include <arch/irqchip.h>
 #include <arch/tables.h>
 #include <lib/kcon.h>
 #include <ninex/proc.h>

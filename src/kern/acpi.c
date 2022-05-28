@@ -1,8 +1,8 @@
-#include <ninex/acpi.h>
+#include <arch/irqchip.h>
 #include <lib/cmdline.h>
 #include <lib/kcon.h>
-#include <arch/ic.h>
-#include <arch/irq.h>
+#include <ninex/acpi.h>
+#include <ninex/irq.h>
 #include <vm/phys.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
@@ -16,11 +16,6 @@ static bool xsdt_found;
 static struct acpi_rsdt_t* rsdt;
 static struct acpi_xsdt_t* xsdt;
 
-vec_lapic_t  madt_lapics;
-vec_ioapic_t madt_ioapics;
-vec_iso_t    madt_isos;
-vec_nmi_t    madt_nmis;
-
 void*
 acpi_query(const char* signature, int index)
 {
@@ -33,7 +28,6 @@ acpi_query(const char* signature, int index)
       ptr = (acpi_header_t*)((size_t)xsdt->tables[i] + VM_MEM_OFFSET);
       if (!memcmp(ptr->signature, signature, 4)) {
         if (cnt++ == index) {
-          // klog("acpi: Found \"%s\" at 0x%lx", signature, (size_t)ptr);
           return (void*)ptr;
         }
       }
@@ -44,66 +38,16 @@ acpi_query(const char* signature, int index)
       ptr = (acpi_header_t*)((size_t)rsdt->tables[i] + VM_MEM_OFFSET);
       if (!memcmp(ptr->signature, signature, 4)) {
         if (cnt++ == index) {
-          // klog("acpi: Found \"%s\" at 0x%lx", signature, (size_t)ptr);
           return (void*)ptr;
         }
       }
     }
   }
 
-  // klog("acpi: \"%s\" not found", signature);
   return NULL;
 }
 
-
-static void map_table(uintptr_t phys) {
-  size_t    length = ((acpi_header_t*)(phys + VM_MEM_OFFSET))->length;
-  uintptr_t paddr  = phys & ~(VM_PAGE_SIZE - 1);
-  uint64_t  vsize  = (DIV_ROUNDUP(length, 0x1000) * 0x1000) + VM_PAGE_SIZE*2;
-
-  for(size_t pg = 0; pg < vsize; pg += VM_PAGE_SIZE) {
-    vm_virt_fragment(&kernel_space, paddr + pg + VM_MEM_OFFSET, VM_PERM_READ | VM_PERM_WRITE);
-    vm_virt_map(&kernel_space, paddr + pg, paddr + pg + VM_MEM_OFFSET, VM_PERM_READ | VM_CACHE_UNCACHED);
-  }
-}
-
-void madt_init() {
-  acpi_madt_t* pmadt = (acpi_madt_t*)acpi_query("APIC", 0);
-  if (pmadt == NULL)
-    PANIC(NULL, "Unable to find ACPI MADT table");
-
-  // Initialize the vectors
-  vec_init(&madt_lapics);
-  vec_init(&madt_ioapics);
-  vec_init(&madt_isos);
-  vec_init(&madt_nmis);
-
-  // Parse the actual entries
-  for (uint8_t *madt_ptr = (uint8_t *)pmadt->entries;
-      (uintptr_t)madt_ptr < (uintptr_t)pmadt + pmadt->header.length;
-      madt_ptr += *(madt_ptr + 1)) {
-        switch (*(madt_ptr)) {
-            case 0: // Processor Local APIC
-                vec_push(&madt_lapics, (madt_lapic_t *)madt_ptr);
-                break;
-            case 1: // I/O APIC
-                vec_push(&madt_ioapics, (madt_ioapic_t *)madt_ptr);
-                break;
-            case 2: // Interrupt Source Override
-                vec_push(&madt_isos, (madt_iso_t *)madt_ptr);
-                break;
-            case 4: // Non-Maskable Interrupt
-                vec_push(&madt_nmis, (madt_nmi_t *)madt_ptr);
-                break;
-        }
-  }
-
-  klog("acpi: Detected %u ISOs, %u I/O APICs, and %u NMIs", madt_isos.length, madt_ioapics.length, madt_nmis.length);
-}
-
-void
-setup_ec(void)
-{
+void setup_ec(void) {
   LAI_CLEANUP_STATE lai_state_t state;
   lai_init_state(&state);
 
@@ -130,9 +74,7 @@ setup_ec(void)
   }
 }
 
-static void
-sci_handler(struct cpu_context* context, void* arg)
-{
+static void sci_handler(struct cpu_context* context, void* arg) {
   (void)context;
   (void)arg;
 
@@ -153,28 +95,26 @@ sci_handler(struct cpu_context* context, void* arg)
   }
 }
 
-void
-setup_sci(void)
-{
+void setup_sci(void) {
   // Find the required ACPI tables
   acpi_fadt_t* fadt = acpi_query("FACP", 0);
   acpi_madt_t* madt = acpi_query("APIC", 0);
 
   // Register the handler
   int slot;
-  struct irq_handler* hnd = request_irq("acpi_sci", &slot);
-  hnd->should_return = true;
-  hnd->is_irq = true;
-  hnd->hnd    = sci_handler;
+  struct irq_resource* res = alloc_irq_handler(&slot);
+  res->procfs_name = "acpi_sci";
+  res->HandlerFunc = sci_handler;
 
   // Redirect the IRQ to the proper CPU
-  ic_create_redirect(0, slot, fadt->sci_irq, (madt->flags & 1));
+  ic_create_redirect(0, slot, fadt->sci_irq, 0, (madt->flags & 1));
 
   // Enable Interrupts
   __asm__ volatile("sti");
 }
 
 CREATE_STAGE(acpi_stage, acpi_init, 0, {})
+CREATE_STAGE(acpi_late_stage, acpi_late_init, 0, {});
 static void acpi_init() {
   struct stivale2_struct_tag_rsdp* rk =
       stivale2_find_tag(STIVALE2_STRUCT_TAG_RSDP_ID);
@@ -191,35 +131,29 @@ static void acpi_init() {
   size_t header_len = (xsdt_found) ? xsdt->header.length : rsdt->header.length;
   size_t entry_count =
     ((header_len - sizeof(acpi_header_t))) / ((xsdp->revision > 0) ? 8 : 4);
-  klog("acpi: dumping %u entries... (revision: %u)", entry_count, xsdp->revision);
-  klog("    %-8s %-s %-6s  %-11s", "Signature", "Rev", "OEMID", "Address");
+  klog("acpi: a total of %u entries... (ACPI revision is %d)", entry_count,
+       xsdp->revision == 0 ? 1 : xsdp->revision);
 
   for (size_t i = 0; i < entry_count; i++) {
     uint64_t table_addr =
       (xsdp->revision > 0) ? xsdt->tables[i] : rsdt->tables[i];
 
-    // TODO: Map ACPI tables (current func is broken)
     acpi_header_t* c = (acpi_header_t*)(table_addr + VM_MEM_OFFSET);
-    klog("    %-c%c%c%c %6d %3c%c%c%c%c%c  %#0lx",
-        c->signature[0],
-        c->signature[1],
-        c->signature[2],
-        c->signature[3],
-        c->revision,
-        c->oem[0],
-        c->oem[1],
-        c->oem[2],
-        c->oem[3],
-        c->oem[4],
-        c->oem[5],
-        (uint64_t)table_addr + VM_MEM_OFFSET);
+    klog(" *  %c%c%c%c  0x%lx %5u  (v%d %c%c%c%c%c%c%c", c->signature[0],
+         c->signature[1], c->signature[2], c->signature[3], table_addr,
+         c->length, c->revision, c->oem[0], c->oem[1], c->oem[2], c->oem[3],
+         c->oem[4], (c->oem[5] == ' ') ? ')' : c->oem[5],
+         (c->oem[5] == ' ') ? ' ' : ')', (uint64_t)table_addr);
   }
+}
 
-  // Parse the MADT for IO-APIC information
-  madt_init();
+static void acpi_late_init() {
+  struct stivale2_struct_tag_rsdp* rk =
+      stivale2_find_tag(STIVALE2_STRUCT_TAG_RSDP_ID);
+  acpi_xsdp_t* xsdp = (acpi_xsdp_t*)rk->rsdp;
 
   // Enable ACPI (make it a choice, since some ACPI impls are buggy/unsupported upstream)
-  if (!cmdline_get_bool("acpi", true)) {
+  if (cmdline_get_bool("acpi", true)) {
     // Init the ACPI OSL
     lai_set_acpi_revision(xsdp->revision);
     lai_create_namespace();
@@ -229,4 +163,187 @@ static void acpi_init() {
     setup_ec();
     setup_sci();
   }
+}
+
+////////////////////////////////////////////////
+// LAI (Lightweight ACPI Interpreter) Bindings
+////////////////////////////////////////////////
+#define ARCH_INTERNAL
+#include <arch/asm.h>
+
+void* laihost_malloc(size_t size) {
+  return kmalloc(size);
+}
+
+void* laihost_realloc(void* p, size_t size, size_t old_size) {
+  return krealloc(p, size);
+}
+
+void laihost_free(void* p, size_t unused) {
+  return kfree(p);
+}
+
+void laihost_panic(const char* str) {
+  PANIC(NULL, "lai: %s\n", str);
+
+  for (;;)
+    ;  // To satisfy GCC
+}
+
+void laihost_log(int level, const char* msg) {
+  if (level == LAI_WARN_LOG) {
+    klog("WARNING: (lai) %s", msg);
+  } else {
+    klog("lai: %s", msg);
+  }
+}
+
+void* laihost_scan(const char* signature, size_t index) {
+  if (!memcmp(signature, "DSDT", 4)) {
+    // Scan for the FADT
+    acpi_fadt_t* fadt = (acpi_fadt_t*)acpi_query("FACP", 0);
+    void* dsdt = (char*)((size_t)fadt->dsdt + VM_MEM_OFFSET);
+
+    return dsdt;
+  } else {
+    return acpi_query(signature, index);
+  }
+}
+
+void* laihost_map(size_t base, size_t length) {
+  (void)length;
+  return (void*)(base + VM_MEM_OFFSET);
+}
+
+void laihost_unmap(void* base, size_t length) {
+  (void)base;
+  (void)length;
+}
+
+#ifdef __x86_64__
+
+void laihost_outb(uint16_t port, uint8_t data) {
+  asm_outb(port, data);
+}
+
+void laihost_outw(uint16_t port, uint16_t data) {
+  asm_outw(port, data);
+}
+
+void laihost_outd(uint16_t port, uint32_t data) {
+  asm_outd(port, data);
+}
+
+uint8_t laihost_inb(uint16_t port) {
+  return asm_inb(port);
+}
+
+uint16_t laihost_inw(uint16_t port) {
+  return asm_inw(port);
+}
+
+uint32_t laihost_ind(uint16_t port) {
+  return asm_ind(port);
+}
+
+uint8_t laihost_pci_readb(uint16_t seg,
+                          uint8_t bus,
+                          uint8_t slot,
+                          uint8_t func,
+                          uint16_t offset) {
+  asm_outd(0xCF8, (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfffc) |
+                      0x80000000);
+  uint8_t v = asm_inb(0xCFC + (offset & 3));
+  return v;
+}
+
+void laihost_pci_writeb(uint16_t seg,
+                        uint8_t bus,
+                        uint8_t slot,
+                        uint8_t func,
+                        uint16_t offset,
+                        uint8_t value) {
+  asm_outd(0xCF8, (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfffc) |
+                      0x80000000);
+  asm_outb(0xCFC + (offset & 3), value);
+}
+
+uint16_t laihost_pci_readw(uint16_t seg,
+                           uint8_t bus,
+                           uint8_t slot,
+                           uint8_t func,
+                           uint16_t offset) {
+  asm_outd(0xCF8, (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfffc) |
+                      0x80000000);
+  uint16_t v = asm_inw(0xCFC + (offset & 2));
+  return v;
+}
+
+void laihost_pci_writew(uint16_t seg,
+                        uint8_t bus,
+                        uint8_t slot,
+                        uint8_t func,
+                        uint16_t offset,
+                        uint16_t value) {
+  asm_outd(0xCF8, (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfffc) |
+                      0x80000000);
+  asm_outw(0xCFC + (offset & 2), value);
+}
+
+uint32_t laihost_pci_readd(uint16_t seg,
+                           uint8_t bus,
+                           uint8_t slot,
+                           uint8_t func,
+                           uint16_t offset) {
+  asm_outd(0xCF8, (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfffc) |
+                      0x80000000);
+  uint32_t v = asm_ind(0xCFC);
+  return v;
+}
+
+void laihost_pci_writed(uint16_t seg,
+                        uint8_t bus,
+                        uint8_t slot,
+                        uint8_t func,
+                        uint16_t offset,
+                        uint32_t value) {
+  asm_outd(0xCF8, (bus << 16) | (slot << 11) | (func << 8) | (offset & 0xfffc) |
+                      0x80000000);
+  asm_outd(0xCFC, value);
+}
+
+#endif  // __x86_64__
+
+// TODO: Actually sleep (with HPET?)
+void laihost_sleep(uint64_t ms) {
+  for (size_t i = 0; i < 1000 * ms; i++) {
+    asm_inb(0x80);
+  }
+}
+
+// The following are stubs functions I keep in here, so that the linker dosen't
+// generate R_X86_64_GLOB_DAT relocations
+#define STUB_CALLED() klog("lai: STUB CALLED!!!")
+uint64_t laihost_timer() {
+  STUB_CALLED();
+  return 0;
+}
+void laihost_handle_amldebug(lai_variable_t* ptr) {
+  (void)ptr;
+  STUB_CALLED();
+  return;
+}
+int laihost_sync_wait(struct lai_sync_state* ctx,
+                      unsigned int val,
+                      int64_t deadline) {
+  (void)ctx;
+  (void)val;
+  (void)deadline;
+  STUB_CALLED();
+  return 0;
+}
+void laihost_sync_wake(struct lai_sync_state* ctx) {
+  (void)ctx;
+  STUB_CALLED();
+  return;
 }

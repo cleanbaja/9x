@@ -1,7 +1,7 @@
 #include <arch/asm.h>
 #include <arch/cpuid.h>
 #include <arch/hat.h>
-#include <arch/irq.h>
+#include <arch/irqchip.h>
 #include <lib/cmdline.h>
 #include <lib/kcon.h>
 #include <vm/phys.h>
@@ -212,7 +212,7 @@ void vm_space_load(vm_space_t* s) {
   s->active = true;
 }
 
-static void handle_pf(cpu_ctx_t* context, void* __attribute__((unused)) extra) {
+void handle_pf(cpu_ctx_t* context) {
   uint32_t ec = context->ec;
   uintptr_t address = asm_read_cr2();
 
@@ -276,10 +276,4 @@ static void hat_setup_func() {
   // NOTE: The rest remain at the default, see
   // AMD Programmer's Manual Volume 2, Section 7.8.2
   asm_wrmsr(0x277, 0x105040600070406);
-
-  // Finally, set the handler for page faults (#PF, 14)
-  struct irq_handler* pg_fault = get_handler(14);
-  pg_fault->name = "page_fault";
-  pg_fault->hnd = handle_pf;
-  pg_fault->should_return = true;
 }

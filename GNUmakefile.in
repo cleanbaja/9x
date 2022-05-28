@@ -14,24 +14,25 @@ ifeq ($(V),)
 endif
 
 # Import in variables from automake
-CC ?= @CC@
-LD ?= @LD@
-AR ?= @AR@
-KERNEL_CFLAGS  ?= @KERNEL_CFLAGS@ 
-KERNEL_LDFLAGS ?= @KERNEL_LDFLAGS@
-ARCH ?= @ARCH@
-HARDENED_BUILD ?= @HARDENED_BUILD@
-LIMINE_EARLYCONSOLE ?= @LIMINE_EARLYCONSOLE@
-PREFIX ?= @prefix@
-DESTDIR ?=
+override CC := @CC@
+override LD := @LD@
+override AR := @AR@
+override KERNEL_CFLAGS  := @KERNEL_CFLAGS@ 
+override KERNEL_LDFLAGS := @KERNEL_LDFLAGS@
+override ARCH := @ARCH@
+HARDENED_BUILD := @HARDENED_BUILD@
+LIMINE_EARLYCONSOLE := @LIMINE_EARLYCONSOLE@
+PREFIX := @prefix@
+DESTDIR :=
 
 # Set compiler flags
 override CREALFLAGS := $(KERNEL_CFLAGS)           \
+		       -std=gnu11                 \
                        -ffreestanding             \
-	            	   -fpic                      \
-	                   -mno-red-zone              \
-	                   -fno-omit-frame-pointer    \
-                       -fplan9-extensions 
+	               -fpic                      \
+	               -mno-red-zone              \
+	               -fno-omit-frame-pointer    \
+                       -fms-extensions 
 
 override LDREALFLAGS := $(KERNEL_LDFLAGS) -zmax-page-size=0x1000 -nostdlib -pie
 override CREALFLAGS  +=  -I .                       \

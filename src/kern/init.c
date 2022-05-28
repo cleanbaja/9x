@@ -1,12 +1,12 @@
 #include <arch/arch.h>
-#include <arch/ic.h>
+#include <arch/irqchip.h>
 #include <fs/vfs.h>
 #include <lib/kcon.h>
 #include <ninex/acpi.h>
 #include <ninex/init.h>
 #include <vm/vm.h>
 
-static uint16_t _kstack[8192];
+static uint8_t _kstack[0x1000 * 16];
 
 static struct stivale2_header_tag_smp smp_tag = {
   .tag = { .identifier = STIVALE2_HEADER_TAG_SMP_ID, .next = 0 },
@@ -53,7 +53,8 @@ __attribute__((section(".stivale2hdr"),
 CREATE_STAGE(root_stage,
              DUMMY_CALLBACK,
              0,
-             {arch_early_stage, vm_stage, acpi_stage, vfs_stage})
+             {arch_early_stage, vm_stage, acpi_stage, arch_late_stage,
+              vfs_stage})
 
 struct init_stage* stage_resolve(struct init_stage* entry) {
   struct init_stage *head, *tail, *stack;
@@ -93,8 +94,7 @@ struct init_stage* stage_resolve(struct init_stage* entry) {
   return head;
 }
 
-int stage_run(struct init_stage* entry, bool smp) {
-  int n_targets = 0;
+void stage_run(struct init_stage* entry, bool smp) {
   while (entry != NULL) {
     if (entry->flags & INIT_COMPLETE) {
       klog("init: (WARN) attempting to run already ran target %s", entry->name);
@@ -113,16 +113,11 @@ int stage_run(struct init_stage* entry, bool smp) {
       }
     }
 
-    n_targets++;
     entry = entry->next;
   }
-
-  return n_targets;
 }
 
-void*
-stivale2_find_tag(uint64_t id)
-{
+void* stivale2_find_tag(uint64_t id) {
   if (id == 1)
     return bootags;
 
@@ -150,8 +145,8 @@ kern_entry(struct stivale2_struct* bootinfo)
 
   // Generate the initgraph and run it
   struct init_stage* resolved_stages = stage_resolve(root_stage);
-  klog("init: completed %d targets, going to rest!",
-       stage_run(resolved_stages, false));
+  stage_run(resolved_stages, false);
+  klog("init: completed all targets, going to rest!");
 
   // Wait for ACPI power interrupts...
   ic_send_ipi(IPI_HALT, 0, IPI_OTHERS);

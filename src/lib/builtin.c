@@ -76,6 +76,7 @@ strlen(const char* str)
   return i;
 }
 
+/*
 int
 strcmp(const char* s1, const char* s2)
 {
@@ -85,6 +86,19 @@ strcmp(const char* s1, const char* s2)
         s2++;
     }
     return *(const unsigned char*)s1 - *(const unsigned char*)s2;
+}
+*/
+
+int strcmp(const char* s1, const char* s2) {
+  while (1) {
+    int res = ((*s1 == 0) || (*s1 != *s2));
+    if (__builtin_expect((res), 0)) {
+      break;
+    }
+    ++s1;
+    ++s2;
+  }
+  return (*s1 - *s2);
 }
 
 char* strdup(const char* s) {

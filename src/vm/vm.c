@@ -1,6 +1,5 @@
 #include <arch/hat.h>
-#include <arch/ic.h>
-#include <arch/irq.h>
+#include <arch/irqchip.h>
 #include <lib/cmdline.h>
 #include <lib/kcon.h>
 #include <vm/phys.h>

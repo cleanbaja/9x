@@ -2,6 +2,7 @@
 #include <arch/tables.h>
 #include <lib/kcon.h>
 #include <lib/lock.h>
+#include <ninex/irq.h>
 
 static struct gdt main_gdt = { 0 };
 static struct idt_entry entries[256] = { 0 };
@@ -175,3 +176,16 @@ dump_context(cpu_ctx_t* regs)
           regs->ss);
 }
 
+cpu_ctx_t* sys_dispatch_isr(cpu_ctx_t* context) {
+  uint32_t vec = context->int_no;
+
+  if (vec == 14) {
+    handle_pf();
+  } else if (vec < 32) {
+    PANIC(context, NULL);
+  } else {
+    respond_irq(context, vec);
+  }
+
+  return context;
+}

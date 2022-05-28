@@ -1,12 +1,12 @@
 #ifndef PROC_H
 #define PROC_H
 
-#include <lib/posix.h>
+#include <arch/irqchip.h>
 #include <lib/lock.h>
+#include <lib/posix.h>
 #include <lib/vec.h>
-#include <arch/irq.h>
-#include <vm/virt.h>
 #include <stddef.h>
+#include <vm/virt.h>
 
 #define DEFAULT_TIMESLICE 20 // A default timeslice of 20 milleseconds
 

@@ -1,8 +1,8 @@
 #ifndef ARCH_TIMER_H
 #define ARCH_TIMER_H
 
-#include <arch/ic.h>
 #include <acpispec/tables.h>
+#include <arch/irqchip.h>
 
 typedef struct acpi_hpet_t {
     acpi_header_t header;

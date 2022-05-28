@@ -52,7 +52,7 @@ static uint64_t parse_octal(const char* str) {
 }
 
 void initramfs_populate(struct stivale2_struct_tag_modules* mods) {
-  if (mods->module_count < 1) {
+  if (mods == NULL || mods->module_count < 1) {
     klog("vfs: initramfs missing, kernel might fail on real hardware!");
     return;
   }

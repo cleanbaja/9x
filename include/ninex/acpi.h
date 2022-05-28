@@ -8,7 +8,7 @@
 
 typedef struct acpi_madt_t {
     acpi_header_t header;
-    uint32_t apic_base_addr; // Ignored, we use the APIC MSRs
+    uint32_t apic_base_addr;  // Ignored, we use the APIC MSR
     uint32_t flags;
     char entries[];
 } __attribute__((packed)) acpi_madt_t;
@@ -24,7 +24,7 @@ typedef struct madt_lapic_t {
 typedef struct madt_ioapic_t {
     uint8_t    type;
     uint8_t    length;
-    uint8_t    apic_id;
+    uint8_t id;
     uint8_t    reserved;
     uint32_t   addr;
     uint32_t   gsib;
@@ -47,17 +47,8 @@ typedef struct madt_nmi_t {
     uint8_t    lint;
 } __attribute__((packed)) madt_nmi_t;
 
-typedef vec_t(madt_lapic_t*)  vec_lapic_t;
-typedef vec_t(madt_ioapic_t*) vec_ioapic_t;
-typedef vec_t(madt_iso_t*)    vec_iso_t;
-typedef vec_t(madt_nmi_t*)    vec_nmi_t;
-
-extern vec_lapic_t  madt_lapics;
-extern vec_ioapic_t madt_ioapics;
-extern vec_iso_t    madt_isos;
-extern vec_nmi_t    madt_nmis;
-
 EXPORT_STAGE(acpi_stage);
+EXPORT_STAGE(acpi_late_stage);
 
 void*
 acpi_query(const char* signature, int index);
