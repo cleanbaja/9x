@@ -1,7 +1,6 @@
+#include <lib/kcon.h>
 #include <ninex/irq.h>
-// #include <lib/kcon.h>
 #include <stddef.h>
-extern int klog(const char* fmt, ...);
 
 static struct irq_resource irq_table[ARCH_NUM_IRQS] = {0};
 static int last_vector = ARCH_LOWEST_IRQ;
@@ -40,9 +39,7 @@ struct irq_resource* alloc_irq_handler(int* result) {
 }
 
 void dispatch_level_irq(cpu_ctx_t* c, struct irq_resource* res, int irq) {
-  // klog("one!");
   mask_ack_irq(irq);
-  // klog("two");
   res->status |= IRQ_INPROGRESS;
 
   // Actually dispatch the IRQ...
@@ -51,7 +48,6 @@ void dispatch_level_irq(cpu_ctx_t* c, struct irq_resource* res, int irq) {
   res->status &= ~IRQ_INPROGRESS;
   if (!(res->status & IRQ_DISABLED)) {
     unmask_irq(irq);
-    // klog("three");
   }
   return;
 }

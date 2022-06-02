@@ -12,7 +12,7 @@
 #include <arch/asm.h>
 
 // List of CPU features recognized by 9x
-#define CPU_FEAT_FSGSBASE  (1 << 0)
+#define CPU_FEAT_RDPID (1 << 0)
 #define CPU_FEAT_INVARIANT (1 << 1)
 #define CPU_FEAT_DEADLINE  (1 << 2)
 #define CPU_FEAT_PCID      (1 << 3)

@@ -6,7 +6,7 @@
 #include <vm/virt.h>
 #include <vm/vm.h>
 
-CREATE_STAGE(vm_phys_stage, vm_callback, 0, {})
+CREATE_STAGE_NODEP(vm_phys_stage, vm_callback)
 
 static char*
 mem_to_str(int mem_type)

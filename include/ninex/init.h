@@ -27,7 +27,8 @@ struct init_stage {
     stage->completed;         \
   })
 
-#define CREATE_STAGE(stage, callback, flgs, ...)         \
+// Macros to create different types of init stages
+#define CREATE_STAGE(stage, callback, ...)               \
   static void callback();                                \
   static struct init_stage* stage##deps[] = __VA_ARGS__; \
   struct init_stage stage[] = {(struct init_stage){      \
@@ -38,9 +39,26 @@ struct init_stage {
       .next = NULL,                                      \
       .next_resolve = NULL,                              \
       .depth = 0,                                        \
-      .flags = flgs,                                     \
+      .flags = 0,                                        \
       .completed = false,                                \
   }};
+#define CREATE_STAGE_SMP(stage, callback, ...)           \
+  static void callback();                                \
+  static struct init_stage* stage##deps[] = __VA_ARGS__; \
+  struct init_stage stage[] = {(struct init_stage){      \
+      .deps = stage##deps,                               \
+      .count = ARRAY_LEN(stage##deps),                   \
+      .func = callback,                                  \
+      .name = #stage,                                    \
+      .next = NULL,                                      \
+      .next_resolve = NULL,                              \
+      .depth = 0,                                        \
+      .flags = INIT_SMP_READY,                           \
+      .completed = false,                                \
+  }};
+#define CREATE_STAGE_NODEP(stage, callback) CREATE_STAGE(stage, callback, {})
+#define CREATE_STAGE_SMP_NODEP(stage, callback) \
+  CREATE_STAGE_SMP(stage, callback, {})
 
 // Dummy callback for init stages without a callback
 #define DUMMY_CALLBACK dummy_func
@@ -48,5 +66,8 @@ static void dummy_func(void) {}
 
 // The main kernel init stage, which is the last one to run
 EXPORT_STAGE(root_stage);
+
+// Kernel entrypoint for AP (Application Processors)
+void kern_smp_entry();
 
 #endif  // NINEX_INIT_H

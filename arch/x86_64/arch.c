@@ -6,15 +6,15 @@
 #include <lib/stivale2.h>
 #include <ninex/acpi.h>
 
+// The bare miniumum to get a x86_64 build of ninex to the early console
 CREATE_STAGE(arch_early_stage,
              arch_early_callback,
-             0,
              {kcon_stage, cpu_init_stage, tables_setup_stage})
 
+// All remaining arch-specific things, that depended on the VM...
 CREATE_STAGE(arch_late_stage,
              DUMMY_CALLBACK,
-             0,
-             {apic_ready, scan_madt_target, acpi_late_stage})
+             {scan_madt_target, acpi_late_stage})
 
 static void arch_early_callback() {
   struct stivale2_struct_tag_cmdline* cmdline_tag =

@@ -1,10 +1,9 @@
-#include <arch/cpu.h>
 #include <arch/cpuid.h>
 #include <arch/irqchip.h>
+#include <arch/smp.h>
 #include <arch/tables.h>
 #include <lib/kcon.h>
 #include <ninex/proc.h>
-#include <ninex/smp.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
 
@@ -13,7 +12,7 @@ uint64_t fpu_save_size = 0;
 uint64_t fpu_save_align = 0;
 extern void asm_syscall_entry();
 
-CREATE_STAGE(cpu_init_stage, cpu_early_init, 0, {});
+CREATE_STAGE_SMP_NODEP(cpu_init_stage, cpu_early_init);
 
 static void detect_cpu_features() {
   uint32_t eax, ebx, ecx, edx;
@@ -30,8 +29,8 @@ static void detect_cpu_features() {
   }
   
   cpuid_subleaf(0x7, 0x0, &eax, &ebx, &ecx, &edx);
-  if (ebx & CPUID_EBX_FSGSBASE) {
-    cpu_features |= CPU_FEAT_FSGSBASE;
+  if (ecx & CPUID_ECX_RDPID) {
+    cpu_features |= CPU_FEAT_RDPID;
   }
   if (ebx & CPUID_EBX_SMAP) {
     cpu_features |= CPU_FEAT_SMAP;
@@ -48,6 +47,7 @@ static void detect_cpu_features() {
   cpuid_subleaf(0x80000001, 0x0, &eax, &ebx, &ecx, &edx);
   if (ecx & CPUID_ECX_TCE) {
     cpu_features |= CPU_FEAT_TCE;
+    klog("cpu: using translation cache extension on AMD!");
   }
  
   // Set the last bit so that we don't run this function more than once
@@ -150,16 +150,15 @@ void cpu_early_init() {
   
   // Then enable all possible features
   uint64_t cr4 = asm_read_cr4();
-  cr4 |= (1 << 2) |   // Stop userspace from reading the TSC
-         (1 << 7) |   // Enables Global Pages
+  cr4 |= (1 << 7) |   // Enables Global Pages
          (1 << 9) |   // Allows for fxsave/fxrstor, along with SSE
          (1 << 10) |  // Allows for unmasked SSE exceptions
          (1 << 20);   // Enables Supervisor Mode Execution Prevention
   asm_write_cr4(cr4);
 
   uint64_t efer = asm_rdmsr(IA32_EFER);
-  efer |= (1 << 11) | // Enable No-Execute
-          (1 << 0);   // Enable the syscall/sysret mechanism
+  efer |= (1 << 11) |  // Enable No-Execute Pages
+          (1 << 0);    // Enable the syscall/sysret mechanism
   asm_wrmsr(IA32_EFER, efer);
 
   /* Enable optional features, if supported! */
@@ -173,10 +172,6 @@ void cpu_early_init() {
   if (CPU_CHECK(CPU_FEAT_PCID))
     cr4 |= (1 << 17);
   
-  // Enable FSGSBASE instructions
-  if (CPU_CHECK(CPU_FEAT_FSGSBASE))
-    cr4 |= (1 << 16);
-
   // Enable X{SAVE,RSTOR} instructions
   if (CPU_CHECK(CPU_FEAT_XSAVE))
     cr4 |= (1 << 18);
@@ -225,7 +220,7 @@ void syscall_archctl(cpu_ctx_t* context) {
   switch (context->rdi) {
   case ARCHCTL_WRITE_FS:
     asm_wrmsr(IA32_FS_BASE, context->rsi);
-    per_cpu(cur_thread)->percpu_base = context->rsi;
+    // per_cpu(cur_thread)->percpu_base = context->rsi;
     break;
   case ARCHCTL_READ_MSR:
     context->rax = asm_rdmsr(context->rsi);

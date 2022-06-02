@@ -1,19 +1,19 @@
-#include <arch/asm.h>
 #include <arch/cpuid.h>
 #include <arch/irqchip.h>
+#include <arch/smp.h>
 #include <arch/tables.h>
 #include <arch/timer.h>
 #include <lib/kcon.h>
 #include <ninex/acpi.h>
 #include <ninex/irq.h>
-#include <ninex/smp.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
 
 #define LAPIC_SPURIOUS 0x0f0
+#define LAPIC_EOI 0x0b0
+#define LAPIC_ID 0x020
 #define LAPIC_ICR0     0x300
 #define LAPIC_ICR1     0x310
-#define LAPIC_EOI      0x0b0
 #define LAPIC_SELF_IPI 0x3F0
 
 #define LAPIC_TIMER_LVT  0x320
@@ -34,7 +34,8 @@ vec_t(madt_nmi_t*) madt_nmis;
 static bool use_x2apic = false;
 static uintptr_t xapic_base = 0x0;
 static uint8_t translation_table[256];
-CREATE_STAGE(apic_ready, ic_enable, 0, {})
+CREATE_STAGE_SMP_NODEP(apic_ready, ic_enable)
+CREATE_STAGE(scan_madt_target, madt_init, {apic_ready});
 
 static void xapic_write(uint32_t reg, uint64_t val) {
   if (use_x2apic) {
@@ -49,6 +50,14 @@ static uint64_t xapic_read(uint32_t reg) {
     return asm_rdmsr(IA32_x2APIC_BASE + (reg >> 4));
   } else {
     return *((volatile uint32_t*)((xapic_base + VM_MEM_OFFSET) + reg));
+  }
+}
+
+uint32_t get_lapic_id() {
+  if (use_x2apic) {
+    return xapic_read(LAPIC_ID);
+  } else {
+    return (xapic_read(LAPIC_ID) >> 24);
   }
 }
 
@@ -83,6 +92,27 @@ void ic_send_ipi(uint8_t vec, uint32_t cpu, enum ipi_mode mode) {
     xapic_write(LAPIC_ICR1, ((uint32_t)cpu << 24));
     xapic_write(LAPIC_ICR0, icr_low);
 
+    while (xapic_read(LAPIC_ICR0) & (1 << 12))
+      ;
+  }
+}
+
+void ic_perform_startup(uint32_t apic_id) {
+  if (use_x2apic) {
+    // Do the IPI in two 64-bit writes
+    xapic_write(LAPIC_ICR0, 0x4500 | ((uint64_t)apic_id << 32));
+    xapic_write(LAPIC_ICR0,
+                0x4600 | (0x80000 / 4096) | ((uint64_t)apic_id << 32));
+  } else {
+    // Send the INIT ipi
+    xapic_write(LAPIC_ICR1, (apic_id << 24));
+    xapic_write(LAPIC_ICR0, 0x4500);
+
+    // Then send the startup address of the AP (0x80 for 0x80000)
+    xapic_write(LAPIC_ICR1, (apic_id << 24));
+    xapic_write(LAPIC_ICR0, 0x4600 | 0x80);
+
+    // Wait for the second IPI to complete...
     while (xapic_read(LAPIC_ICR0) & (1 << 12))
       ;
   }
@@ -133,7 +163,7 @@ void ic_timer_calibrate() {
   timer_msleep(10);
 
   // Set the frequency, then disable the timer once more
-  per_cpu(lapic_freq) = (((uint32_t)-1) - xapic_read(LAPIC_TIMER_CNT)) / 10ull;
+  this_cpu->lapic_freq = (((uint32_t)-1) - xapic_read(LAPIC_TIMER_CNT)) / 10ull;
   xapic_write(LAPIC_TIMER_INIT, 0);
   xapic_write(LAPIC_TIMER_LVT, (1 << 16));
 }
@@ -141,7 +171,7 @@ void ic_timer_calibrate() {
 void ic_timer_oneshot(uint8_t vec, uint64_t ms) {
   if (CPU_CHECK(CPU_FEAT_INVARIANT) && CPU_CHECK(CPU_FEAT_DEADLINE)) {
     xapic_write(LAPIC_TIMER_LVT, (0b10 << 17) | vec);
-    uint64_t goal = asm_rdtsc() + (ms * per_cpu(tsc_freq));
+    uint64_t goal = asm_rdtsc() + (ms * this_cpu->tsc_freq);
 
     asm_wrmsr(IA32_TSC_DEADLINE, goal);
   } else {
@@ -150,14 +180,14 @@ void ic_timer_oneshot(uint8_t vec, uint64_t ms) {
     xapic_write(LAPIC_TIMER_LVT, (1 << 16));
 
     // Calculate the total ticks we need
-    uint64_t ticks = ms * per_cpu(lapic_freq);
+    uint64_t ticks = ms * this_cpu->lapic_freq;
 
     // Setup the registers
     xapic_write(LAPIC_TIMER_LVT, (xapic_read(LAPIC_TIMER_LVT) & ~(0b11 << 17)));
     xapic_write(LAPIC_TIMER_LVT,
                 (xapic_read(LAPIC_TIMER_LVT) & 0xFFFFFF00) | vec);
     xapic_write(LAPIC_TIMER_DIV, 0x3);
-    xapic_write(LAPIC_TIMER_INIT, per_cpu(lapic_freq) * ms);
+    xapic_write(LAPIC_TIMER_INIT, this_cpu->lapic_freq * ms);
 
     // Clear the mask, and off we go!
     xapic_write(LAPIC_TIMER_LVT, xapic_read(LAPIC_TIMER_LVT) & ~(1 << 16));
@@ -263,7 +293,6 @@ void ic_create_redirect(uint8_t lapic_id,
 //////////////////////////////
 //        MADT Parser
 //////////////////////////////
-CREATE_STAGE(scan_madt_target, madt_init, 0, {apic_ready});
 static void madt_init() {
   acpi_madt_t* madt = (acpi_madt_t*)acpi_query("APIC", 0);
   if (madt == NULL)

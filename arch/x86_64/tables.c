@@ -1,4 +1,5 @@
 #include <arch/asm.h>
+#include <arch/hat.h>
 #include <arch/tables.h>
 #include <lib/kcon.h>
 #include <lib/lock.h>
@@ -6,13 +7,12 @@
 
 static struct gdt main_gdt = { 0 };
 static struct idt_entry entries[256] = { 0 };
-extern void* asm_dispatch_table[256];
-
 static CREATE_SPINLOCK(table_lock);
-extern void  asm_load_gdt(void* g, uint16_t codeseg, uint16_t dataseg);
-#define asm_load_idt(ptr) __asm__ volatile("lidt %0" ::"m"(ptr))
+CREATE_STAGE_SMP_NODEP(tables_setup_stage, tables_callback);
 
-CREATE_STAGE(tables_setup_stage, tables_callback, 0, {});
+// External assembly definitions we need here
+extern void* asm_dispatch_table[256];
+extern void asm_load_gdt(void* gdt_ptr, uint16_t codeseg, uint16_t dataseg);
 
 static struct idt_entry
 make_idt_entry(void* handler, uint8_t ist)
@@ -39,7 +39,7 @@ static void reload_tables() {
   // Reload the IDT
   table_pointer.base = (uint64_t)entries;
   table_pointer.limit = sizeof(entries) - 1;
-  asm_load_idt(table_pointer);
+  __asm__ volatile("lidt %0" ::"m"(table_pointer));
 
   spinlock_release(&table_lock);
 }
@@ -113,7 +113,7 @@ load_tss(uintptr_t address)
   struct table_ptr idt_pointer;
   idt_pointer.base = (uint64_t)entries;
   idt_pointer.limit = sizeof(entries) - 1;
-  asm_load_idt(idt_pointer);
+  __asm__ volatile("lidt %0" ::"m"(idt_pointer));
 
   spinlock_release(&table_lock);
 }
@@ -180,7 +180,7 @@ cpu_ctx_t* sys_dispatch_isr(cpu_ctx_t* context) {
   uint32_t vec = context->int_no;
 
   if (vec == 14) {
-    handle_pf();
+    handle_pf(context);
   } else if (vec < 32) {
     PANIC(context, NULL);
   } else {

@@ -55,7 +55,8 @@ override KERNEL_SOURCE := $(shell find $(SOURCE_DIR)/kern $(SOURCE_DIR)/lib $(SO
 override LAI_SOURCE    := $(shell find $(LAI_DIR) -name '*.c')
 override ARCH_SOURCE   := $(shell find $(ARCH_DIR) -name '*.c')
 ifeq ($(ARCH), x86_64)
-    override ARCH_ASSEMBLY_SOURCE := $(shell find $(ARCH_DIR) -name '*.asm')
+    override ARCH_ASSEMBLY_SOURCE := $(shell find $(ARCH_DIR) -name *.asm)
+    override ARCH_REALMODE_SOURCE := $(shell find $(ARCH_DIR) -name *.real)
     override CREALFLAGS += -mno-80387                 \
                            -mno-mmx                   \
                            -mno-3dnow                 \
@@ -74,6 +75,7 @@ override LAI_OBJECTS := $(LAI_SOURCE:.c=.o)
 ifeq ($(ARCH), x86_64)
     override ARCH_LIB := libx86_64.a
     override ARCH_OBJECTS := $(ARCH_SOURCE:.c=.o) $(ARCH_ASSEMBLY_SOURCE:.asm=.o) 
+    override ARCH_BLOBS := $(ARCH_REALMODE_SOURCE:.real=.bin)
 else ifeq ($(ARCH), aarch64)
     override ARCH_LIB := libaarch64.a
     override ARCH_OBJECTS := $(ARCH_SOURCE:.c=.o) $(ARCH_ASSEMBLY_SOURCE:.S=.o) 
@@ -93,12 +95,15 @@ arch/%.o: arch/%.c
 	$(CC) $(CREALFLAGS) -c -o $@ $<
 
 ifeq ($(ARCH), x86_64)
+%.bin: %.real
+	$(COOL_PROMPT) "REAL" $<
+	nasm -f bin -i @srcdir@ -o $@ $<
+
 %.o: %.asm
 	$(COOL_PROMPT) "ASM " $<
-	@
 	nasm -f elf64 -i @srcdir@ -o $@ $<
 
-$(ARCH_LIB): $(ARCH_OBJECTS)
+$(ARCH_LIB): $(ARCH_BLOBS) $(ARCH_OBJECTS) 
 	$(COOL_PROMPT) "LIB " $@
 	$(AR) rcs $@ $(ARCH_OBJECTS)
 endif
@@ -113,13 +118,13 @@ $(KERNEL): $(LAI_LIB) $(ARCH_LIB) $(OBJECTS)
 
 # Cleaning targets
 clean:
-	@rm -rf $(OBJECTS) $(LAI_OBJECTS) $(ARCH_OBJECTS) $(KERNEL) $(LAI_LIB) $(ARCH_LIB)
+	rm -rf $(OBJECTS) $(LAI_OBJECTS) $(ARCH_OBJECTS) $(ARCH_BLOBS) $(KERNEL) $(LAI_LIB) $(ARCH_LIB)
 
 distclean: clean
-	@rm -rf GNUmakefile config.log config.status config.h $(IMAGE)
+	rm -rf GNUmakefile config.log config.status config.h $(IMAGE)
 
 maintainer-clean: distclean
-	@rm -rf configure install-sh autom4te* *'~' third_party
+	rm -rf configure install-sh autom4te* *'~' third_party
 
 # Installation/Distribution targets
 .PHONY: install install-strip dist
@@ -158,7 +163,7 @@ $(IMAGE): $(KERNEL) misc/limine.cfg
 .PHONY: run run-kvm
 override QEMU_BASE_FLAGS += -smp 2 -m 1G -M q35 -drive file=$(IMAGE),if=none,id=nvm -device nvme,serial=deadbeef,drive=nvm -debugcon stdio
 run: $(IMAGE)
-	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu qemu64,+smep,+la57
+	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu max -smp `nproc`
 run-kvm: $(IMAGE)
 	qemu-system-x86_64 $(QEMU_BASE_FLAGS) --enable-kvm -cpu max,+invtsc
 

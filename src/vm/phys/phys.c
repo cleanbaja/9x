@@ -48,7 +48,7 @@ vm_phys_alloc(size_t pages, int flags)
   }
 
   // We couldn't find anything, so return NULL
-  klog("vm/phys: (WARN) Out of physical memory!");
+  klog("vm/phys: (WARN) Out of physical memory! (size: %u)", pages);
   return NULL;
 }
 

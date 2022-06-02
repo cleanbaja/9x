@@ -1,5 +1,6 @@
 #include <arch/hat.h>
 #include <lib/builtin.h>
+#include <lib/kcon.h>
 #include <vm/phys.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
@@ -111,19 +112,21 @@ static bool handle_anon_pf(struct vm_seg* segment,
     // one process
     if (pg->refcount >= 1 && pg->state == TRACKED_PAGE_PRESENT) {
       uintptr_t phys_buffer =
-          vm_phys_alloc(cfg->page_size / 0x1000, VM_ALLOC_ZERO);
+          (uintptr_t)vm_phys_alloc(cfg->page_size / 0x1000, VM_ALLOC_ZERO);
       vm_map_range(&kernel_space, phys_buffer, segment->base + offset,
                    cfg->page_size, calculate_prot(segment->prot));
 
       // Copy in the previous page, and bump the refcount
-      memcpy(phys_buffer + VM_MEM_OFFSET, pg->phys + VM_MEM_OFFSET, 0x1000);
+      memcpy((void*)(phys_buffer + VM_MEM_OFFSET),
+             (void*)(pg->phys + VM_MEM_OFFSET), 0x1000);
       pg->refcount++;
       goto finished;
     }
   }
 
   // Otherwise, perform a standard allocation of 'page_size' bytes
-  uintptr_t phys_window = vm_phys_alloc(cfg->page_size / 0x1000, VM_ALLOC_ZERO);
+  uintptr_t phys_window =
+      (uintptr_t)vm_phys_alloc(cfg->page_size / 0x1000, VM_ALLOC_ZERO);
   vm_map_range(&kernel_space, phys_window, segment->base + offset,
                cfg->page_size, calculate_prot(segment->prot));
 
@@ -206,7 +209,7 @@ void vm_unmap_seg(struct vm_seg* seg, uintptr_t base, size_t len) {
     page->refcount -= 1;
 
     if ((page->refcount == 0) && page->phys) {
-      vm_phys_free(page->phys, cfg->page_size / 0x1000);
+      vm_phys_free((void*)page->phys, cfg->page_size / 0x1000);
       page->phys = 0;
     }
   }
@@ -229,7 +232,7 @@ void vm_destroy_seg(struct vm_seg* seg) {
     if (page->state == TRACKED_PAGE_PRESENT)
       vm_unmap_range(&kernel_space, page->virt, cfg->page_size);
     if (page->phys != 0)
-      vm_phys_free(page->phys, 1);
+      vm_phys_free((void*)page->phys, 1);
     kfree(page);
   }
 

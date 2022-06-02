@@ -9,8 +9,8 @@
 #include <vm/vm.h>
 
 // Set defaults to match 4LV paging
-CREATE_STAGE(hat_init_stage, hat_setup_func, 0, {})
 static CREATE_SPINLOCK(hat_lock);
+CREATE_STAGE_SMP_NODEP(hat_init_stage, hat_setup_func)
 
 struct vm_config possible_x86_modes[] = {
     /* There are two possible modes for x86, that are the
@@ -259,6 +259,8 @@ void handle_pf(cpu_ctx_t* context) {
 static void hat_setup_func() {
   uint32_t a, b, c, d;
   cpuid_subleaf(0x7, 0x0, &a, &b, &c, &d);
+  if (cur_config != NULL)
+    goto smp_entry;
 
   // Use 5lv paging, unless its unwanted/unsupported
   if (c & (1 << 16)) {
@@ -269,6 +271,7 @@ static void hat_setup_func() {
     cur_config = &possible_x86_modes[0];
   }
 
+smp_entry:
   // Load the PAT with our custom value, which changes 2 registers.
   //   PA6 => Formerly UC-, now Write Protect
   //   PA7 => Formerly UC, now Write Combining

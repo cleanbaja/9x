@@ -2,7 +2,6 @@
 #include <lib/builtin.h>
 #include <lib/kcon.h>
 #include <lib/lock.h>
-#include <ninex/smp.h>
 #include <vm/vm.h>
 
 #include "config.h"
@@ -92,10 +91,10 @@ static struct kcon_sink bxdbg_term_sink = {
 // Generic Kernel Console routines
 //////////////////////////////////////////////////
 
-static CREATE_SPINLOCK(kcon_lock);
 static uint16_t num_sinks;
 static struct kcon_sink* sinks[MAX_KCON_SINKS];
-CREATE_STAGE(kcon_stage, kcon_init, 0, {});
+CREATE_STAGE_NODEP(kcon_stage, kcon_init);
+static CREATE_SPINLOCK(kcon_lock);
 
 void kcon_register_sink(struct kcon_sink* sink) {
   spinlock_acquire(&kcon_lock);

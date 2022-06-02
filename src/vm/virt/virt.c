@@ -8,7 +8,7 @@
 #include <vm/vm.h>
 
 vm_space_t kernel_space;
-CREATE_STAGE(vm_stage, vm_virt_init, 0, {hat_init_stage, vm_phys_stage})
+CREATE_STAGE(vm_stage, vm_virt_init, {hat_init_stage, vm_phys_stage})
 
 //////////////////////////
 //   ASID Management

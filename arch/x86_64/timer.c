@@ -1,9 +1,7 @@
-#include <ninex/acpi.h>
+#include <arch/smp.h>
 #include <arch/timer.h>
-#include <arch/cpu.h>
 #include <lib/kcon.h>
-#include <ninex/smp.h>
-#include <vm/virt.h>
+#include <ninex/acpi.h>
 #include <vm/vm.h>
 
 #define FEMTO_PER_MS    (1000000000000)
@@ -57,23 +55,23 @@ void timer_calibrate_tsc() {
   // the INVARIANT feat so that we may use the HPET
   cpu_features &= ~CPU_FEAT_INVARIANT;
   uint64_t start = 0, delta = 0;
-  per_cpu(tsc_freq) = 0x0;
+  this_cpu->tsc_freq = 0x0;
 
   // Run the actual calibration
   for (int i = 0; i < TSC_CALI_CYCLES; i++) {
     start = asm_rdtsc();  
     timer_msleep(10);
     delta = (asm_rdtsc() - start) / 10;
-    
-    per_cpu(tsc_freq) += delta;
+
+    this_cpu->tsc_freq += delta;
   }
 
   // Restore the INVARIANT feat, and even out the readings
-  per_cpu(tsc_freq) /= TSC_CALI_CYCLES;
+  this_cpu->tsc_freq /= TSC_CALI_CYCLES;
   cpu_features |= CPU_FEAT_INVARIANT;
 
   if (is_bsp()) {
-    uint64_t n = per_cpu(tsc_freq) / 1000;
+    uint64_t n = this_cpu->tsc_freq / 1000;
     int d4 = (n % 10);
     int d3 = (n / 10) % 10;
     int d2 = (n / 100) % 10;
@@ -106,8 +104,8 @@ void timer_msleep(uint64_t ms) {
     while(hpet_read(HPET_REG_COUNTER) < goal)
         __asm__ volatile("pause");
   } else {
-    uint64_t goal = asm_rdtsc() + (ms * per_cpu(tsc_freq));
-   
+    uint64_t goal = asm_rdtsc() + (ms * this_cpu->tsc_freq);
+
     while (asm_rdtsc() < goal)
       __asm__ volatile ("pause");
   }

@@ -1,0 +1,108 @@
+; SMP Trampoline code based off AMD Programmer's Manual, Section 14.8
+; NOTE: Bootinfo is located at 0x82000, while the trampoline is located at the default 0x80000
+
+org 0
+bits 16
+
+; Clear the direction flag, disable interrupts, and fix the CS segment...
+cli
+cld
+jmp 0x8000:entry_16
+
+entry_16:
+  ; Set the remaining segment registers (all but CS)
+  mov ax, 0x8000
+  mov ds, ax
+  mov es, ax
+  mov fs, ax
+  mov ss, ax
+  mov gs, ax
+
+  ; Load the temporary GDT and a invalid IDT (to catch bugs)
+  lgdt [BOOT_GDT_DESCRIPTOR]
+  lidt [INVALID_IDT]
+ 
+  ; Load CR3 with our page table
+  mov eax, [0x2000 + 8]
+  mov cr3, eax
+
+  ; Try to enable 5-level paging, but only if its supported
+  test dword [0x2000 + 40], (1 << 0)
+  mov eax, cr4
+  jz .no_5lv_paging
+
+  ; Enable 5lv paging by setting CR4.la57
+  bts eax, 12
+
+.no_5lv_paging:
+  ; Set PAE and reload CR4
+  bts eax, 5
+  mov cr4, eax
+
+  ; Enable long mode
+  mov ecx, 0xc0000080
+  rdmsr
+  bts eax, 8
+  wrmsr
+
+  ; Enable paging to activate long mode
+  mov eax, 0x80000011
+  mov cr0, eax
+
+  ; Finally, perform a longjump into 64-bit code
+  mov dword [.jmpstruct], entry_64 + 0x80000
+  o32 jmp far [.jmpstruct]
+
+[bits 64]
+.jmpstruct:
+  .offet:   dd 0
+  .segment: dd 0x08
+
+entry_64:
+  ; Once again, reload all segments except CS
+  mov ax, 0x10
+  mov ds, ax
+  mov es, ax
+  mov fs, ax
+  mov gs, ax
+  mov ss, ax
+
+  ; Load the kernel IDT
+  mov rcx, qword [0x82000 + 32] ; idtr
+  lidt [rcx]
+
+  ; Set the CPU stack, clear RBP (for stacktraces) and off we go
+  mov rsp, qword [0x82000]
+  mov rcx, qword [0x82000 + 16]
+  xor rbp, rbp
+ 
+  jmp rcx
+
+;--------------------------------
+;   Constants used in SMP boot
+;--------------------------------
+BOOT_GDT_DESCRIPTOR:
+      dw GDT_END - GDT_START - 1
+      dd GDT_START + 0x80000
+
+INVALID_IDT:
+      dw 0
+      dd 0
+
+GDT_START:
+.null: dq 0
+.code:
+      dw 0
+      dw 0
+      db 0
+      db 0b10011010
+      db 0b00100000
+      db 0
+.data:
+      dw 0
+      dw 0
+      db 0
+      db 0b10010010
+      db 0
+      db 0
+GDT_END:

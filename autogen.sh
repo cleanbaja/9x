@@ -10,9 +10,9 @@ cd "$srcdir"
 cp "$(automake --print-libdir)/install-sh" .
 autoconf
 
-# Pull in thomtl's fork of lai, with improved real hw support
+# Pull in lai, our AML interpreter
 mkdir -p $srcdir/third_party
-git clone https://github.com/thomtl/lai.git $srcdir/third_party/lai
+git clone https://github.com/managarm/lai.git $srcdir/third_party/lai
 
 # Pull in echfs, and build the tools
 git clone https://github.com/echfs/echfs.git $srcdir/third_party/echfs

@@ -6,18 +6,16 @@
 
 struct vfs_node* root_node = NULL;
 vec_t(struct filesystem*) fs_list;
-extern void initramfs_populate(struct stivale2_struct_tag_modules* mods);
 static CREATE_SPINLOCK(vfs_lock);
 
-CREATE_STAGE(vfs_stage, vfs_callback, 0, {})
+extern void initramfs_populate(struct stivale2_struct_tag_modules* mods);
+CREATE_STAGE_NODEP(vfs_stage, vfs_callback);
 
-void
-vfs_register_fs(struct filesystem* fs) {
+void vfs_register_fs(struct filesystem* fs) {
   vec_push(&fs_list, fs);
 }
 
-static struct filesystem*
-find_fs(const char* name) {
+static struct filesystem* find_fs(const char* name) {
   int i;
   struct filesystem* cur;
   vec_foreach(&fs_list, cur, i)

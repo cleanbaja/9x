@@ -1,26 +1,27 @@
 #include <arch/arch.h>
 #include <arch/irqchip.h>
+#include <arch/smp.h>
 #include <fs/vfs.h>
 #include <lib/kcon.h>
 #include <ninex/acpi.h>
 #include <ninex/init.h>
 #include <vm/vm.h>
 
+// Root kernel stage!
+CREATE_STAGE_SMP(root_stage,
+                 DUMMY_CALLBACK,
+                 {arch_early_stage, vm_stage, acpi_stage, arch_late_stage,
+                  smp_stage, vfs_stage});
+static CREATE_SPINLOCK(smp_entry_lock);
 static uint8_t _kstack[0x1000 * 16];
 
-static struct stivale2_header_tag_smp smp_tag = {
-  .tag = { .identifier = STIVALE2_HEADER_TAG_SMP_ID, .next = 0 },
-  .flags = (1 << 0)
-};
-
+///////////////////////////
+//  Stivale2 Interface
+///////////////////////////
 #ifdef LIMINE_EARLYCONSOLE
 static struct stivale2_header_tag_terminal terminal_hdr_tag = {
-    .tag = {
-        .identifier = STIVALE2_HEADER_TAG_TERMINAL_ID,
-        .next = (uintptr_t)&smp_tag
-    },
-    .flags = 0
-};
+    .tag = {.identifier = STIVALE2_HEADER_TAG_TERMINAL_ID, .next = 0},
+    .flags = 0};
 #endif
 
 static struct stivale2_header_tag_framebuffer fbuf_tag = {
@@ -28,8 +29,8 @@ static struct stivale2_header_tag_framebuffer fbuf_tag = {
   #ifdef LIMINE_EARLYCONSOLE
            .next = (uintptr_t)&terminal_hdr_tag },
   #else
-           .next = (uintptr_t)&smp_tag },
-  #endif
+            .next = 0},
+#endif
   .framebuffer_width = 0,
   .framebuffer_height = 0,
   .framebuffer_bpp = 0
@@ -49,13 +50,28 @@ __attribute__((section(".stivale2hdr"),
   .tags = (uintptr_t)&five_lv_tag,
 };
 
-// Root kernel stage!
-CREATE_STAGE(root_stage,
-             DUMMY_CALLBACK,
-             0,
-             {arch_early_stage, vm_stage, acpi_stage, arch_late_stage,
-              vfs_stage})
+void* stivale2_find_tag(uint64_t id) {
+  if (id == 1)
+    return bootags;
 
+  struct stivale2_tag* current_tag = (struct stivale2_tag*)bootags->tags;
+  for (;;) {
+    if (current_tag == NULL) {
+      return NULL;
+    }
+
+    if (current_tag->identifier == id) {
+      return current_tag;
+    }
+
+    // Get a pointer to the next tag in the linked list and repeat.
+    current_tag = (struct stivale2_tag*)current_tag->next;
+  }
+}
+
+///////////////////////////
+//  Initgraph Functions
+///////////////////////////
 struct init_stage* stage_resolve(struct init_stage* entry) {
   struct init_stage *head, *tail, *stack;
   entry->next_resolve = NULL;
@@ -96,7 +112,7 @@ struct init_stage* stage_resolve(struct init_stage* entry) {
 
 void stage_run(struct init_stage* entry, bool smp) {
   while (entry != NULL) {
-    if (entry->flags & INIT_COMPLETE) {
+    if ((entry->flags & INIT_COMPLETE) && !smp) {
       klog("init: (WARN) attempting to run already ran target %s", entry->name);
     } else {
       if (smp) {
@@ -117,41 +133,30 @@ void stage_run(struct init_stage* entry, bool smp) {
   }
 }
 
-void* stivale2_find_tag(uint64_t id) {
-  if (id == 1)
-    return bootags;
+///////////////////////////
+//   Kernel Entrypoints
+///////////////////////////
+struct init_stage* resolved_stages = NULL;
+void kern_smp_entry() {
+  spinlock_acquire(&smp_entry_lock);
 
-  struct stivale2_tag* current_tag = (struct stivale2_tag*)bootags->tags;
-  for (;;) {
-    if (current_tag == NULL) {
-      return NULL;
-    }
-
-    if (current_tag->identifier == id) {
-      return current_tag;
-    }
-
-    // Get a pointer to the next tag in the linked list and repeat.
-    current_tag = (struct stivale2_tag*)current_tag->next;
-  }
+  // Just run the initgraph (smp) and we're done
+  stage_run(resolved_stages, true);
+  spinlock_release(&smp_entry_lock);
 }
 
-void
-kern_entry(struct stivale2_struct* bootinfo)
-{
+void kern_entry(struct stivale2_struct* bootinfo) {
   // Save bootinfo and zero rbp (for stacktracing)
   bootags = bootinfo;
   __asm__ volatile("xor %rbp, %rbp");
 
   // Generate the initgraph and run it
-  struct init_stage* resolved_stages = stage_resolve(root_stage);
+  resolved_stages = stage_resolve(root_stage);
   stage_run(resolved_stages, false);
   klog("init: completed all targets, going to rest!");
 
   // Wait for ACPI power interrupts...
-  ic_send_ipi(IPI_HALT, 0, IPI_OTHERS);
   for (;;) {
     __asm__ volatile("sti; hlt");
   }
 }
-

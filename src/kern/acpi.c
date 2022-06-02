@@ -15,10 +15,10 @@
 static bool xsdt_found;
 static struct acpi_rsdt_t* rsdt;
 static struct acpi_xsdt_t* xsdt;
+CREATE_STAGE_NODEP(acpi_stage, acpi_init);
+CREATE_STAGE_NODEP(acpi_late_stage, acpi_late_init);
 
-void*
-acpi_query(const char* signature, int index)
-{
+void* acpi_query(const char* signature, int index) {
   acpi_header_t* ptr;
   int cnt = 0;
 
@@ -47,7 +47,7 @@ acpi_query(const char* signature, int index)
   return NULL;
 }
 
-void setup_ec(void) {
+static void setup_ec(void) {
   LAI_CLEANUP_STATE lai_state_t state;
   lai_init_state(&state);
 
@@ -74,9 +74,8 @@ void setup_ec(void) {
   }
 }
 
-static void sci_handler(struct cpu_context* context, void* arg) {
+static void sci_handler(struct cpu_context* context) {
   (void)context;
-  (void)arg;
 
   uint16_t ev = lai_get_sci_event();
 
@@ -89,13 +88,12 @@ static void sci_handler(struct cpu_context* context, void* arg) {
     ev_name = "sleep wake up";
 
   klog("acpi: a SCI event has occured: 0x%x (%s)", ev, ev_name);
-
   if (ev & ACPI_POWER_BUTTON) {
     lai_enter_sleep(5); // Good Night!
   }
 }
 
-void setup_sci(void) {
+static void setup_sci(void) {
   // Find the required ACPI tables
   acpi_fadt_t* fadt = acpi_query("FACP", 0);
   acpi_madt_t* madt = acpi_query("APIC", 0);
@@ -113,8 +111,6 @@ void setup_sci(void) {
   __asm__ volatile("sti");
 }
 
-CREATE_STAGE(acpi_stage, acpi_init, 0, {})
-CREATE_STAGE(acpi_late_stage, acpi_late_init, 0, {});
 static void acpi_init() {
   struct stivale2_struct_tag_rsdp* rk =
       stivale2_find_tag(STIVALE2_STRUCT_TAG_RSDP_ID);
@@ -339,11 +335,20 @@ int laihost_sync_wait(struct lai_sync_state* ctx,
   (void)ctx;
   (void)val;
   (void)deadline;
+
   STUB_CALLED();
   return 0;
 }
 void laihost_sync_wake(struct lai_sync_state* ctx) {
   (void)ctx;
+  STUB_CALLED();
+  return;
+}
+
+void laihost_handle_global_notify(lai_nsnode_t* ctx, int unused) {
+  (void)ctx;
+  (void)unused;
+
   STUB_CALLED();
   return;
 }
