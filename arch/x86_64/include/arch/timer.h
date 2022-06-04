@@ -3,6 +3,7 @@
 
 #include <acpispec/tables.h>
 #include <arch/irqchip.h>
+#include <ninex/init.h>
 
 typedef struct acpi_hpet_t {
     acpi_header_t header;
@@ -20,13 +21,6 @@ typedef struct acpi_hpet_t {
     uint8_t       page_protection;
 } __attribute__((packed)) acpi_hpet_t;
 
-#define HPET_REG_CAP      0x0
-#define HPET_REG_CONF     0x10
-#define HPET_REG_COUNTER  0x0F0
-
-void timer_usleep(uint64_t us);
-void timer_msleep(uint64_t ms);
-
 /* Amount of times that the TSC calibration code 
  * is repeated, more higher value means longer 
  * boot time and better accuracy, and vice versa
@@ -35,7 +29,13 @@ void timer_msleep(uint64_t ms);
  */
 #define TSC_CALI_CYCLES 5
 
-void timer_calibrate_tsc();
+EXPORT_STAGE(timer_cali);
+void timer_usleep(uint64_t us);
+void timer_msleep(uint64_t ms);
+
+// On x86, timer related stuff is done in the APIC, so define it as such
+#define timer_oneshot(ms, slot) ic_timer_oneshot(ms, slot)
+#define timer_stop() ic_timer_stop()
 
 #endif // ARCH_TIMER_H
 

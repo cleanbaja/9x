@@ -153,6 +153,7 @@ static void acpi_late_init() {
     // Init the ACPI OSL
     lai_set_acpi_revision(xsdp->revision);
     lai_create_namespace();
+    lai_enable_tracing(LAI_TRACE_OP | LAI_TRACE_IO);
     lai_enable_acpi(1);
 
     // Setup Embedded Controllers (if they exist) and SCI events

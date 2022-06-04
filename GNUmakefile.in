@@ -161,9 +161,9 @@ $(IMAGE): $(KERNEL) misc/limine.cfg
 	third_party/limine/limine-deploy $(IMAGE)
 
 .PHONY: run run-kvm
-override QEMU_BASE_FLAGS += -smp 2 -m 1G -M q35 -drive file=$(IMAGE),if=none,id=nvm -device nvme,serial=deadbeef,drive=nvm -debugcon stdio
+override QEMU_BASE_FLAGS += -smp `nproc`  -m 1G -M q35 -drive file=$(IMAGE),if=none,id=nvm -device nvme,serial=deadbeef,drive=nvm -debugcon stdio
 run: $(IMAGE)
-	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu max -smp `nproc`
+	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu max
 run-kvm: $(IMAGE)
 	qemu-system-x86_64 $(QEMU_BASE_FLAGS) --enable-kvm -cpu max,+invtsc
 

@@ -1,6 +1,7 @@
 #include <arch/arch.h>
 #include <arch/irqchip.h>
 #include <arch/smp.h>
+#include <arch/timer.h>
 #include <fs/vfs.h>
 #include <lib/kcon.h>
 #include <ninex/acpi.h>
@@ -11,7 +12,7 @@
 CREATE_STAGE_SMP(root_stage,
                  DUMMY_CALLBACK,
                  {arch_early_stage, vm_stage, acpi_stage, arch_late_stage,
-                  smp_stage, vfs_stage});
+                  smp_stage, timer_cali, vfs_stage});
 static CREATE_SPINLOCK(smp_entry_lock);
 static uint8_t _kstack[0x1000 * 16];
 
@@ -122,6 +123,7 @@ void stage_run(struct init_stage* entry, bool smp) {
           continue;
         }
 
+        // Finally, actually run the target
         entry->func();
       } else {
         entry->func();
@@ -157,6 +159,6 @@ void kern_entry(struct stivale2_struct* bootinfo) {
 
   // Wait for ACPI power interrupts...
   for (;;) {
-    __asm__ volatile("sti; hlt");
+    asm volatile("sti; hlt");
   }
 }

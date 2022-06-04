@@ -2,6 +2,7 @@
 *.o
 *.a
 *.elf
+*.bin
 *.cache
 ninex.hdd
 GNUmakefile

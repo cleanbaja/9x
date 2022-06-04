@@ -12,6 +12,7 @@
 
 struct percpu_info {
   uint32_t lapic_id;
+  uint16_t proc_id;
   uint64_t tsc_freq, lapic_freq;
   uintptr_t kernel_stack;
   vm_space_t* cur_spc;

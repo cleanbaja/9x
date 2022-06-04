@@ -35,7 +35,8 @@ static bool use_x2apic = false;
 static uintptr_t xapic_base = 0x0;
 static uint8_t translation_table[256];
 CREATE_STAGE_SMP_NODEP(apic_ready, ic_enable)
-CREATE_STAGE(scan_madt_target, madt_init, {apic_ready});
+CREATE_STAGE_SMP_NODEP(apic_timer_cali, ic_timer_cali)
+CREATE_STAGE(scan_madt_target, madt_init, {apic_ready})
 
 static void xapic_write(uint32_t reg, uint64_t val) {
   if (use_x2apic) {
@@ -153,7 +154,11 @@ static void ic_enable() {
 //////////////////////////////
 //        APIC Timer
 //////////////////////////////
-void ic_timer_calibrate() {
+static void ic_timer_cali() {
+  // If we plan on using the deadline TSC, then skip calibration
+  if (CPU_CHECK(CPU_FEAT_INVARIANT) && CPU_CHECK(CPU_FEAT_DEADLINE))
+    return;
+
   // Setup the calibration, with divisor set to 16 (0x3)
   xapic_write(LAPIC_TIMER_DIV, 0x3);
   xapic_write(LAPIC_TIMER_LVT, 0xFF | (1 << 16));
@@ -168,12 +173,18 @@ void ic_timer_calibrate() {
   xapic_write(LAPIC_TIMER_LVT, (1 << 16));
 }
 
-void ic_timer_oneshot(uint8_t vec, uint64_t ms) {
+void ic_timer_oneshot(uint64_t ms, uint16_t vec) {
   if (CPU_CHECK(CPU_FEAT_INVARIANT) && CPU_CHECK(CPU_FEAT_DEADLINE)) {
-    xapic_write(LAPIC_TIMER_LVT, (0b10 << 17) | vec);
-    uint64_t goal = asm_rdtsc() + (ms * this_cpu->tsc_freq);
+    // Stop the LAPIC timer
+    xapic_write(LAPIC_TIMER_INIT, 0x0);
+    xapic_write(LAPIC_TIMER_LVT, (1 << 16));
 
-    asm_wrmsr(IA32_TSC_DEADLINE, goal);
+    // Calculate the deadline for the TSC and setup the lapic regs
+    uint64_t goal = ms * this_cpu->tsc_freq;
+    xapic_write(LAPIC_TIMER_LVT, (vec | (0b10 << 17)) & ~(1 << 16));
+
+    // Write the final goal, and off we go!
+    asm_wrmsr(IA32_TSC_DEADLINE, goal + asm_rdtsc());
   } else {
     // Stop the LAPIC timer
     xapic_write(LAPIC_TIMER_INIT, 0x0);
@@ -235,7 +246,8 @@ static uint32_t get_ioapic_for_gsi(uint32_t gsi) {
 void ic_mask_irq(uint16_t slot, bool status) {
   uint32_t gsi = translation_table[slot];
   if (gsi == 0) {
-    klog("apic: can't mask IO-APIC IRQ from vector, if GSI is unknown!");
+    klog("apic: can't mask IO-APIC IRQ #%d from vector, if GSI is unknown!",
+         slot);
     return;
   }
 

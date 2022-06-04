@@ -35,7 +35,8 @@ static inline void spinlock_acquire(struct spinlock* lock) {
   
   if (loop_cnt >= 0xFFFFFFF) {
     extern void panic(void* frame, char* fmt, ...); // Don't introduce a header dependency...
-    panic(0x0, "Spinlock Deadlock Detected!\n");                                   
+    panic(0x0, "Spinlock Deadlock Detected! (caller: 0x%lx)\n",
+          __builtin_return_address(0));
   }
 
   // Mask interrupts (if needed)

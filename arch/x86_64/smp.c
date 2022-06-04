@@ -9,6 +9,7 @@
 
 extern vec_t(madt_lapic_t*) madt_lapics;
 static _Atomic(int) online_cores = 0;
+struct madt_lapic_t* cur_lapic = NULL;
 CREATE_STAGE(smp_stage, smp_startup, {scan_madt_target});
 
 // Include the compiled smp trampoline
@@ -23,7 +24,7 @@ asm(".global smp_bootcode_begin\n\t"
 static void hello_ap(struct percpu_info* info) {
   // Save the information before clearing RBP
   asm_wrmsr(IA32_KERNEL_GS_BASE, (uint64_t)info);
-  asm_wrmsr(IA32_TSC_AUX, online_cores + 1);
+  asm_wrmsr(IA32_TSC_AUX, info->proc_id);
   asm volatile("xor %rbp, %rbp");
 
   // Let the BSP know that we're online...
@@ -53,28 +54,32 @@ static void smp_startup() {
 
   // Loop through all the cores, booting them as needed
   for (int i = 0; i < madt_lapics.length; i++) {
-    struct madt_lapic_t* cur_lapic = madt_lapics.data[i];
+    cur_lapic = madt_lapics.data[i];
+
+    // Create the CPU local information (stored in GS)
+    struct percpu_info* percpu = kmalloc(sizeof(struct percpu_info));
+    percpu->lapic_id = cur_lapic->apic_id;
+    percpu->proc_id = cur_lapic->processor_id;
+    percpu->cur_spc = &kernel_space;
+    percpu->kernel_stack = (uint64_t)vm_phys_alloc(16, VM_ALLOC_ZERO) +
+                           VM_MEM_OFFSET + (VM_PAGE_SIZE * 16);
+
     if (!(cur_lapic->flags & 1)) {
       klog("smp: CPU core %d is disabled!", cur_lapic->processor_id);
       expected_cpus--;
       continue;
     } else if (cur_lapic->apic_id == get_lapic_id()) {
+      asm_wrmsr(IA32_KERNEL_GS_BASE, (uint64_t)percpu);
+      asm_wrmsr(IA32_TSC_AUX, cur_lapic->processor_id);
       continue;
     }
-
-    // Create the CPU local information (stored in GS)
-    struct percpu_info* percpu = kmalloc(sizeof(struct percpu_info));
-    percpu->lapic_id = cur_lapic->apic_id;
-    percpu->cur_spc = &kernel_space;
-    percpu->kernel_stack = (uint64_t)vm_phys_alloc(16, VM_ALLOC_ZERO) +
-                           VM_MEM_OFFSET + (VM_PAGE_SIZE * 16);
 
     // Fill in the bootinfo accordingly...
     uint64_t* bootinfo_ptr = (uint64_t*)0x82000;
     bootinfo_ptr[0] = percpu->kernel_stack;
     bootinfo_ptr[1] = kernel_space.root;
     bootinfo_ptr[2] = (uintptr_t)hello_ap;
-    bootinfo_ptr[3] = percpu;
+    bootinfo_ptr[3] = (uint64_t)percpu;
     bootinfo_ptr[4] = (uintptr_t)&saved_idtr;
     if (enable_la57)
       bootinfo_ptr[5] = 1;

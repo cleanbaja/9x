@@ -74,6 +74,7 @@ entry_64:
   ; Set the CPU stack, clear RBP (for stacktraces) and off we go
   mov rsp, qword [0x82000]
   mov rcx, qword [0x82000 + 16]
+  mov rdi, qword [0x82000 + 24]
   xor rbp, rbp
  
   jmp rcx

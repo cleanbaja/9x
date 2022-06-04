@@ -1,4 +1,5 @@
 #include <arch/irqchip.h>
+#include <arch/smp.h>
 #include <lib/builtin.h>
 #include <lib/kcon.h>
 #include <lib/lock.h>
@@ -144,7 +145,7 @@ void panic(void* frame, char* fmt, ...) {
   // ic_send_ipi(IPI_HALT, 0, IPI_OTHERS);
 
   // Log all the information possible
-  // klog_unlocked("\nKERNEL PANIC on CPU #%d\n", cpunum());
+  klog_unlocked("\n--- KERNEL PANIC on CPU #%d ---\n", cpu_num);
   if (fmt) {
       va_list va;
       va_start(va, fmt);
