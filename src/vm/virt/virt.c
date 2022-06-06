@@ -52,8 +52,8 @@ void vm_map_range(vm_space_t* space,
     ALIGN_UP(len, cfg->page_size);
 
   // Use a huge mapping if we can
-  if ((virt % cfg->huge_page_size) == 0)
-    flags |= VM_PAGE_HUGE;
+  /*if ((virt % cfg->huge_page_size) == 0)
+    flags |= VM_PAGE_HUGE;*/
 
   int mode =
       (flags & VM_PAGE_HUGE) ? TRANSLATE_DEPTH_HUGE : TRANSLATE_DEPTH_NORM;

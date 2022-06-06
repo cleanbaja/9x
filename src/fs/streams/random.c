@@ -151,8 +151,8 @@ void setup_random_streams()
   // Init the RNG (Random Number Generator) and create the VFS nodes
   status = kmalloc(n * sizeof(uint32_t));
   srand(seed);
-  struct backing* urandom_bck = devtmpfs_create_device("urandom");
-  struct backing* random_bck = devtmpfs_create_device("random");
+  struct backing* urandom_bck = devtmpfs_create_device("urandom", 0);
+  struct backing* random_bck = devtmpfs_create_device("random", 0);
 
   // Setup '/dev/random'
   random_bck->st.st_dev     = devtmpfs_create_id(0);

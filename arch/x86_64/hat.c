@@ -218,7 +218,7 @@ void handle_pf(cpu_ctx_t* context) {
 
   // For more information on the bits of the error code,
   // see Intel x86_64 SDM Volume 3a Chapter 4.7
-  klog("hat: Page Fault at 0x%lx! (%s) (%s) %s", address,
+  klog("hat: Page Fault at 0x%lx! (%s) (%s) (%s)", address,
        (ec & (1 << 1)) ? "write" : "read", (ec & (1 << 2)) ? "user" : "kmode",
        (ec & (1 << 4)) ? "ifetch" : "");
 

@@ -6,7 +6,9 @@ override ARCH_DIR    := @srcdir@/arch/@ARCH@
 override LAI_DIR     := @srcdir@/third_party/lai
 override VERSION     := @PACKAGE_VERSION@
 override ECHFS       := @srcdir@/third_party/echfs/echfs-utils
+override INITRD      := initrd.img
 override IMAGE       := ninex.hdd
+override EXTENSIONS_DIR := @srcdir@/extensions
 
 # Do a verbose build only when requested
 ifeq ($(V),)
@@ -34,7 +36,7 @@ override CREALFLAGS := $(KERNEL_CFLAGS)           \
 	               -fno-omit-frame-pointer    \
                        -fms-extensions 
 
-override LDREALFLAGS := $(KERNEL_LDFLAGS) -zmax-page-size=0x1000 -nostdlib -pie
+override LDREALFLAGS := $(KERNEL_LDFLAGS) -zmax-page-size=0x1000 -nostdlib
 override CREALFLAGS  +=  -I .                       \
                          -I $(INCLUDE_DIR)          \
                          -I $(LAI_DIR)/include      \
@@ -113,12 +115,26 @@ $(LAI_LIB): $(LAI_OBJECTS)
 	$(AR) rcs $@ $(LAI_OBJECTS)
 
 $(KERNEL): $(LAI_LIB) $(ARCH_LIB) $(OBJECTS)
+	$(LD) $(LDREALFLAGS) -pie -T $(ARCH_DIR)/kernel.ld -o $@ $(OBJECTS) $(LAI_LIB) $(ARCH_LIB)
+	./tools/symbols.sh kern_symbols.c $@
+	$(CC) $(CREALFLAGS) -o kern_symbols.o -c kern_symbols.c
 	$(COOL_PROMPT) "LINK" $@
-	$(LD) $(LDREALFLAGS) -T $(ARCH_DIR)/kernel.ld -o $@ $(OBJECTS) $(LAI_LIB) $(ARCH_LIB)
+	$(LD) $(LDREALFLAGS) -pie -T $(ARCH_DIR)/kernel.ld -o $@ $(OBJECTS) $(LAI_LIB) $(ARCH_LIB) kern_symbols.o
+
+# Kernel Drivers (aka Extensions)
+include extensions/build.mk
+
+# Initrd (contains drivers, and sometimes init)
+$(INITRD): $(REQUIRED_DRIVERS)
+	$(COOL_PROMPT) "GEN " $@
+	mkdir initrd && cp $(REQUIRED_DRIVERS) initrd
+	tar -cf initrd.tar initrd &> /dev/null
+	gzip initrd.tar && mv initrd.tar.gz initrd.img
+	rm -rf initrd
 
 # Cleaning targets
-clean:
-	rm -rf $(OBJECTS) $(LAI_OBJECTS) $(ARCH_OBJECTS) $(ARCH_BLOBS) $(KERNEL) $(LAI_LIB) $(ARCH_LIB)
+clean: extensions_clean
+	rm -rf kern_symbols.* $(OBJECTS) $(LAI_OBJECTS) $(ARCH_OBJECTS) $(ARCH_BLOBS) $(KERNEL) $(LAI_LIB) $(ARCH_LIB)
 
 distclean: clean
 	rm -rf GNUmakefile config.log config.status config.h $(IMAGE)
@@ -148,13 +164,14 @@ dist:
 	rm -rf "ninex-$(VERSION)"
 
 # Kernel testing/running targets
-$(IMAGE): $(KERNEL) misc/limine.cfg
+$(IMAGE): $(KERNEL) $(INITRD) misc/limine.cfg
 	$(COOL_PROMPT) "GEN " $@
 	dd if=/dev/zero of=$(IMAGE) bs=1M count=32
 	parted -s $(IMAGE) mklabel msdos
 	parted -s $(IMAGE) mkpart primary 2048s 100%
 	@$(ECHFS) -m -p0 $(IMAGE) quick-format 512
 	@$(ECHFS) -m -p0 $(IMAGE) import $(KERNEL) /boot/kernel/$(KERNEL)
+	@$(ECHFS) -m -p0 $(IMAGE) import $(INITRD) /boot/initrd.img
 	@$(ECHFS) -m -p0 $(IMAGE) import @srcdir@/misc/limine.cfg /boot/limine.cfg
 	@$(ECHFS) -m -p0 $(IMAGE) import @srcdir@/third_party/limine/limine.sys \
 				           /boot/limine.sys

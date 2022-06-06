@@ -56,8 +56,8 @@ static void null_close(struct backing* bck) {
 
 void setup_unix_streams()
 {
-  struct backing* zero_bck = devtmpfs_create_device("zero");
-  struct backing* null_bck = devtmpfs_create_device("null");
+  struct backing* zero_bck = devtmpfs_create_device("zero", 0);
+  struct backing* null_bck = devtmpfs_create_device("null", 0);
       
   // Setup '/dev/zero'
   zero_bck->st.st_dev     = devtmpfs_create_id(0);

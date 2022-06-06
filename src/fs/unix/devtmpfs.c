@@ -158,14 +158,14 @@ size_t devtmpfs_create_id(int subclass) {
   return MKDEV(dev_counter++, subclass);
 }
 
-struct backing* devtmpfs_create_device(char* path) {
+struct backing* devtmpfs_create_device(char* path, int size) {
   struct vfs_resolved_node res =
       vfs_resolve(root_mount, path, RESOLVE_CREATE_SHALLOW);
   if (!res.success)
     return NULL;
 
   kfree(res.raw_string);
-  res.target->backing = create_backing(0);
+  res.target->backing = create_backing(size);
   return res.target->backing;
 }
 

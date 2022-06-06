@@ -16,7 +16,7 @@
 #define MKDEV(maj, min) (min | ((uint64_t)maj << 32))
 
 // Path has to be relative to /dev, like "dri/card0"
-struct backing* devtmpfs_create_device(char* path);
+struct backing* devtmpfs_create_device(char* path, int size);
 size_t devtmpfs_create_id(int subclass);
 
 void setup_unix_streams();

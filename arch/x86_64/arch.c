@@ -1,6 +1,8 @@
 #include <arch/arch.h>
 #include <arch/cpu.h>
 #include <arch/tables.h>
+#include <arch/smp.h>
+#include <arch/timer.h>
 #include <lib/cmdline.h>
 #include <lib/kcon.h>
 #include <lib/stivale2.h>
@@ -14,7 +16,7 @@ CREATE_STAGE(arch_early_stage,
 // All remaining arch-specific things, that depended on the VM...
 CREATE_STAGE(arch_late_stage,
              DUMMY_CALLBACK,
-             {scan_madt_target, acpi_late_stage})
+             {scan_madt_target, acpi_late_stage, smp_stage, timer_cali})
 
 static void arch_early_callback() {
   struct stivale2_struct_tag_cmdline* cmdline_tag =

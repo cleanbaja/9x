@@ -1,4 +1,4 @@
-AC_INIT(9x, 0.0.8, https://github.com/cleanbaja/CrecentOS/issues, ninex)
+AC_INIT(9x, 0.0.9, https://github.com/cleanbaja/CrecentOS/issues, ninex)
 AC_COPYRIGHT([Copyright (c) 2022 cleanbaja, All Rights Reserved.])
 
 # Search for the programs we need...
