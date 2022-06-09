@@ -51,10 +51,7 @@ void vm_map_range(vm_space_t* space,
   if ((len % cfg->page_size) != 0)
     ALIGN_UP(len, cfg->page_size);
 
-  // Use a huge mapping if we can
-  /*if ((virt % cfg->huge_page_size) == 0)
-    flags |= VM_PAGE_HUGE;*/
-
+  // TODO: Use a huge mapping if we can
   int mode =
       (flags & VM_PAGE_HUGE) ? TRANSLATE_DEPTH_HUGE : TRANSLATE_DEPTH_NORM;
   size_t inc_size =
@@ -100,16 +97,6 @@ void vm_unmap_range(vm_space_t* space, uintptr_t virt, size_t len) {
   vm_invl(space, virt, len);
 }
 
-void vm_space_destroy(vm_space_t* s) {
-  free_asid(s->asid);
-  hat_scrub_pde(s->root, cur_config->levels);
-  for (int i = 0; i < s->mappings.length; i++) {
-    vm_destroy_seg(s->mappings.data[i]);
-  }
-
-  kfree(s);
-}
-
 //////////////////////////
 //   Space Management
 //////////////////////////
@@ -127,6 +114,20 @@ vm_space_t* vm_space_create() {
   return trt;
 }
 
+void vm_space_destroy(vm_space_t* s) {
+  free_asid(s->asid);
+  hat_scrub_pde(s->root, cur_config->levels);
+  for (int i = 0; i < s->mappings.length; i++) {
+    struct vm_seg* sg = s->mappings.data[i];
+    sg->ops.remove(sg, true);
+  }
+
+  kfree(s);
+}
+
+//////////////////////////
+//    Misc Functions
+//////////////////////////
 void vm_invl(vm_space_t* spc, uintptr_t addr, size_t len) {
   if (addr == (uintptr_t)-1)
     hat_invl(spc->root, 0, spc->asid, INVL_SINGLE_ASID);
@@ -136,6 +137,19 @@ void vm_invl(vm_space_t* spc, uintptr_t addr, size_t len) {
     hat_invl(spc->root, index, spc->asid, INVL_SINGLE_ADDR);
   }
 }
+
+bool vm_fault(uintptr_t location, enum vm_fault flags) {
+  uintptr_t offset;
+  struct vm_seg* seg = vm_find_seg(location, &offset);
+  if (seg == NULL)
+    return false;
+
+  if (!seg->ops.fault(seg, offset, flags))
+    return false;
+
+  return true;
+}
+
 
 #ifdef __x86_64__
 static void vm_virt_init() {

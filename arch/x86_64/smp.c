@@ -17,7 +17,7 @@ extern uint64_t smp_bootcode_begin[];
 extern uint64_t smp_bootcode_end[];
 asm(".global smp_bootcode_begin\n\t"
     "smp_bootcode_begin: \n\t"
-    ".incbin \"arch/x86_64/smp_trampoline.bin\"\n\t"
+    ".incbin \"" SMP_INCLUDE_DIR  "/smp_trampoline.bin\"\n\t"
     ".global smp_bootcode_end\n\t"
     "smp_bootcode_end:\n\t");
 

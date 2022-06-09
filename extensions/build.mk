@@ -1,11 +1,10 @@
+EXT_BIN_DIR=$(BUILD_DIR)/bin
 include $(EXTENSIONS_DIR)/serial/build.mk
 
 # As of right now, we only have one driver (the serial console)
-REQUIRED_DRIVERS = $(EXTENSIONS_DIR)/serial.kext
+REQUIRED_DRIVERS = $(EXT_BIN_DIR)/serial.kext
 
-.PHONY: extensions extensions_clean
-extensions: $(REQUIRED_DRIVERS)
+.PHONY: extensions_clean
 extensions_clean:
 	rm -f $(REQUIRED_DRIVERS)
-	find $(EXTENSIONS_DIR) -name '*.o' -delete
 

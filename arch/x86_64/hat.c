@@ -19,8 +19,7 @@ struct vm_config possible_x86_modes[] = {
     {0xFFFF800000000000, 4, 4096, 4096, 4096 * 512},
     {0xFF00000000000000, 5, 4096, 4096, 4096 * 512}};
 struct vm_config* cur_config = NULL;
-uintptr_t kernel_vma =
-    0xFFFF800000000000;  // Assume standard x86_64 paging by default
+uintptr_t kernel_vma = 0xFFFF800000000000;
 
 static uint64_t* next_level(uint64_t* prev_level, uint64_t index, bool create) {
   if (!(prev_level[index] & 1)) {
@@ -32,6 +31,28 @@ static uint64_t* next_level(uint64_t* prev_level, uint64_t index, bool create) {
   }
 
   return (uint64_t*)((prev_level[index] & ~(0x1ff)) + VM_MEM_OFFSET);
+}
+
+uintptr_t hat_get_base(enum base_type bt) {
+  if (cur_config->levels == 5) {
+    switch (bt) {
+    case HAT_BASE_KEXT:
+      return 0xFFD4000000000000;
+    case HAT_BASE_USEG:
+      // 1GB below the end of the usermode address space
+      return 0x00fff00000000000 - (0x1000 * 512 * 512);
+    }
+  } else {
+    switch (bt) {
+    case HAT_BASE_KEXT:
+      return 0xFFFFEA0000000000;
+    case HAT_BASE_USEG:
+      // 1GB below the end of the usermode address space
+      return 0x0000700000000000 - (0x1000 * 512 * 512);
+    }
+  }
+
+  return 0x0;
 }
 
 uint64_t* hat_translate_addr(uintptr_t root,
@@ -218,9 +239,9 @@ void handle_pf(cpu_ctx_t* context) {
 
   // For more information on the bits of the error code,
   // see Intel x86_64 SDM Volume 3a Chapter 4.7
-  klog("hat: Page Fault at 0x%lx! (%s) (%s) (%s)", address,
+  klog("hat: Page Fault at 0x%lx! (%s) (%s)", address,
        (ec & (1 << 1)) ? "write" : "read", (ec & (1 << 2)) ? "user" : "kmode",
-       (ec & (1 << 4)) ? "ifetch" : "");
+       (ec & (1 << 4)) ? "(ifetch)" : "");
 
   // Provide some more information...
   enum vm_fault vf = VM_FAULT_NONE;
@@ -243,16 +264,10 @@ void handle_pf(cpu_ctx_t* context) {
   if (ec & (1 << 1))
     vf |= VM_FAULT_WRITE;
 
-  size_t offset;
-  struct vm_seg* segment = vm_find_seg(address, &offset);
-  if (segment == NULL) {
-    PANIC(context, NULL);
-  } else {
-    bool result = segment->deal_with_pf(segment, offset, vf);
-    if (!result)
-      PANIC(context,
-            NULL);  // PANIC for now, since we can't send signals/kill threads
-  }
+  // Call the kernel page fault handler, and 
+  // make sure the page fault was fixed
+  if (!vm_fault(address, vf))
+    PANIC(context, NULL);  // PANIC for now, since we can't send signals/kill threads
 }
 
 // Bootstraps the HAT...

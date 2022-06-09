@@ -1,13 +1,11 @@
 # Set some defaults first
 override COOL_PROMPT := printf '[\e[1;31m%s\e[m] \e[1;32m%s\e[m\n'
-override SOURCE_DIR  := @srcdir@/src
-override INCLUDE_DIR := @srcdir@/include
+override SOURCE_DIR  := @srcdir@
+override BUILD_DIR   := @BUILDDIR@
 override ARCH_DIR    := @srcdir@/arch/@ARCH@
 override LAI_DIR     := @srcdir@/third_party/lai
 override VERSION     := @PACKAGE_VERSION@
 override ECHFS       := @srcdir@/third_party/echfs/echfs-utils
-override INITRD      := initrd.img
-override IMAGE       := ninex.hdd
 override EXTENSIONS_DIR := @srcdir@/extensions
 
 # Do a verbose build only when requested
@@ -25,20 +23,20 @@ override ARCH := @ARCH@
 HARDENED_BUILD := @HARDENED_BUILD@
 LIMINE_EARLYCONSOLE := @LIMINE_EARLYCONSOLE@
 PREFIX := @prefix@
-DESTDIR :=
 
 # Set compiler flags
 override CREALFLAGS := $(KERNEL_CFLAGS)           \
 		       -std=gnu11                 \
                        -ffreestanding             \
 	               -fpic                      \
+		       -MMD                       \
 	               -mno-red-zone              \
 	               -fno-omit-frame-pointer    \
                        -fms-extensions 
 
 override LDREALFLAGS := $(KERNEL_LDFLAGS) -zmax-page-size=0x1000 -nostdlib
 override CREALFLAGS  +=  -I .                       \
-                         -I $(INCLUDE_DIR)          \
+                         -I $(SOURCE_DIR)/include   \
                          -I $(LAI_DIR)/include      \
                          -I $(ARCH_DIR)/include
 
@@ -53,7 +51,7 @@ ifeq ($(LIMINE_EARLYCONSOLE), yes)
 endif
 
 # Find all the source code
-override KERNEL_SOURCE := $(shell find $(SOURCE_DIR)/kern $(SOURCE_DIR)/lib $(SOURCE_DIR)/vm $(SOURCE_DIR)/fs -name '*.c')
+override KERNEL_SOURCE := $(shell find $(SOURCE_DIR)/src -name '*.c')
 override LAI_SOURCE    := $(shell find $(LAI_DIR) -name '*.c')
 override ARCH_SOURCE   := $(shell find $(ARCH_DIR) -name '*.c')
 ifeq ($(ARCH), x86_64)
@@ -70,17 +68,21 @@ else ifeq ($(ARCH), aarch64)
 endif
 
 # Create all the objects
-override KERNEL      := vr9x.elf
-override LAI_LIB     := liblai.a
-override OBJECTS     := $(KERNEL_SOURCE:.c=.o)
-override LAI_OBJECTS := $(LAI_SOURCE:.c=.o)
+override KERNEL      := $(BUILD_DIR)/vr9x.elf
+override INITRD      := $(BUILD_DIR)/initrd.img
+override IMAGE       := $(BUILD_DIR)/ninex.hdd
+override LAI_LIB     := $(BUILD_DIR)/third_party/lai/liblai.a
+override OBJECTS     := $(addprefix $(BUILD_DIR), $(patsubst %.c, %.o, $(KERNEL_SOURCE:$(SOURCE_DIR)%=%)))
+override LAI_OBJECTS := $(addprefix $(BUILD_DIR), $(patsubst %.c, %.o, $(LAI_SOURCE:$(SOURCE_DIR)%=%)))
 ifeq ($(ARCH), x86_64)
-    override ARCH_LIB := libx86_64.a
-    override ARCH_OBJECTS := $(ARCH_SOURCE:.c=.o) $(ARCH_ASSEMBLY_SOURCE:.asm=.o) 
-    override ARCH_BLOBS := $(ARCH_REALMODE_SOURCE:.real=.bin)
+    override ARCH_LIB     := $(BUILD_DIR)/arch/libx86_64.a
+    override ARCH_OBJECTS := $(addprefix $(BUILD_DIR), $(patsubst %.c, %.o, $(ARCH_SOURCE:$(SOURCE_DIR)%=%))) 
+    override ARCH_OBJECTS += $(addprefix $(BUILD_DIR), $(patsubst %.asm, %.o, $(ARCH_ASSEMBLY_SOURCE:$(SOURCE_DIR)%=%))) 
+    override ARCH_BLOBS   := $(addprefix $(BUILD_DIR), $(patsubst %.real, %.bin, $(ARCH_REALMODE_SOURCE:$(SOURCE_DIR)%=%)))
 else ifeq ($(ARCH), aarch64)
-    override ARCH_LIB := libaarch64.a
-    override ARCH_OBJECTS := $(ARCH_SOURCE:.c=.o) $(ARCH_ASSEMBLY_SOURCE:.S=.o) 
+    override ARCH_LIB     := $(BUILD_DIR)/arch/libaarch64.a
+    override ARCH_OBJECTS := $(addprefix $(BUILD_DIR)/arch/,$(patsubst %.c, %.o, $(ARCH_SOURCE))) \
+	                     $(addprefix $(BUILD_DIR)/arch/,$(patsubst %.S, %.o, $(ARCH_ASSEMBLY_SOURCE))) 
 endif
 
 # Build the kernel by default
@@ -88,41 +90,47 @@ endif
 all: $(KERNEL)
 
 # Targets for compiling the kernel
-arch/%.o: arch/%.c
+$(BUILD_DIR)/arch/@ARCH@/%.o: $(ARCH_DIR)/%.c
 	@$(COOL_PROMPT) " CC " $<
-	$(CC) $(CREALFLAGS) -D ARCH_INTERNAL -c -o $@ $<
+	mkdir -p $(@D)
+	$(CC) $(CREALFLAGS) -D ARCH_INTERNAL -DSMP_INCLUDE_DIR=\"$(BUILD_DIR)/arch/@ARCH@\" -c -o $@ $<
 
-%.o: %.c
+$(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
 	@$(COOL_PROMPT) " CC " $<
+	mkdir -p $(@D)
 	$(CC) $(CREALFLAGS) -c -o $@ $<
 
 ifeq ($(ARCH), x86_64)
-%.bin: %.real
+$(BUILD_DIR)/arch/x86_64/%.bin: $(ARCH_DIR)/%.real
 	$(COOL_PROMPT) "REAL" $<
+	mkdir -p $(@D)
 	nasm -f bin -i @srcdir@ -o $@ $<
 
-%.o: %.asm
+$(BUILD_DIR)/arch/x86_64/%.o: $(ARCH_DIR)/%.asm
 	$(COOL_PROMPT) "ASM " $<
+	mkdir -p $(@D)
 	nasm -f elf64 -i @srcdir@ -o $@ $<
 
 $(ARCH_LIB): $(ARCH_BLOBS) $(ARCH_OBJECTS) 
 	$(COOL_PROMPT) "LIB " $@
+	mkdir -p $(@D)
 	$(AR) rcs $@ $(ARCH_OBJECTS)
 endif
 
 $(LAI_LIB): $(LAI_OBJECTS)
 	$(COOL_PROMPT) "LIB " $@
+	mkdir -p $(@D)
 	$(AR) rcs $@ $(LAI_OBJECTS)
+
+# Kernel Drivers (aka Extensions)
+include $(EXTENSIONS_DIR)/build.mk
 
 $(KERNEL): $(LAI_LIB) $(ARCH_LIB) $(OBJECTS)
 	$(LD) $(LDREALFLAGS) -pie -T $(ARCH_DIR)/kernel.ld -o $@ $(OBJECTS) $(LAI_LIB) $(ARCH_LIB)
-	./tools/symbols.sh kern_symbols.c $@
+	@@srcdir@/tools/symbols.sh kern_symbols.c $@
 	$(CC) $(CREALFLAGS) -o kern_symbols.o -c kern_symbols.c
 	$(COOL_PROMPT) "LINK" $@
 	$(LD) $(LDREALFLAGS) -pie -T $(ARCH_DIR)/kernel.ld -o $@ $(OBJECTS) $(LAI_LIB) $(ARCH_LIB) kern_symbols.o
-
-# Kernel Drivers (aka Extensions)
-include extensions/build.mk
 
 # Initrd (contains drivers, and sometimes init)
 $(INITRD): $(REQUIRED_DRIVERS)
@@ -132,25 +140,36 @@ $(INITRD): $(REQUIRED_DRIVERS)
 	gzip initrd.tar && mv initrd.tar.gz initrd.img
 	rm -rf initrd
 
+# Header dependencies
+override HEADER_DEPS := $(addprefix $(BUILD_DIR), $(patsubst %.c, %.d, $(KERNEL_SOURCE:$(SOURCE_DIR)%=%)))
+override HEADER_DEPS += $(addprefix $(BUILD_DIR), $(patsubst %.c, %.d, $(LAI_SOURCE:$(SOURCE_DIR)%=%)))
+override HEADER_DEPS += $(addprefix $(BUILD_DIR), $(patsubst %.c, %.d, $(ARCH_SOURCE:$(SOURCE_DIR)%=%)))
+-include $(HEADER_DEPS)
+
 # Cleaning targets
 clean: extensions_clean
-	rm -rf kern_symbols.* $(OBJECTS) $(LAI_OBJECTS) $(ARCH_OBJECTS) $(ARCH_BLOBS) $(KERNEL) $(LAI_LIB) $(ARCH_LIB)
+	rm -rf $(BUILD_DIR)/kern_symbols.* $(OBJECTS) $(LAI_OBJECTS) $(ARCH_OBJECTS) $(ARCH_BLOBS) $(KERNEL) $(LAI_LIB) $(ARCH_LIB)
 
 distclean: clean
-	rm -rf GNUmakefile config.log config.status config.h $(IMAGE)
+	rm -rf $(BUILD_DIR)/{GNUmakefile,config.log,config.status,config.h} $(IMAGE)
 
 maintainer-clean: distclean
-	rm -rf configure install-sh autom4te* *'~' third_party
+	rm -rf $(SOURCE_DIR)/configure $(SOURCE_DIR)/install-sh $(SOURCE_DIR)/autom4te* $(SOURCE_DIR)/*'~' $(SOURCE_DIR)/third_party
 
 # Installation/Distribution targets
 .PHONY: install install-strip dist
-install: $(KERNEL)
-	@@INSTALL@ -d "$(DESTDIR)$(PREFIX)/kernel"
-	@@INSTALL@ $(KERNEL) "$(DESTDIR)$(PREFIX)/kernel"
+install: $(KERNEL) $(REQUIRED_DRIVERS)
+	@INSTALL@ -d "$(DESTDIR)$(PREFIX)/kernel"
+	@INSTALL@ -s $(KERNEL) "$(DESTDIR)$(PREFIX)/kernel"
+	@INSTALL@ -d "$(DESTDIR)/lib/extensions/"
+	@INSTALL@ -t "$(DESTDIR)/lib/extensions/" $(REQUIRED_DRIVERS)
 
-install-strip: $(KERNEL)
-	@@INSTALL@ -d "$(DESTDIR)$(PREFIX)/kernel"
-	@@INSTALL@ -s $(KERNEL) "$(DESTDIR)$(PREFIX)/kernel"
+
+install-strip: $(KERNEL) $(REQUIRED_DRIVERS)
+	@INSTALL@ -d "$(DESTDIR)$(PREFIX)/kernel"
+	@INSTALL@ -s $(KERNEL) "$(DESTDIR)$(PREFIX)/kernel"
+	@INSTALL@ -d "$(DESTDIR)/lib/extensions/"
+	@INSTALL@ -t "$(DESTDIR)/lib/extensions/" -s $(REQUIRED_DRIVERS)
 
 dist:
 	rm -rf "ninex-$(VERSION)"
@@ -164,7 +183,7 @@ dist:
 	rm -rf "ninex-$(VERSION)"
 
 # Kernel testing/running targets
-$(IMAGE): $(KERNEL) $(INITRD) misc/limine.cfg
+$(IMAGE): $(KERNEL) $(INITRD) $(SOURCE_DIR)/misc/limine.cfg
 	$(COOL_PROMPT) "GEN " $@
 	dd if=/dev/zero of=$(IMAGE) bs=1M count=32
 	parted -s $(IMAGE) mklabel msdos
@@ -175,10 +194,10 @@ $(IMAGE): $(KERNEL) $(INITRD) misc/limine.cfg
 	@$(ECHFS) -m -p0 $(IMAGE) import @srcdir@/misc/limine.cfg /boot/limine.cfg
 	@$(ECHFS) -m -p0 $(IMAGE) import @srcdir@/third_party/limine/limine.sys \
 				           /boot/limine.sys
-	third_party/limine/limine-deploy $(IMAGE)
+	$(BUILD_DIR)/third_party/limine/limine-deploy $(IMAGE)
 
 .PHONY: run run-kvm
-override QEMU_BASE_FLAGS += -smp `nproc`  -m 1G -M q35 -drive file=$(IMAGE),if=none,id=nvm -device nvme,serial=deadbeef,drive=nvm -debugcon stdio
+override QEMU_BASE_FLAGS += -smp `nproc` -m 1G -M q35 -drive file=$(IMAGE),if=none,id=nvm -device nvme,serial=deadbeef,drive=nvm -debugcon stdio
 run: $(IMAGE)
 	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu max
 run-kvm: $(IMAGE)

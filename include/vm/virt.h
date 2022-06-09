@@ -2,8 +2,7 @@
 #define VM_VIRT_H
 
 #include <lib/stivale2.h>
-#include <stdbool.h>
-#include <stddef.h>
+#include <lib/vec.h>
 #include <vm/seg.h>
 
 // Flags passed to vm_virt_map()...
@@ -50,6 +49,7 @@ vm_space_t* vm_space_create();
 
 // Misc virt functions...
 void vm_invl(vm_space_t* spc, uintptr_t addr, size_t len);
+bool vm_fault(uintptr_t location, enum vm_fault flags);
 
 // The kernel's space, which all others inherit from
 extern vm_space_t kernel_space;

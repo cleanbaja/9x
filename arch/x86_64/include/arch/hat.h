@@ -26,8 +26,15 @@ uint64_t* hat_translate_addr(uintptr_t root,
                              bool create,
                              int depth);
 
-// Handles all pagefaults
+// Passes pagefaults to the VM, after some inspection
 void handle_pf(cpu_ctx_t* context);
+
+// Finds the arch-specific location for various memory regions
+enum base_type {
+  HAT_BASE_KEXT,
+  HAT_BASE_USEG
+};
+uintptr_t hat_get_base(enum base_type bt);
 
 // Does some information gathering, and bootstraps the PAT MSR...
 EXPORT_STAGE(hat_init_stage);

@@ -14,10 +14,7 @@ static uintptr_t ext_bump_base = 0;
 
 static uintptr_t find_base_for_mod(size_t req_len) {
   if (ext_bump_base == 0) {
-    if (cur_config->levels == 5)
-      ext_bump_base = 0xFFD4000000000000;
-    else
-      ext_bump_base = 0xFFFFEA0000000000;
+    ext_bump_base = hat_get_base(HAT_BASE_KEXT);
   }
 
   ext_bump_base += req_len;
@@ -232,8 +229,11 @@ void kern_load_extensions() {
   // By default, kernel extensions are located in /initrd
   struct vfs_resolved_node res = vfs_resolve(NULL, "/initrd", 0);
   kfree(res.raw_string);
-  if (res.target == NULL || res.target->children.length == 0)
-    return;  // Initrd proably wasn't found!
+  if (res.target == NULL || res.target->children.length == 0) {
+    res = vfs_resolve(NULL, "/lib/extensions", 0);
+    if (res.target == NULL || res.target->children.length == 0)
+      return; // No idea where the extensions are, so bail out
+  }
 
   struct vfs_node* kext_parent = res.target;
   for (int i = 0; i < kext_parent->children.length; i++) {

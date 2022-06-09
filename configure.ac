@@ -1,4 +1,4 @@
-AC_INIT(9x, 0.0.9, https://github.com/cleanbaja/CrecentOS/issues, ninex)
+AC_INIT(9x, 0.1.0, https://github.com/cleanbaja/CrecentOS/issues, ninex)
 AC_COPYRIGHT([Copyright (c) 2022 cleanbaja, All Rights Reserved.])
 
 # Search for the programs we need...
@@ -7,6 +7,12 @@ AC_CHECK_PROG([NASM_LOCATED], [nasm], [yes])
 if ! test "x$NASM_LOCATED" = "xyes"; then
     AC_MSG_ERROR([NASM (Netwide Assembler) is not present on this system, please install before running!])
 fi
+
+# Find the build dir, the current date, and export them all
+BUILDDIR="$(pwd -P)"
+CUR_DATE="$(date +'%b %d, %Y')"
+AC_SUBST(BUILDDIR, [$BUILDDIR])
+AC_SUBST(CONFIG_DATE, [$CUR_DATE])
 
 # Kernel features that can be enabled/disabled
 #----------------------------------------------#

@@ -5,12 +5,20 @@
 *.bin
 *.cache
 ninex.hdd
+
+# autoconf things
 GNUmakefile
 configure
 config.h
 config.log
 config.status
-install_sh
+install-sh
+
+# build directories
+debug
+release
+out
+build
 
 # third-party software/libraries
 third_party

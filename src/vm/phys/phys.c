@@ -12,8 +12,8 @@ find_zone(uintptr_t addr)
   spinlock_acquire(&pmm_lock);
 
   // Look for the zone that encompasses this address
-  for (struct vm_zone* zn = head_zone; zn->next != NULL; zn = zn->next) {
-    if ((zn->base < addr) && (addr < zn->limit)) {
+  for (struct vm_zone* zn = head_zone; zn != NULL; zn = zn->next) {
+    if (zn->base <= addr && addr <= zn->limit) {
       spinlock_release(&pmm_lock);
       return zn;
     }
@@ -55,9 +55,12 @@ vm_phys_alloc(size_t pages, int flags)
 void
 vm_phys_free(void* ptr, size_t count)
 {
+  if (ptr == NULL)
+    return;
+
   struct vm_zone* zn = find_zone((uintptr_t)ptr);
   if (zn == NULL) {
-    klog("vm/phys: address 0x%lx dosen't fit in any zone!", zn);
+    klog("vm/phys: address 0x%lx dosen't fit in any zone!", ptr);
     return;
   } else {
     vm_zone_free(zn, ptr, count);

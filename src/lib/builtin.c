@@ -1,5 +1,4 @@
 #include <lib/builtin.h>
-#include <limits.h>
 #include <vm/vm.h>
 
 void

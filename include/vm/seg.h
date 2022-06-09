@@ -1,7 +1,7 @@
 #ifndef VM_SEG_H
 #define VM_SEG_H
 
-#include <lib/vec.h>
+#include <lib/htab.h>
 #include <stdbool.h>
 #include <stddef.h>
 
@@ -25,11 +25,14 @@ enum vm_fault {
   VM_FAULT_PROTECTION = (1 << 4)
 };
 
-struct tracked_page {
-  uintptr_t virt, phys;
-  int refcount;
-
-  enum { TRACKED_PAGE_NONE, TRACKED_PAGE_PRESENT, TRACKED_PAGE_UNMAPPED } state;
+struct vm_page {
+  void* metadata;
+  uint32_t refcount;
+  struct {
+    uint32_t present  : 1;
+    uint32_t unmapped : 1;
+    uint32_t unused   : 30;
+  }; 
 };
 
 struct vm_seg {
@@ -38,8 +41,14 @@ struct vm_seg {
   bool shared;
   size_t len;
 
-  bool (*deal_with_pf)(struct vm_seg*, size_t, enum vm_fault);
-  vec_t(struct tracked_page*) pagelist;
+  struct {
+    bool (*fault)(struct vm_seg*, size_t, enum vm_fault);
+    struct vm_seg* (*clone)(struct vm_seg*, void*);
+    void (*remove)(struct vm_seg*, bool);
+  } ops;
+
+  struct hash_table pagelist;
+  void* context; // Parent seg for anon, backing for file
 };
 
 /* This function has a diffrent amount of parameters for the segment type
@@ -50,9 +59,6 @@ struct vm_seg {
  * hint)
  */
 struct vm_seg* vm_create_seg(int mode, ...);
-
 struct vm_seg* vm_find_seg(uintptr_t addr, size_t* offset);
-void vm_unmap_seg(struct vm_seg* seg, uintptr_t base, size_t len);
-void vm_destroy_seg(struct vm_seg* seg);
 
 #endif  // VM_SEG_H
