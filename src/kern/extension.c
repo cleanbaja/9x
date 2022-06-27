@@ -8,7 +8,6 @@
 #include <vm/virt.h>
 #include <vm/vm.h>
 
-CREATE_STAGE_NODEP(kext_stage, kern_load_extensions);
 static vec_t(struct kernel_extension*) extensions;
 static uintptr_t ext_bump_base = 0;
 
@@ -60,7 +59,7 @@ static struct kernel_extension* load_extension(struct backing* file) {
                    ALIGN_UP(misalign + phdr.p_memsz, 0x1000), pf);
 
       // Fill the segment.
-      memset((void*)(base + phdr.p_vaddr), 0, phdr.p_memsz);
+      // memset((void*)(base + phdr.p_vaddr), 0, phdr.p_memsz);
       file->read(file, (void*)(base + phdr.p_vaddr), phdr.p_offset,
                  phdr.p_filesz);
 
@@ -99,7 +98,7 @@ static struct kernel_extension* load_extension(struct backing* file) {
         str_tab = (char*)(base + ent->d_ptr);
         break;
       case DT_SYMTAB:
-        sym_tab = (const struct Elf64_Sym*)(base + ent->d_ptr);
+        sym_tab = (struct Elf64_Sym*)(base + ent->d_ptr);
         break;
       case DT_HASH:
         hash_tab = (const Elf64_Word*)(base + ent->d_ptr);
@@ -161,11 +160,11 @@ static struct kernel_extension* load_extension(struct backing* file) {
     file->read(file, &relocation, rela_offset + offset, sizeof(struct Elf64_Rela));
 
     struct Elf64_Sym* symbol = sym_tab + ELF64_R_SYM(relocation.r_info);
-    uint64_t* target = (uint64_t*)(base + relocation.r_offset); 
+    uint64_t* target = (uint64_t*)(base + relocation.r_offset);
     switch (ELF64_R_TYPE(relocation.r_info)) {
       case R_X86_64_RELATIVE: {
-        *target = base + relocation.r_addend;	
-        break;			      
+        *target = base + relocation.r_addend;
+        break;
       }
       case R_X86_64_64: {
         *target = (base + symbol->st_value) + relocation.r_addend;
@@ -178,7 +177,7 @@ static struct kernel_extension* load_extension(struct backing* file) {
       default:
 	klog("kext: unknown relocation type 0x%x!", ELF64_R_TYPE(relocation.r_info));
         break;
-    } 
+    }
   }
 
   // Perform Patch-Ins of functions.
@@ -189,12 +188,12 @@ static struct kernel_extension* load_extension(struct backing* file) {
       klog("kext: non-JUMP_SLOT relocation in '.rela.plt'");
       return NULL;
     }
- 
+
     uint64_t* rp = (uint64_t*)(base + reloc->r_offset);
     struct Elf64_Sym* symbol = sym_tab + ELF64_R_SYM(reloc->r_info);
     char* sym_name = str_tab + symbol->st_name;
     *rp = strace_get_symbol(sym_name);
-   
+
     if (*rp == 0x0) {
       *rp = (base + symbol->st_value);
     }
@@ -228,11 +227,12 @@ static struct kernel_extension* load_extension(struct backing* file) {
 void kern_load_extensions() {
   // By default, kernel extensions are located in /initrd
   struct vfs_resolved_node res = vfs_resolve(NULL, "/initrd", 0);
-  kfree(res.raw_string);
   if (res.target == NULL || res.target->children.length == 0) {
     res = vfs_resolve(NULL, "/lib/extensions", 0);
-    if (res.target == NULL || res.target->children.length == 0)
+    if (res.target == NULL || res.target->children.length == 0) {
+      kfree(res.raw_string);
       return; // No idea where the extensions are, so bail out
+    }
   }
 
   struct vfs_node* kext_parent = res.target;
@@ -242,12 +242,15 @@ void kern_load_extensions() {
     if (ext == NULL) {
       klog("kext: failed to load %s!", kext_parent->children.data[i]->name);
     } else {
-      if (ext->init())
+       if (ext->init())
         vec_push(&extensions, ext);
 
       // TODO: Unload a extension when it fails to load!
       klog("kext: loaded %s v%s", ext->name, ext->version);
     }
   }
+
+  kfree(res.raw_string);
+  return;
 }
 

@@ -1,8 +1,9 @@
-#include <arch/irqchip.h>
 #include <arch/smp.h>
+#include <arch/timer.h>
+#include <lib/lock.h>
 #include <lib/builtin.h>
 #include <lib/kcon.h>
-#include <lib/lock.h>
+#include <ninex/irq.h>
 #include <vm/vm.h>
 
 #include "config.h"
@@ -25,17 +26,14 @@ void stivale2_console_setup(const char* initial_buffer) {
 
   if (term_str_tag == NULL) {
     // What now, PANIC???
-    for (;;) { __asm__ volatile ("cli; hlt"); }
+    for (;;) { asm_halt(false); }
   }
 
   void *term_write_ptr = (void *)term_str_tag->term_write;
   stivale2_term_write = term_write_ptr;
 
-  // Load Limine's CR3 and print the initial buffer if needed
+  // Save Limine's CR3 for later...
   limine_pagemap = asm_read_cr3();
-  if (initial_buffer != NULL) {
-    stivale2_term_write(initial_buffer, strlen(initial_buffer));
-  }
 }
 
 void stivale2_console_write(const char* message) {
@@ -94,16 +92,23 @@ static struct kcon_sink bxdbg_term_sink = {
 
 static uint16_t num_sinks;
 static struct kcon_sink* sinks[MAX_KCON_SINKS];
-CREATE_STAGE_NODEP(kcon_stage, kcon_init);
-static CREATE_SPINLOCK(kcon_lock);
+static lock_t kcon_lock;
 
 void kcon_register_sink(struct kcon_sink* sink) {
-  spinlock_acquire(&kcon_lock);
+  spinlock(&kcon_lock);
   if (num_sinks >= MAX_KCON_SINKS)
     return;
 
   sinks[num_sinks++] = sink;
-  spinlock_release(&kcon_lock);
+  spinrelease(&kcon_lock);
+}
+
+static void halt_ipi(cpu_ctx_t* context) {
+  (void)context;
+
+  for (;;) {
+    asm_halt(false);
+  }
 }
 
 void kcon_init() {
@@ -123,9 +128,15 @@ void kcon_init() {
   }
 
   // Print the 9x banner
-  struct stivale2_struct* info = stivale2_find_tag(1);
+  struct stivale2_struct* info = stivale2_get_struct();
   klog("9x (%s) (%s) - A project by cleanbaja", NINEX_VERSION, NINEX_ARCH);
   klog("Bootloader: %s [%s]", info->bootloader_brand, info->bootloader_version);
+
+  // Set the HALT IPI handler...
+  struct irq_resource* halt_irq = get_irq_handler(IPI_HALT);
+  halt_irq->procfs_name  = "cpu_halt";
+  halt_irq->HandlerFunc  = halt_ipi;
+  halt_irq->eoi_strategy = EOI_MODE_EDGE;
 }
 
 void panic(void* frame, char* fmt, ...) {
@@ -133,16 +144,16 @@ void panic(void* frame, char* fmt, ...) {
   static int in_panic = 0;
 
   // See if we're already in a panic
-  if (in_panic == 1) {                                                       
+  if (in_panic == 1) {
     for (;;) {
-      asm_halt();
-    } 
+      asm_halt(false);
+    }
   } else {
-    in_panic = 1; 
+    in_panic = 1;
   }
 
   // Shootdown all other CPUs
-  // ic_send_ipi(IPI_HALT, 0, IPI_OTHERS);
+  ic_send_ipi(IPI_HALT, 0, IPI_OTHERS);
 
   // Log all the information possible
   klog_unlocked("\n--- KERNEL PANIC on CPU #%d ---\n", cpu_num);
@@ -153,11 +164,11 @@ void panic(void* frame, char* fmt, ...) {
       char realstr[512];
       vsnprintf(realstr, 512, fmt, va);
       va_end(va);
-      
+
       klog_unlocked(realstr);
   }
-  
-  // Dump CPU contexts and stacktraces 
+
+  // Dump CPU contexts and stacktraces
   if (stack_frame) {
     dump_context(stack_frame);
     strace_unwind(stack_frame->rbp);
@@ -165,9 +176,10 @@ void panic(void* frame, char* fmt, ...) {
     strace_unwind(0);
   }
 
-  // Halt for now...
+  // Stop the scheduler on this CPU, and wait for ACPI interrupts
+  timer_stop();
   for (;;) {
-    asm_halt();
+    asm_halt(true);
   }
 }
 
@@ -203,11 +215,11 @@ static void __buf_write(char* str) {
 }
 
 void klog(char* fmt, ...) {
-  if (ATOMIC_READ(&console_locked) == true)
+  if (ATOMIC_READ(&console_locked))
     return;
 
   // Grab the spinlock and setup the va_args
-  spinlock_acquire(&kcon_lock);
+  spinlock(&kcon_lock);
   va_list va;
   va_start(va, fmt);
 
@@ -226,10 +238,8 @@ void klog(char* fmt, ...) {
   // Then write to the internal buffer
   __buf_write(big_buf);
 
-  // Clear both buffers and return
-  memset64(format_buf, 0, 512);
-  memset64(big_buf, 0, 512);
-  spinlock_release(&kcon_lock);
+  // Return
+  spinrelease(&kcon_lock);
 }
 
 void klog_unlocked(char* fmt, ...) {

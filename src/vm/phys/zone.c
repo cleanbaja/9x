@@ -70,7 +70,7 @@ vm_create_zone(uintptr_t base, uint64_t len)
 void*
 vm_zone_alloc(struct vm_zone* zn, size_t pages, size_t align)
 {
-  spinlock_acquire(&zn->lck);
+  spinlock(&zn->lck);
 
   // Align the previous allocation to our align
   uintptr_t real_base = DIV_ROUNDUP(zn->base + (zn->last_index * VM_PAGE_SIZE),
@@ -82,7 +82,7 @@ vm_zone_alloc(struct vm_zone* zn, size_t pages, size_t align)
        i += align) {
     // Check to see if we have exceeded the boundaries
     if (zn->bitmap_len < (i + pages)) {
-      spinlock_release(&zn->lck);
+      spinrelease(&zn->lck);
       return NULL;
     }
 
@@ -99,7 +99,7 @@ vm_zone_alloc(struct vm_zone* zn, size_t pages, size_t align)
           BIT_SET(zn->bitmap, i + z);
         }
 
-        spinlock_release(&zn->lck);
+        spinrelease(&zn->lck);
         zn->last_index = (real_base - zn->base) / VM_PAGE_SIZE;
         zn->last_index += pages;
         return (void*)real_base;
@@ -108,18 +108,18 @@ vm_zone_alloc(struct vm_zone* zn, size_t pages, size_t align)
   }
 
   // TODO: Set last_index to zero and try again.
-  spinlock_release(&zn->lck);
+  spinrelease(&zn->lck);
   return NULL;
 }
 
 void
 vm_zone_free(struct vm_zone* zn, void* ptr, size_t pages)
 {
-  spinlock_acquire(&zn->lck);
+  spinlock(&zn->lck);
 
   uintptr_t idx = (uintptr_t)ptr / VM_PAGE_SIZE;
   for (size_t i = idx; i < idx + pages; i++)
     BIT_CLEAR(zn->bitmap, i);
 
-  spinlock_release(&zn->lck);
+  spinrelease(&zn->lck);
 }

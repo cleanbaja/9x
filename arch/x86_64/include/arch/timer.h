@@ -3,7 +3,6 @@
 
 #include <acpispec/tables.h>
 #include <arch/irqchip.h>
-#include <ninex/init.h>
 
 typedef struct acpi_hpet_t {
     acpi_header_t header;
@@ -29,7 +28,7 @@ typedef struct acpi_hpet_t {
  */
 #define TSC_CALI_CYCLES 5
 
-EXPORT_STAGE(timer_cali);
+void timer_cali();
 void timer_usleep(uint64_t us);
 void timer_msleep(uint64_t ms);
 

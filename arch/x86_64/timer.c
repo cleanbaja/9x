@@ -10,10 +10,9 @@
 #define HPET_REG_CONF 0x10
 #define HPET_REG_COUNTER 0x0F0
 
-CREATE_STAGE_SMP(timer_cali, timer_calibrate_tsc, {apic_timer_cali});
 static void* hpet_base = NULL;
 static uint64_t hpet_period = 0;
-static CREATE_SPINLOCK(timer_lock);
+static lock_t timer_lock;
 
 static inline uint64_t hpet_read(uint16_t reg) {
   return *((volatile uint64_t*)(hpet_base + reg));
@@ -79,15 +78,17 @@ static bool cpuid_calibrate_tsc() {
   return (this_cpu->tsc_freq != 0);
 }
 
-static void timer_calibrate_tsc() {
-  spinlock_acquire(&timer_lock);
+void timer_cali() {
+  // Before anything, try to calibrate the APIC Timer, then grab the spinlock
+  ic_timer_cali();
+  spinlock(&timer_lock);
 
   // Make sure that we can proceed with the callibration
   if (!CPU_CHECK(CPU_FEAT_INVARIANT)) {
     if (is_bsp())
       klog("tsc: Invariant TSC is not supported, falling back to HPET!");
 
-    spinlock_release(&timer_lock);
+    spinrelease(&timer_lock);
     return;
   }
 
@@ -129,7 +130,7 @@ check_cpu_speed:
         d4);
   }
 
-  spinlock_release(&timer_lock);
+  spinrelease(&timer_lock);
 }
 
 void timer_usleep(uint64_t us) {

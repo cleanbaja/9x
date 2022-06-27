@@ -15,8 +15,6 @@
 static bool xsdt_found;
 static struct acpi_rsdt_t* rsdt;
 static struct acpi_xsdt_t* xsdt;
-CREATE_STAGE_NODEP(acpi_stage, acpi_init);
-CREATE_STAGE_NODEP(acpi_late_stage, acpi_late_init);
 
 void* acpi_query(const char* signature, int index) {
   acpi_header_t* ptr;
@@ -111,7 +109,7 @@ static void setup_sci(void) {
   __asm__ volatile("sti");
 }
 
-static void acpi_init() {
+void acpi_enable() {
   struct stivale2_struct_tag_rsdp* rk =
       stivale2_find_tag(STIVALE2_STRUCT_TAG_RSDP_ID);
   acpi_xsdp_t* xsdp = (acpi_xsdp_t*)rk->rsdp;
@@ -143,7 +141,7 @@ static void acpi_init() {
   }
 }
 
-static void acpi_late_init() {
+void acpi_enter_ospm() {
   struct stivale2_struct_tag_rsdp* rk =
       stivale2_find_tag(STIVALE2_STRUCT_TAG_RSDP_ID);
   acpi_xsdp_t* xsdp = (acpi_xsdp_t*)rk->rsdp;

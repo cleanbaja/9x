@@ -13,7 +13,7 @@ struct backing {
   void    (*close)(struct backing* bck);
 
   struct  stat st;
-  struct  spinlock lock;
+  lock_t  lock;
   int64_t refcount;
 };
 

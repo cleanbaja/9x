@@ -2,7 +2,6 @@
 #define VM_H
 
 #include <lib/stivale2.h>
-#include <ninex/init.h>
 #include <stddef.h>
 
 // Repersents all tuneable, arch-specific constants
@@ -21,8 +20,7 @@ extern struct vm_config* cur_config;
 extern uintptr_t kernel_vma;
 
 // Bootstraps the entire VM
-EXPORT_STAGE(vm_stage);
-EXPORT_STAGE(vm_phys_stage);
+void vm_setup();
 
 // liballoc (aka kmalloc) defs
 #define PREFIX(func) k##func

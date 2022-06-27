@@ -1,6 +1,7 @@
 #include <lib/cmdline.h>
 #include <lib/builtin.h>
 #include <lib/kcon.h>
+#include <stdbool.h> 
 
 #define CMDLINE_BUF_SZ 4096
 char __kernel_cmdline[CMDLINE_BUF_SZ];

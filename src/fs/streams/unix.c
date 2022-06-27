@@ -49,9 +49,9 @@ null_resize(struct backing* bck, off_t new_size)
 }
 
 static void null_close(struct backing* bck) {
-  spinlock_acquire(&bck->lock);
+  spinlock(&bck->lock);
   bck->refcount--;
-  spinlock_release(&bck->lock);
+  spinrelease(&bck->lock);
 }
 
 void setup_unix_streams()

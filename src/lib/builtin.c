@@ -75,19 +75,6 @@ strlen(const char* str)
   return i;
 }
 
-/*
-int
-strcmp(const char* s1, const char* s2)
-{
-    while(*s1 && (*s1 == *s2))
-    {
-        s1++;
-        s2++;
-    }
-    return *(const unsigned char*)s1 - *(const unsigned char*)s2;
-}
-*/
-
 int strcmp(const char* s1, const char* s2) {
   while (1) {
     int res = ((*s1 == 0) || (*s1 != *s2));
@@ -99,6 +86,12 @@ int strcmp(const char* s1, const char* s2) {
   }
   return (*s1 - *s2);
 }
+
+char* strcpy(char *dst, const char *src) {
+	while ((*dst++ = *src++));
+	return dst;
+}
+
 
 char* strdup(const char* s) {
   char* str = kmalloc(strlen(s));

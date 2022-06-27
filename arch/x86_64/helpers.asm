@@ -68,14 +68,13 @@ asm_load_gdt:
   mov ss, ax
  
   pop r10
-  pushf
-  pop r11
 
   push rdx
   push rsp
-  push r11  
+  pushf
   push qword rsi
   push r10
+
   iretq
 
 extern sys_dispatch_isr
@@ -138,6 +137,15 @@ __intr_255:
   ret
 
 
+global sched_spinup
+sched_spinup:
+  mov rsp, rdi
+
+  asm_pop_regs
+  add rsp, 16  ; Pop the CPU pushed error code and int-no
+
+  iretq
+
 section .data
 
 global asm_dispatch_table
@@ -149,4 +157,4 @@ INTR_NAME i
 %assign i i+1
 
 %endrep
-  
+ 

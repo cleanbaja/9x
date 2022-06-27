@@ -8,17 +8,17 @@
 #include <vm/virt.h>
 #include <vm/vm.h>
 
-// Set defaults to match 4LV paging
-static CREATE_SPINLOCK(hat_lock);
-CREATE_STAGE_SMP_NODEP(hat_init_stage, hat_setup_func)
-
 struct vm_config possible_x86_modes[] = {
     /* There are two possible modes for x86, that are the
      * same, except for 4/5 level translation */
-    /* Higher-Half Base - Levels - ASID count - Page size - Huge Page size*/
+    /* Higher-Half Base - Levels - ASID count - Page size - Huge Page size */
     {0xFFFF800000000000, 4, 4096, 4096, 4096 * 512},
     {0xFF00000000000000, 5, 4096, 4096, 4096 * 512}};
 struct vm_config* cur_config = NULL;
+static bool log_pagefault = false;
+static lock_t hat_lock;
+
+// Set defaults to match 4LV paging
 uintptr_t kernel_vma = 0xFFFF800000000000;
 
 static uint64_t* next_level(uint64_t* prev_level, uint64_t index, bool create) {
@@ -142,7 +142,7 @@ uint64_t hat_create_pte(vm_flags_t flags, uintptr_t phys, bool is_block) {
 }
 
 void hat_invl(uintptr_t root, uintptr_t virt, uint32_t asid, int mode) {
-  spinlock_acquire(&hat_lock);
+  spinlock(&hat_lock);
 
   if (CPU_CHECK(CPU_FEAT_PCID)) {
     // Use the INVPCID instruction, if supported!
@@ -198,7 +198,7 @@ void hat_invl(uintptr_t root, uintptr_t virt, uint32_t asid, int mode) {
     }
   }
 
-  spinlock_release(&hat_lock);
+  spinrelease(&hat_lock);
 }
 
 void hat_scrub_pde(uintptr_t root, int level) {
@@ -239,45 +239,54 @@ void handle_pf(cpu_ctx_t* context) {
 
   // For more information on the bits of the error code,
   // see Intel x86_64 SDM Volume 3a Chapter 4.7
-  klog("hat: Page Fault at 0x%lx! (%s) (%s)", address,
-       (ec & (1 << 1)) ? "write" : "read", (ec & (1 << 2)) ? "user" : "kmode",
-       (ec & (1 << 4)) ? "(ifetch)" : "");
+  if (log_pagefault) {
+    klog("hat: Page Fault at 0x%lx! (%s) (%s) %s", address,
+         (ec & (1 << 1)) ? "write" : "read", (ec & (1 << 2)) ? "user" : "kmode",
+         (ec & (1 << 4)) ? "(ifetch)" : "");
 
-  // Provide some more information...
+    if (ec & (1 << 0))
+      klog("  -> Cause: Page Protection Violation!");
+    else if (ec & (1 << 3))
+      klog("  -> Cause: Reserved Bit set!");
+    else if (ec & (1 << 5))
+      klog("  -> Cause: Protection Key Violation");
+    else if (ec & (1 << 15))
+      klog("  -> Cause: Intel(r) SGX Violation!");
+    else
+      klog("  -> Cause: Page Not Present!");
+  }
+
+  // Fill in the vm_fault flags...
   enum vm_fault vf = VM_FAULT_NONE;
-  if (ec & (1 << 3))
-    klog("  -> Cause: Reserved Bit set!");
-  else if (ec & (1 << 5)) {
-    klog("  -> Cause: Protection Key Violation!");
+  if (ec & (1 << 0))
     vf |= VM_FAULT_PROTECTION;
-  } else if (ec & (1 << 15))
-    klog("  -> Cause: Intel(r) SGX Violation!");
-  else if (ec & (1 << 0)) {
-    klog("  -> Cause: Page Protection Violation!");
-    vf |= VM_FAULT_PROTECTION;
-  } else
-    klog("  -> Cause: Page Not Present!");
-
-  // Fill in the rest of the vm_fault flags...
   if (ec & (1 << 4))
     vf |= VM_FAULT_EXEC;
   if (ec & (1 << 1))
     vf |= VM_FAULT_WRITE;
 
-  // Call the kernel page fault handler, and 
+  // Switch GS, so we can access kernel structures
+  if (context->cs & 3)
+    asm_swapgs();
+
+  // Call the kernel page fault handler, and
   // make sure the page fault was fixed
   if (!vm_fault(address, vf))
     PANIC(context, NULL);  // PANIC for now, since we can't send signals/kill threads
+
+  // Now that the page fault is successfully handled, switch GS back
+  if (context->cs & 3)
+    asm_swapgs();
 }
 
 // Bootstraps the HAT...
-static void hat_setup_func() {
+void hat_init() {
   uint32_t a, b, c, d;
   cpuid_subleaf(0x7, 0x0, &a, &b, &c, &d);
   if (cur_config != NULL)
     goto smp_entry;
 
-  // Use 5lv paging, unless its unwanted/unsupported
+  // Use 5lv paging, unless its unsupported
   if (c & (1 << 16)) {
     cur_config = &possible_x86_modes[1];
     kernel_vma = cur_config->higher_half_window;

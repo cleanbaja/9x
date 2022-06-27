@@ -48,10 +48,10 @@ struct Elf64_Sym {
 	Elf64_Xword st_size;
 };
 
-extern inline unsigned char ELF64_ST_BIND(unsigned char info) {
+static inline unsigned char ELF64_ST_BIND(unsigned char info) {
 	return info >> 4;
 }
-extern inline unsigned char ELF64_ST_TYPE(unsigned char info) {
+static inline unsigned char ELF64_ST_TYPE(unsigned char info) {
 	return info & 0x0F;
 }
 
@@ -83,10 +83,10 @@ struct Elf64_Rela {
 	Elf64_Sxword r_addend;
 };
 
-extern inline Elf64_Xword ELF64_R_SYM(Elf64_Xword info) {
+static inline Elf64_Xword ELF64_R_SYM(Elf64_Xword info) {
 	return info >> 32;
 }
-extern inline Elf64_Xword ELF64_R_TYPE(Elf64_Xword info) {
+static inline Elf64_Xword ELF64_R_TYPE(Elf64_Xword info) {
 	return info & 0xFFFFFFFF;
 }
 
@@ -187,5 +187,21 @@ typedef struct {
     Elf64_Xword sh_addralign;
     Elf64_Xword sh_entsize;
 } Elf64_Shdr;
+
+#define AT_NULL   0
+#define AT_ENTRY  9
+#define AT_PHDR   3
+#define AT_PHENT  4
+#define AT_PHNUM  5
+#define AT_CPUCAP 0x8086
+
+typedef struct
+{
+  uintptr_t at_entry;
+  uintptr_t at_phdr;
+  uintptr_t at_phent;
+  uintptr_t at_phnum;
+  uintptr_t at_cpucap;
+} auxval_t;
 
 #endif // LIB_ELF_H

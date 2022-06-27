@@ -1,8 +1,7 @@
 /* kern_entry - src/generic/kern.c */
 ENTRY(kern_entry)
 
-PHDRS
-{
+PHDRS {
     null    PT_NULL    FLAGS(0) ;                   /* Null segment */
     text    PT_LOAD    FLAGS(5) ;                   /* Execute + Read */
     rodata  PT_LOAD    FLAGS(4) ;                   /* Read only */
@@ -34,12 +33,32 @@ SECTIONS {
         *(.data .data.*)
     } :data
 
+	/* PIE related memes */
     .dynamic : {
         *(.dynamic)
     } :data :dynamic
 
+    .rela : {
+        *(.rela .rela.*)
+    } :data
+
+    .got : {
+        *(.got .got.*)
+    } :data
+
     .bss : {
         *(.bss .bss.*)
         *(COMMON)
+
+        /* Reserve a 16 KB stack for kernel startup */
+        . = ALIGN(16);
+        . += CONSTANT(MAXPAGESIZE) * 16;
+        __kern_stack_top = .;
     } :data
+
+    /* Discard unused sections (fixes issues with certain linkers) */
+    /DISCARD/ : {
+        *.o(*)
+        *.a:*(*)
+    }
 }

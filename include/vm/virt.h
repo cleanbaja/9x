@@ -50,6 +50,7 @@ vm_space_t* vm_space_create();
 // Misc virt functions...
 void vm_invl(vm_space_t* spc, uintptr_t addr, size_t len);
 bool vm_fault(uintptr_t location, enum vm_fault flags);
+void vm_virt_init();
 
 // The kernel's space, which all others inherit from
 extern vm_space_t kernel_space;

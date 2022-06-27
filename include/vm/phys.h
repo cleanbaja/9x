@@ -16,7 +16,7 @@
 struct vm_zone
 {
   struct vm_zone *next;              // VM zones are stored as a singly-linked list
-  struct spinlock lck;               // Spinlock for protecting bitmap
+  lock_t lck;                        // Spinlock for protecting bitmap
 
   uintptr_t base, limit, bitmap_len; // Length of bitmap, along with position of the zone in memory
   uintptr_t last_index;              // Last allocated index

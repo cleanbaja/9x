@@ -1,19 +1,18 @@
 #ifndef LIB_KCON_H
 #define LIB_KCON_H
 
-#include <ninex/init.h>
-
 struct kcon_sink {
   void (*setup)(const char* initial_buffer);
   void (*write)(const char* message);
   void (*flush)();
 };
 
-// Sets up the kernel buffers and the default sinks
-EXPORT_STAGE(kcon_stage);
-
+// KCON management functions...
+void kcon_init();
 void kcon_disable();
 void kcon_register_sink(struct kcon_sink* sink);
+
+// Logging functions...
 void klog(char* fmt, ...);
 void klog_unlocked(char* fmt, ...);
 

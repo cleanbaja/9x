@@ -20,7 +20,7 @@ static ssize_t tmpfs_read(struct backing* bck,
                           off_t offset,
                           size_t count) {
   struct tmpfs_backing* b = (struct tmpfs_backing*)bck;
-  spinlock_acquire(&b->lock);
+  spinlock(&b->lock);
 
   // Truncate the read if the size is too big!
   if (offset + count > b->st.st_size)
@@ -28,7 +28,7 @@ static ssize_t tmpfs_read(struct backing* bck,
 
   // Read the file into the buffer
   memcpy(buf, b->data + offset, count);
-  spinlock_release(&b->lock);
+  spinrelease(&b->lock);
   return count;
 }
 
@@ -37,7 +37,7 @@ static ssize_t tmpfs_write(struct backing* bck,
                            off_t offset,
                            size_t count) {
   struct tmpfs_backing* b = (struct tmpfs_backing*)bck;
-  spinlock_acquire(&b->lock);
+  spinlock(&b->lock);
 
   // Grow the file if needed!
   if (offset + count > b->capacity) {
@@ -50,14 +50,14 @@ static ssize_t tmpfs_write(struct backing* bck,
   // Update stuff...
   memcpy(b->data + offset, buf, count);
   b->st.st_size += count;
-  spinlock_release(&b->lock);
+  spinrelease(&b->lock);
 
   return count;
 }
 
 static ssize_t tmpfs_resize(struct backing* bck, off_t new_size) {
   struct tmpfs_backing* b = (struct tmpfs_backing*)bck;
-  spinlock_acquire(&b->lock);
+  spinlock(&b->lock);
 
   // Prevent downsizing...
   if (new_size <= b->capacity)
@@ -70,14 +70,14 @@ static ssize_t tmpfs_resize(struct backing* bck, off_t new_size) {
 
   // Update data structures
   b->st.st_size = new_size;
-  spinlock_release(&b->lock);
+  spinrelease(&b->lock);
   return new_size;
 }
 
 static void tmpfs_close(struct backing* bck) {
-  spinlock_acquire(&bck->lock);
+  spinlock(&bck->lock);
   bck->refcount--;
-  spinlock_release(&bck->lock);
+  spinrelease(&bck->lock);
 }
 
 static struct backing* tmpfs_open(struct vfs_node* node,

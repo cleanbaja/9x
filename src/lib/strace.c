@@ -1,6 +1,7 @@
 #include <lib/kcon.h>
 #include <lib/stivale2.h>
 #include <lib/builtin.h>
+#include <stdbool.h>
 
 #define BACKTRACE_MAX 20
 

@@ -4,7 +4,6 @@
 #include <acpispec/tables.h>
 #include <lib/stivale2.h>
 #include <lib/vec.h>
-#include <ninex/init.h>
 
 typedef struct acpi_madt_t {
     acpi_header_t header;
@@ -47,11 +46,9 @@ typedef struct madt_nmi_t {
     uint8_t    lint;
 } __attribute__((packed)) madt_nmi_t;
 
-EXPORT_STAGE(acpi_stage);
-EXPORT_STAGE(acpi_late_stage);
-
-void*
-acpi_query(const char* signature, int index);
+void acpi_enable();
+void acpi_enter_ospm();
+void* acpi_query(const char* signature, int index);
 
 #endif // ACPI_H
 

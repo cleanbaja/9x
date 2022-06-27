@@ -48,7 +48,7 @@ static uintptr_t alloc_mmap_base(vm_space_t* spc, size_t len) {
 //////////////////////////////////
 //      Anonymous Segments
 //////////////////////////////////
-bool anon_fault(struct vm_seg* segment, size_t offset, enum vm_fault flags) {
+static bool anon_fault(struct vm_seg* segment, size_t offset, enum vm_fault flags) {
   if (!verify_prot(flags, segment->prot))
     return false;
 
@@ -73,7 +73,7 @@ bool anon_fault(struct vm_seg* segment, size_t offset, enum vm_fault flags) {
     struct vm_seg* parent = segment->context;
     if (!parent || !(flags & VM_FAULT_WRITE))
       return false;
-    
+
     // Don't do the actual copy unless the page has been touched
     struct vm_page* ppg = htab_find(&parent->pagelist, &offset, sizeof(size_t));
     if (ppg && ppg->refcount >= 1 && ppg->present) {
@@ -109,12 +109,10 @@ bool anon_fault(struct vm_seg* segment, size_t offset, enum vm_fault flags) {
   pg->refcount = 1;
 
 finished:
-  // TODO: Should we really be invalidating pages?
-  vm_invl(this_cpu->cur_spc, segment->base + offset, cur_config->page_size);
   return true;
 }
 
-struct vm_seg* anon_clone(struct vm_seg* segment, void* space) {
+static struct vm_seg* anon_clone(struct vm_seg* segment, void* space) {
   // Copy the segment perfectly, except for the pagelist.
   struct vm_seg* new_segment = kmalloc(sizeof(struct vm_seg));
   *new_segment = *segment;
@@ -143,7 +141,7 @@ struct vm_seg* anon_clone(struct vm_seg* segment, void* space) {
   }
 }
 
-void anon_remove(struct vm_seg* segment, bool delete) {
+static void anon_remove(struct vm_seg* segment, bool delete) {
   // Iterate over all the pages, deleting/unref'ing them if needed!
   for (size_t i = 0; i < segment->len; i += cur_config->page_size) {
     struct vm_page* pg = htab_find(&segment->pagelist, &i, sizeof(size_t));
@@ -160,7 +158,7 @@ void anon_remove(struct vm_seg* segment, bool delete) {
 
       if (delete)  
         klog("seg: deleteing shared anonymous page!");
-      
+
       vm_phys_free(pg->metadata, cur_config->page_size / VM_PAGE_SIZE);
       vm_unmap_range(this_cpu->cur_spc, segment->base + i, cur_config->page_size);
       htab_delete(&segment->pagelist, &i, sizeof(size_t));
@@ -169,7 +167,7 @@ void anon_remove(struct vm_seg* segment, bool delete) {
   }
 }
 
-static struct vm_seg* anon_create(uintptr_t hint, uint64_t len, int prot, int mode) {
+static struct vm_seg* anon_create(vm_space_t* space, uintptr_t hint, uint64_t len, int prot, int mode) {
   // Make sure the flags are valid
   if (mode & MAP_SHARED) {
     klog("vm/seg: MAP_SHARED is not yet supported for anonymous mappings!");
@@ -192,19 +190,33 @@ static struct vm_seg* anon_create(uintptr_t hint, uint64_t len, int prot, int mo
 
   // Find a suitable base for this segment
   if (!hint || !(mode & MAP_FIXED) || (hint % 0x1000 != 0)) {
-    segment->base = alloc_mmap_base(this_cpu->cur_spc, len);
+    segment->base = alloc_mmap_base(space, len);
   } else {
     if (vm_find_seg(hint, NULL) != NULL) {
       klog("vm/seg: (WARN) hint 0x%lx tried to overwrite existing mapping!",
            hint);
-      segment->base = alloc_mmap_base(this_cpu->cur_spc, len);
+      segment->base = alloc_mmap_base(space, len);
     } else {
       segment->base = hint;
     }
   }
 
+  if (mode & MAP_NODEMAND) {
+    for (uintptr_t i = 0; i < segment->len; i += 0x1000) {
+      uintptr_t phys_window = (uintptr_t)vm_phys_alloc(cur_config->page_size / 0x1000, VM_ALLOC_ZERO);
+      vm_map_range(space, phys_window, segment->base + i, cur_config->page_size, calculate_prot(segment->prot));
+      struct vm_page* pg = kmalloc(sizeof(struct vm_page));
+
+      htab_insert(&segment->pagelist, &i, sizeof(size_t), pg);
+      pg->metadata = (void*)phys_window;
+      pg->present  = 1;
+      pg->refcount = 1;
+	  klog("here!!!");
+	}
+  }
+
   // Add segment to the current space's mappings
-  vec_push(&this_cpu->cur_spc->mappings, segment);
+  vec_push(&space->mappings, segment);
   return segment;
 }
 
@@ -232,20 +244,21 @@ struct vm_seg* vm_create_seg(int mode, ...) {
   va_start(va, mode);
 
   int prot = va_arg(va, int);
+  uint64_t len = va_arg(va, uint64_t);
+  uint64_t hint = 0;
+  vm_space_t* space = this_cpu->cur_spc;
+  struct vm_seg* sg = NULL;
+
+  // Gather the remaining args
+  if (mode & MAP_FIXED)
+	hint = va_arg(va, uint64_t);
+  if (mode & MAP_CUSTOM_SPC)
+    space = (vm_space_t*)va_arg(va, uintptr_t);
+
   if (mode & MAP_ANON) {
-    uint64_t len = va_arg(va, uint64_t);
-
-    struct vm_seg* sg = NULL;
-    if (mode & MAP_FIXED) {
-      sg = anon_create(va_arg(va, uintptr_t), len, prot, mode);
-    } else {
-      sg = anon_create(0, len, prot, mode);
-    }
-
-    va_end(va);
-    return sg;
-  } else {
-    va_end(va);
-    return NULL;
+	sg = anon_create(space, hint, len, prot, mode);
   }
+
+  va_end(va);
+  return sg;
 }

@@ -18,7 +18,7 @@ static ssize_t serial_read(struct backing* bck,
                              void* buf,
                              off_t offset,
                              size_t count) {
-  spinlock_acquire(&bck->lock);
+  spinlock(&bck->lock);
 
   uint16_t port = portmap[EXTRACT_DEVICE_MINOR(bck->st.st_dev) - 1];
   for (int i = 0; i < count; i++) {
@@ -29,7 +29,7 @@ static ssize_t serial_read(struct backing* bck,
     ((char*)buf)[i] = asm_inb(port);
   }
 
-  spinlock_release(&bck->lock);
+  spinrelease(&bck->lock);
   return count;
 }
 
@@ -37,7 +37,7 @@ static ssize_t serial_write(struct backing* bck,
                               const void* buf,
                               off_t offset,
                               size_t count) {
-  spinlock_acquire(&bck->lock);
+  spinlock(&bck->lock);
 
   uint16_t port = portmap[EXTRACT_DEVICE_MINOR(bck->st.st_dev) - 1];
   for (int i = 0; i < count; i++) {
@@ -53,7 +53,7 @@ static ssize_t serial_write(struct backing* bck,
     }
   }
 
-  spinlock_release(&bck->lock);
+  spinrelease(&bck->lock);
   return count;
 }
 
@@ -62,9 +62,9 @@ static ssize_t serial_resize(struct backing* bck, off_t new_size) {
 }
 
 static void serial_close(struct backing* bck) {
-  spinlock_acquire(&bck->lock);
+  spinlock(&bck->lock);
   bck->refcount--;
-  spinlock_release(&bck->lock);
+  spinrelease(&bck->lock);
 }
 
 void rs232_init() {
@@ -74,19 +74,19 @@ void rs232_init() {
 
     asm_outb(base + 1, 0x00);    // Disable all interrupts
     asm_outb(base + 3, 0x80);    // Enable DLAB (set baud rate divisor)
-    asm_outb(base, 0x01);        // Set divisor to 3 (lo byte) 38400 baud
+    asm_outb(base, 0x01);        // Set divisor to 1 (lo byte) 115200 baud
     asm_outb(base + 1, 0x00);    //                  (hi byte)
     asm_outb(base + 3, 0x03);    // 8 bits, no parity, one stop bit
     asm_outb(base + 2, 0xC7);    // Enable FIFO, clear them, with 14-byte threshold
     asm_outb(base + 4, 0x0B);    // IRQs enabled, RTS/DSR set
     asm_outb(base + 4, 0x1E);    // Set in loopback mode, test the serial chip
-    asm_outb(base, 0xFA);        // Test serial chip (send byte 0xAE and check if serial returns same byte)
+    asm_outb(base, 0xFA);        // Test serial chip (send byte 0xFA and check if serial returns same byte)
 
     // Check if serial is faulty (i.e: not same byte as sent)
     if(asm_inb(base) != 0xFA) {
       continue;
     }
- 
+
     // Enable the port (IRQs disabled, OUT1/OUT2 disabled as well) and mark as active
     asm_outb(base + 4, 0x0);
     active_ports |= (1 << i);
@@ -108,12 +108,20 @@ void rs232_init() {
     dev->write  = serial_write;
     dev->resize = serial_resize;
     dev->close  = serial_close;
- 
+
     // Finally, print a small greeting...
     char greeting[128];
     memset(greeting, 0, 128);
     snprintf(greeting, 128, "\n9x Kernel on /dev/%s\n\n", dev_name);
     dev->write(dev, greeting, 0, 128);
   }
+
+
+  int total_ports = 0;
+  for (int i = 0; i < 8; i++)
+    if (active_ports & (1 << i))
+      total_ports++;
+
+  klog("rs232: %d total ports!", total_ports);
 }
 

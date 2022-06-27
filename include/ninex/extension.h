@@ -1,7 +1,6 @@
 #ifndef NINEX_EXTENSION_H
 #define NINEX_EXTENSION_H
 
-#include <ninex/init.h>
 #include <stdbool.h>
 
 struct kernel_extension {
@@ -20,7 +19,7 @@ struct kernel_extension {
     .deinit = fini                                     \
   };
 
-EXPORT_STAGE(kext_stage);
+void kern_load_extensions();
 
 #endif // NINEX_EXTENSION_H
 

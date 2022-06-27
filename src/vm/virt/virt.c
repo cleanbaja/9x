@@ -8,7 +8,6 @@
 #include <vm/vm.h>
 
 vm_space_t kernel_space;
-CREATE_STAGE(vm_stage, vm_virt_init, {hat_init_stage, vm_phys_stage})
 
 //////////////////////////
 //   ASID Management
@@ -152,7 +151,7 @@ bool vm_fault(uintptr_t location, enum vm_fault flags) {
 
 
 #ifdef __x86_64__
-static void vm_virt_init() {
+void vm_virt_init() {
   // Setup the kernel space
   kernel_space.root = (uintptr_t)vm_phys_alloc(1, VM_ALLOC_ZERO);
   kernel_space.asid = 0;

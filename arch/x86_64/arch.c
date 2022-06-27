@@ -9,19 +9,27 @@
 #include <ninex/acpi.h>
 
 // The bare miniumum to get a x86_64 build of ninex to the early console
-CREATE_STAGE(arch_early_stage,
-             arch_early_callback,
-             {kcon_stage, cpu_init_stage, tables_setup_stage})
+void arch_early_init() {
+  // Initialize the kcon and parts of the CPU
+  kcon_init();
+  cpu_early_init();
+  tables_install();
 
-// All remaining arch-specific things, that depended on the VM...
-CREATE_STAGE(arch_late_stage,
-             DUMMY_CALLBACK,
-             {scan_madt_target, acpi_late_stage, smp_stage, timer_cali})
-
-static void arch_early_callback() {
+  // Finally, load the kernel cmdline
   struct stivale2_struct_tag_cmdline* cmdline_tag =
       (struct stivale2_struct_tag_cmdline*)stivale2_find_tag(
           STIVALE2_STRUCT_TAG_CMDLINE_ID);
   cmdline_load((char*)(cmdline_tag->cmdline));
+}
+
+void arch_init() {
+  // Do some ACPI/APIC related stuff
+  ic_enable();
+  scan_madt();
+  acpi_enter_ospm();
+
+  // Boot all other cores, and calibrate the TSC/APIC Timer
+  smp_startup();
+  timer_cali();
 }
 

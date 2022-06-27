@@ -34,9 +34,6 @@ vec_t(madt_nmi_t*) madt_nmis;
 static bool use_x2apic = false;
 static uintptr_t xapic_base = 0x0;
 static uint8_t translation_table[256];
-CREATE_STAGE_SMP_NODEP(apic_ready, ic_enable)
-CREATE_STAGE_SMP_NODEP(apic_timer_cali, ic_timer_cali)
-CREATE_STAGE(scan_madt_target, madt_init, {apic_ready})
 
 static void xapic_write(uint32_t reg, uint64_t val) {
   if (use_x2apic) {
@@ -119,7 +116,7 @@ void ic_perform_startup(uint32_t apic_id) {
   }
 }
 
-static void ic_enable() {
+void ic_enable() {
   // Check for the x2APIC
   if (!use_x2apic) {
     uint32_t eax, ebx, ecx, edx;
@@ -154,7 +151,7 @@ static void ic_enable() {
 //////////////////////////////
 //        APIC Timer
 //////////////////////////////
-static void ic_timer_cali() {
+void ic_timer_cali() {
   // If we plan on using the deadline TSC, then skip calibration
   if (CPU_CHECK(CPU_FEAT_INVARIANT) && CPU_CHECK(CPU_FEAT_DEADLINE))
     return;
@@ -246,9 +243,7 @@ static uint32_t get_ioapic_for_gsi(uint32_t gsi) {
 void ic_mask_irq(uint16_t slot, bool status) {
   uint32_t gsi = translation_table[slot];
   if (gsi == 0) {
-    klog("apic: can't mask IO-APIC IRQ #%d from vector, if GSI is unknown!",
-         slot);
-    return;
+    return; // Ignore, since the scheduler rasies this A LOT!
   }
 
   // Check to see if the IRQ is a legacy one...
@@ -305,7 +300,7 @@ void ic_create_redirect(uint8_t lapic_id,
 //////////////////////////////
 //        MADT Parser
 //////////////////////////////
-static void madt_init() {
+void scan_madt() {
   acpi_madt_t* madt = (acpi_madt_t*)acpi_query("APIC", 0);
   if (madt == NULL)
     PANIC(NULL, "Unable to find ACPI MADT table");

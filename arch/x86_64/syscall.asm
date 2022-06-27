@@ -21,15 +21,15 @@ asm_syscall_entry:
 
   ; First off, swap stacks before we do anything else
   swapgs
-  mov [gs:56], rsp       ; gs.user_stack = rsp
-  mov rsp, [gs:48]       ; rsp = gs.kernel_stack 
+  mov [gs:30], rsp       ; gs.user_stack = rsp
+  mov rsp, [gs:22]       ; rsp = gs.kernel_stack
   sti
 
   ; Create a dummy interrupt frame
-  push qword 0x1b         ; user data segment
-  push qword [gs:56]      ; saved stack
+  push qword 0x38         ; user data segment
+  push qword [gs:30]      ; saved stack
   push r11                ; saved rflags
-  push qword 0x23         ; user code segment 
+  push qword 0x40         ; user code segment
   push rcx                ; instruction pointer
   push 0                  ; error code
   push 0                  ; int no
@@ -76,8 +76,8 @@ asm_syscall_entry:
 
   ; Disable interrupts, before restoring the remaining context
   cli
-  mov rdx, qword [gs:40] ; rdx = gs.errno
-  mov rsp, qword [gs:16]  ; rsp = gs.user_stack
+  mov rdx, 0
+  mov rsp, qword [gs:30]  ; rsp = gs.user_stack
   swapgs
   o64 sysret
 

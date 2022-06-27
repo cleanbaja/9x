@@ -12,8 +12,8 @@
 #define IRQ_DISABLED 0xF3
 struct irq_resource {
   void (*HandlerFunc)(cpu_ctx_t*);
-  enum { EOI_MODE_UNKNOWN, EOI_MODE_LEVEL = 10, EOI_MODE_EDGE } eoi_strategy;
-  int status;
+  enum { EOI_MODE_UNKNOWN, EOI_MODE_LEVEL = 10, EOI_MODE_EDGE, EOI_MODE_TIMER } eoi_strategy;
+  volatile int status, lock;
 
   // Extra information (for debugging and tracking)
   char* procfs_name;
@@ -22,6 +22,11 @@ struct irq_resource {
 struct irq_resource* get_irq_handler(int irq_num);
 struct irq_resource* alloc_irq_handler(int* result);
 void respond_irq(cpu_ctx_t* context, int irq_num);
+
+// Various IPIs that are used within the kernel.
+#define IPI_HALT 254
+#define IPI_INVL_TLB 253
+#define IPI_SCHED_YIELD 252
 
 // Macros that aid in dealing with IRQs
 #define disable_irq(i) get_irq_handler(i)->status |= IRQ_DISABLED;

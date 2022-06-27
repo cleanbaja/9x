@@ -2,7 +2,6 @@
 #define ARCH_HAT_H
 
 #include <arch/irqchip.h>
-#include <ninex/init.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
 
@@ -37,6 +36,6 @@ enum base_type {
 uintptr_t hat_get_base(enum base_type bt);
 
 // Does some information gathering, and bootstraps the PAT MSR...
-EXPORT_STAGE(hat_init_stage);
+void hat_init();
 
 #endif  // ARCH_HAT_H

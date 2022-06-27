@@ -2,7 +2,8 @@
 #define ARCH_SMP_H
 
 #include <arch/cpu.h>
-#include <ninex/init.h>
+#include <arch/tables.h>
+#include <ninex/proc.h>
 #include <vm/virt.h>
 
 #ifndef ARCH_INTERNAL
@@ -14,14 +15,17 @@ struct percpu_info {
   uint32_t lapic_id;
   uint16_t proc_id;
   uint64_t tsc_freq, lapic_freq;
-  uintptr_t kernel_stack;
+  uintptr_t kernel_stack, user_stack;
+  thread_t* cur_thread;
   vm_space_t* cur_spc;
+  struct tss tss;
+  bool yielded;
 } __attribute__((packed));
 
-EXPORT_STAGE(smp_stage);
+void smp_startup();
 
 // Macro for accessing the percpu_info struct
-#define this_cpu ((struct percpu_info*)asm_rdmsr(IA32_KERNEL_GS_BASE))
+#define this_cpu ((struct percpu_info*)asm_rdmsr(IA32_GS_BASE))
 #define cpu_num                                                    \
   ({                                                               \
     int ret;                                                       \

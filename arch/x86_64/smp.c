@@ -1,16 +1,17 @@
-#include <arch/irqchip.h>
 #include <arch/smp.h>
 #include <arch/tables.h>
+#include <arch/timer.h>
+#include <arch/hat.h>
 #include <lib/builtin.h>
 #include <lib/kcon.h>
 #include <ninex/acpi.h>
+#include <ninex/sched.h>
 #include <vm/phys.h>
 #include <vm/vm.h>
 
 extern vec_t(madt_lapic_t*) madt_lapics;
 static _Atomic(int) online_cores = 0;
-struct madt_lapic_t* cur_lapic = NULL;
-CREATE_STAGE(smp_stage, smp_startup, {scan_madt_target});
+static lock_t smp_lock;
 
 // Include the compiled smp trampoline
 extern uint64_t smp_bootcode_begin[];
@@ -22,22 +23,39 @@ asm(".global smp_bootcode_begin\n\t"
     "smp_bootcode_end:\n\t");
 
 static void hello_ap(struct percpu_info* info) {
-  // Save the information before clearing RBP
-  asm_wrmsr(IA32_KERNEL_GS_BASE, (uint64_t)info);
+  // Do some things we couldn't do in the trampoline
   asm_wrmsr(IA32_TSC_AUX, info->proc_id);
   asm volatile("xor %rbp, %rbp");
 
-  // Let the BSP know that we're online...
+  // Let the BSP know that we're online
   online_cores++;
-  kern_smp_entry();
 
-  // The above function shouldn't return, but just in case...
+  // Run all the necissary init functions
+  spinlock(&smp_lock);
+  {
+    cpu_early_init();
+    tables_install();
+
+    // GS is cleared anytime the GDT is reloaded, so write 
+    // it now, after the GDT is already reloaded!
+    asm_wrmsr(IA32_GS_BASE, (uint64_t)info);
+
+    ic_enable();
+    hat_init();
+    load_tss((uintptr_t)&this_cpu->tss);
+    timer_cali();
+    sched_setup();
+  }
+  spinrelease(&smp_lock);
+
+  // Wait for the BSP to finish initialization, then it
+  // will permit us to enter the scheduler...
   for (;;) {
-    asm volatile("hlt");
+    asm_halt(true);
   }
 }
 
-static void smp_startup() {
+void smp_startup() {
   // Map the first 2MB of memory, for the trampoline and stuff
   int flags = VM_PERM_READ | VM_PERM_WRITE | VM_PERM_EXEC | VM_PAGE_HUGE;
   vm_map_range(&kernel_space, 0, 0, (0x1000 * 512), flags);
@@ -54,7 +72,7 @@ static void smp_startup() {
 
   // Loop through all the cores, booting them as needed
   for (int i = 0; i < madt_lapics.length; i++) {
-    cur_lapic = madt_lapics.data[i];
+    madt_lapic_t* cur_lapic = madt_lapics.data[i];
 
     // Create the CPU local information (stored in GS)
     struct percpu_info* percpu = kmalloc(sizeof(struct percpu_info));
@@ -63,14 +81,16 @@ static void smp_startup() {
     percpu->cur_spc = &kernel_space;
     percpu->kernel_stack = (uint64_t)vm_phys_alloc(16, VM_ALLOC_ZERO) +
                            VM_MEM_OFFSET + (VM_PAGE_SIZE * 16);
+    percpu->tss.rsp0 = percpu->kernel_stack;
 
     if (!(cur_lapic->flags & 1)) {
       klog("smp: CPU core %d is disabled!", cur_lapic->processor_id);
       expected_cpus--;
       continue;
     } else if (cur_lapic->apic_id == get_lapic_id()) {
-      asm_wrmsr(IA32_KERNEL_GS_BASE, (uint64_t)percpu);
+      asm_wrmsr(IA32_GS_BASE, (uint64_t)percpu);
       asm_wrmsr(IA32_TSC_AUX, cur_lapic->processor_id);
+      load_tss((uintptr_t)&percpu->tss);
       continue;
     }
 
@@ -91,8 +111,7 @@ static void smp_startup() {
   }
 
   // Wait for all cores to boot, then off we go!
-  while (online_cores != expected_cpus)
-    ;
+  while (online_cores != expected_cpus);
   vm_unmap_range(&kernel_space, 0, (0x1000 * 512));
   klog("smp: a total of %d cores booted!", online_cores);
 }

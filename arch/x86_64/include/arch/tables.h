@@ -1,7 +1,6 @@
 #ifndef ARCH_TABLES_H
 #define ARCH_TABLES_H
 
-#include <ninex/init.h>
 #include "arch/irqchip.h"
 
 #ifndef ARCH_INTERNAL
@@ -26,22 +25,17 @@ struct __attribute__((packed)) tss_entry
   uint32_t reserved;
 };
 
-#define GDT_16BIT_CODE_ENTRY  0x008F9A000000FFFF
-#define GDT_16BIT_DATA_ENTRY  0x008F92000000FFFF
-#define GDT_LEGACY_CODE_ENTRY 0x00CF9A000000FFFF
-#define GDT_LEGACY_DATA_ENTRY 0x00CF92000000FFFF
-#define GDT_KERNEL_CODE_ENTRY 0x00AF9A000000FFFF
-#define GDT_KERNEL_DATA_ENTRY 0x008F92000000FFFF
-#define GDT_USER_CODE_ENTRY   0x00AFFA000000FFFF
-#define GDT_USER_DATA_ENTRY   0x008FF2000000FFFF
-
 #ifdef LIMINE_EARLYCONSOLE
   #define GDT_KERNEL_CODE  0x28
   #define GDT_KERNEL_DATA  0x30
+  #define GDT_USER_CODE    0x40
+  #define GDT_USER_DATA    0x38
   #define GDT_TSS_SELECTOR 0x48
 #else
   #define GDT_KERNEL_CODE  0x08
   #define GDT_KERNEL_DATA  0x10
+  #define GDT_USER_CODE    0x20
+  #define GDT_USER_DATA    0x18
   #define GDT_TSS_SELECTOR 0x28
 #endif
 
@@ -65,9 +59,9 @@ struct __attribute__((packed)) gdt
   uint64_t kcode_entry;
   uint64_t kdata_entry;
 
-  // 64-bit kernel code/data
-  uint64_t ucode_entry;
+  // 64-bit user data/code (reversed for syscall)
   uint64_t udata_entry;
+  uint64_t ucode_entry;
 
   struct tss_entry tss;
 };
@@ -104,7 +98,7 @@ struct __attribute__((packed)) tss
 };
 
 // Stage to create the CPU tables (aka the GDT and IDT)
-EXPORT_STAGE(tables_setup_stage);
+void tables_install();
 
 // Helpers for loading the TSS and dumping CPU context
 void load_tss(uintptr_t address);

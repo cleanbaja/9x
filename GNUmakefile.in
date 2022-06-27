@@ -17,7 +17,7 @@ endif
 override CC := @CC@
 override LD := @LD@
 override AR := @AR@
-override KERNEL_CFLAGS  := @KERNEL_CFLAGS@ 
+override KERNEL_CFLAGS  := @KERNEL_CFLAGS@
 override KERNEL_LDFLAGS := @KERNEL_LDFLAGS@
 override ARCH := @ARCH@
 HARDENED_BUILD := @HARDENED_BUILD@
@@ -26,13 +26,13 @@ PREFIX := @prefix@
 
 # Set compiler flags
 override CREALFLAGS := $(KERNEL_CFLAGS)           \
-		       -std=gnu11                 \
+                       -std=gnu11                 \
                        -ffreestanding             \
-	               -fpic                      \
-		       -MMD                       \
-	               -mno-red-zone              \
-	               -fno-omit-frame-pointer    \
-                       -fms-extensions 
+                       -fpic                      \
+                       -MMD                       \
+                       -mno-red-zone              \
+                       -fno-omit-frame-pointer    \
+                       -fms-extensions
 
 override LDREALFLAGS := $(KERNEL_LDFLAGS) -zmax-page-size=0x1000 -nostdlib
 override CREALFLAGS  +=  -I .                       \
@@ -61,7 +61,7 @@ ifeq ($(ARCH), x86_64)
                            -mno-mmx                   \
                            -mno-3dnow                 \
                            -mno-sse                   \
-                           -mno-sse2               
+                           -mno-sse2
 else ifeq ($(ARCH), aarch64)
     override ARCH_ASSEMBLY_SOURCE := $(shell find $(ARCH_DIR)/src -name '*.S')
     override CREALFLAGS += -mgeneral-regs-only
@@ -109,9 +109,9 @@ $(BUILD_DIR)/arch/x86_64/%.bin: $(ARCH_DIR)/%.real
 $(BUILD_DIR)/arch/x86_64/%.o: $(ARCH_DIR)/%.asm
 	$(COOL_PROMPT) "ASM " $<
 	mkdir -p $(@D)
-	nasm -f elf64 -i @srcdir@ -o $@ $<
+	nasm -f elf64 -g -F dwarf -i @srcdir@ -o $@ $<
 
-$(ARCH_LIB): $(ARCH_BLOBS) $(ARCH_OBJECTS) 
+$(ARCH_LIB): $(ARCH_BLOBS) $(ARCH_OBJECTS)
 	$(COOL_PROMPT) "LIB " $@
 	mkdir -p $(@D)
 	$(AR) rcs $@ $(ARCH_OBJECTS)
@@ -137,7 +137,7 @@ $(INITRD): $(REQUIRED_DRIVERS)
 	$(COOL_PROMPT) "GEN " $@
 	mkdir initrd && cp $(REQUIRED_DRIVERS) initrd
 	tar -cf initrd.tar initrd &> /dev/null
-	gzip initrd.tar && mv initrd.tar.gz initrd.img
+	gzip initrd.tar && mv initrd.tar.gz $(INITRD)
 	rm -rf initrd
 
 # Header dependencies
@@ -148,13 +148,15 @@ override HEADER_DEPS += $(addprefix $(BUILD_DIR), $(patsubst %.c, %.d, $(ARCH_SO
 
 # Cleaning targets
 clean: extensions_clean
-	rm -rf $(BUILD_DIR)/kern_symbols.* $(OBJECTS) $(LAI_OBJECTS) $(ARCH_OBJECTS) $(ARCH_BLOBS) $(KERNEL) $(LAI_LIB) $(ARCH_LIB)
+	rm -rf $(BUILD_DIR)/kern_symbols.* $(OBJECTS) $(LAI_OBJECTS) $(HEADER_DEPS)
+	rm -rf $(ARCH_OBJECTS) $(ARCH_BLOBS) $(KERNEL) $(LAI_LIB) $(ARCH_LIB)
 
 distclean: clean
 	rm -rf $(BUILD_DIR)/{GNUmakefile,config.log,config.status,config.h} $(IMAGE)
 
 maintainer-clean: distclean
-	rm -rf $(SOURCE_DIR)/configure $(SOURCE_DIR)/install-sh $(SOURCE_DIR)/autom4te* $(SOURCE_DIR)/*'~' $(SOURCE_DIR)/third_party
+	rm -rf $(SOURCE_DIR)/configure $(SOURCE_DIR)/install-sh $(SOURCE_DIR)/autom4te* 
+	rm -rf $(SOURCE_DIR)/*'~' $(SOURCE_DIR)/third_party
 
 # Installation/Distribution targets
 .PHONY: install install-strip dist
@@ -189,17 +191,17 @@ $(IMAGE): $(KERNEL) $(INITRD) $(SOURCE_DIR)/misc/limine.cfg
 	parted -s $(IMAGE) mklabel msdos
 	parted -s $(IMAGE) mkpart primary 2048s 100%
 	@$(ECHFS) -m -p0 $(IMAGE) quick-format 512
-	@$(ECHFS) -m -p0 $(IMAGE) import $(KERNEL) /boot/kernel/$(KERNEL)
+	@$(ECHFS) -m -p0 $(IMAGE) import $(KERNEL) /boot/kernel/vr9x.elf
 	@$(ECHFS) -m -p0 $(IMAGE) import $(INITRD) /boot/initrd.img
 	@$(ECHFS) -m -p0 $(IMAGE) import @srcdir@/misc/limine.cfg /boot/limine.cfg
 	@$(ECHFS) -m -p0 $(IMAGE) import @srcdir@/third_party/limine/limine.sys \
 				           /boot/limine.sys
-	$(BUILD_DIR)/third_party/limine/limine-deploy $(IMAGE)
+	$(SOURCE_DIR)/third_party/limine/limine-deploy $(IMAGE)
 
 .PHONY: run run-kvm
 override QEMU_BASE_FLAGS += -smp `nproc` -m 1G -M q35 -drive file=$(IMAGE),if=none,id=nvm -device nvme,serial=deadbeef,drive=nvm -debugcon stdio
 run: $(IMAGE)
-	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu max
+	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu max,+rdtscp
 run-kvm: $(IMAGE)
 	qemu-system-x86_64 $(QEMU_BASE_FLAGS) --enable-kvm -cpu max,+invtsc
 

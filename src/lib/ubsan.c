@@ -188,3 +188,10 @@ __ubsan_handle_invalid_builtin(struct tu_invalid_builtin_data* data)
 
   tu_print_location("invalid builtin", data->location);
 }
+
+// Stack protector stuff...
+uintptr_t __stack_chk_guard = 0x595e9fbd94fda766; 
+void __stack_chk_fail(void) {
+	PANIC(NULL, "Stack Smashing detected");
+}
+

@@ -6,10 +6,8 @@
 
 struct vfs_node* root_node = NULL;
 vec_t(struct filesystem*) fs_list;
-static CREATE_SPINLOCK(vfs_lock);
-
+static lock_t vfs_lock;
 extern void initramfs_populate(struct stivale2_struct_tag_modules* mods);
-CREATE_STAGE_NODEP(vfs_stage, vfs_callback);
 
 void vfs_register_fs(struct filesystem* fs) {
   vec_push(&fs_list, fs);
@@ -71,7 +69,7 @@ static struct vfs_node* search_relative(struct vfs_node* parent, char* name, int
 struct vfs_resolved_node vfs_resolve(struct vfs_node* root, char* path, int flags) {
   struct vfs_resolved_node result = {0};
   char* token = NULL;
-  spinlock_acquire(&vfs_lock);
+  spinlock(&vfs_lock);
 
   // Setup the enviorment, so that we may parse the path
   if (root == NULL)
@@ -89,7 +87,7 @@ struct vfs_resolved_node vfs_resolve(struct vfs_node* root, char* path, int flag
     }
 
     klog("vfs: support parsing single character paths!");
-    spinlock_release(&vfs_lock);
+    spinrelease(&vfs_lock);
     return result;
   } else if (path == NULL) {
     klog("vfs: NULL path was passed to vfs_resolve!");
@@ -112,7 +110,7 @@ struct vfs_resolved_node vfs_resolve(struct vfs_node* root, char* path, int flag
       flags &= ~(RESOLVE_FAIL_IF_EXISTS);
     } else if (!result.target) {
       result.success = false;
-      spinlock_release(&vfs_lock);
+      spinrelease(&vfs_lock);
       return result;
     }
   }
@@ -123,7 +121,7 @@ struct vfs_resolved_node vfs_resolve(struct vfs_node* root, char* path, int flag
     result.success = true;
   }
 
-  spinlock_release(&vfs_lock);
+  spinrelease(&vfs_lock);
   return result;
 }
 
@@ -220,7 +218,7 @@ static void dump_all_nodes(struct vfs_node* node, int depth) {
 }
 */
 
-static void vfs_callback() {
+void vfs_setup() {
   // Create the root node...
   root_node = kmalloc(sizeof(struct vfs_node));
   memcpy(root_node->name, "/", 1);

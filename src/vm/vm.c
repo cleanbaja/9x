@@ -6,8 +6,6 @@
 #include <vm/virt.h>
 #include <vm/vm.h>
 
-CREATE_STAGE_NODEP(vm_phys_stage, vm_callback)
-
 static char*
 mem_to_str(int mem_type)
 {
@@ -42,9 +40,12 @@ mem_to_str(int mem_type)
   }
 }
 
-static void vm_callback() {
+void vm_setup() {
   struct stivale2_struct_tag_memmap* mm_tag =
       stivale2_find_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID);
+
+  // Setup the HAT first
+  hat_init();
 
   // Dump all memmap entries
   if (!(mm_tag->entries > 25) || cmdline_get_bool("verbose", false)) {
@@ -70,4 +71,7 @@ static void vm_callback() {
   if (head_zone == NULL) {
     PANIC(NULL, "No suitable memory zones!\n");
   }
+
+  // Setup virtual memory...
+  vm_virt_init();
 }

@@ -1,4 +1,5 @@
 #include <lib/kcon.h>
+#include <lib/lock.h>
 #include <ninex/irq.h>
 #include <stddef.h>
 
@@ -69,16 +70,18 @@ void dispatch_edge_irq(cpu_ctx_t* c, struct irq_resource* res, int irq) {
 
 void respond_irq(cpu_ctx_t* context, int irq_num) {
   struct irq_resource* cur_irq = get_irq_handler(irq_num);
+  spinlock(&cur_irq->lock);
 
   // Check if we can't respond to the IRQ
   if ((cur_irq->status & IRQ_DISABLED) || (cur_irq->status & IRQ_INPROGRESS) ||
-      !cur_irq->HandlerFunc) {
+      (!cur_irq->HandlerFunc)) {
     mask_ack_irq(irq_num);
     if (cur_irq->eoi_strategy == EOI_MODE_EDGE) {
       cur_irq->status |=
           IRQ_PENDING;  // Mark it as pending, so that we can deal with it later
     }
 
+    spinrelease(&cur_irq->lock);
     return;
   }
 
@@ -97,7 +100,15 @@ void respond_irq(cpu_ctx_t* context, int irq_num) {
     case EOI_MODE_EDGE:
       dispatch_edge_irq(context, cur_irq, irq_num);
       break;
+
+    case EOI_MODE_TIMER:
+      // Timer IRQs are diffrent, since they return their own way...
+      ic_eoi(irq_num);
+      spinrelease(&cur_irq->lock);
+      cur_irq->HandlerFunc(context);
+      break;
   }
 
+  spinrelease(&cur_irq->lock);
   return;
 }
