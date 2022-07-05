@@ -414,20 +414,3 @@ void cpu_create_uctx(thread_t* thrd, struct exec_args args) {
   context->rsp = ((uintptr_t)stack - VM_MEM_OFFSET - stack_base) + THREAD_STACK_BASE;
 }
 
-#define ARCHCTL_WRITE_FS 0xB0
-#define ARCHCTL_READ_MSR 0xB1
-#define ARCHCTL_WRITE_MSR 0xB2
-
-void syscall_archctl(cpu_ctx_t* context) {
-  switch (context->rdi) {
-    case ARCHCTL_WRITE_FS:
-      asm_wrmsr(IA32_FS_BASE, context->rsi);
-      break;
-    case ARCHCTL_READ_MSR:
-      context->rax = asm_rdmsr(context->rsi);
-      break;
-    case ARCHCTL_WRITE_MSR:
-      asm_wrmsr(context->rsi, context->rdx);
-      break;
-  }
-}

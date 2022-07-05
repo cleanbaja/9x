@@ -43,13 +43,11 @@ static void reload_tables() {
   table_pointer.base = (uint64_t)&main_gdt;
   table_pointer.limit = sizeof(struct gdt) - 1;
   asm_load_gdt(&table_pointer, GDT_KERNEL_CODE, GDT_KERNEL_DATA);
-  
+
   // Reload the IDT
   table_pointer.base = (uint64_t)entries;
   table_pointer.limit = sizeof(entries) - 1;
   __asm__ volatile("lidt %0" ::"m"(table_pointer));
-
-  spinrelease(&reload_lock);
 }
 
 static void init_tables() {
@@ -61,7 +59,7 @@ static void init_tables() {
   main_gdt.ocode_entry = GDT_16BIT_CODE_ENTRY;
   main_gdt.odata_entry = GDT_16BIT_DATA_ENTRY;
   main_gdt.lcode_entry = GDT_LEGACY_CODE_ENTRY;
-  main_gdt.ldata_entry = GDT_LEGACY_DATA_ENTRY; 
+  main_gdt.ldata_entry = GDT_LEGACY_DATA_ENTRY;
 #endif // LIMINE_EARLYCONSOLE
 
   // Add the standard 64-bit user/kernel entries
@@ -90,11 +88,10 @@ static void init_tables() {
 }
 
 void tables_install() {
-  if (is_bsp()) {
+  if (is_bsp())
     init_tables();
-  } else {
+  else
     reload_tables();
-  }
 }
 
 void
@@ -111,18 +108,6 @@ load_tss(uintptr_t address)
   main_gdt.tss.base_upper32 = (uint32_t)(address >> 32);
   main_gdt.tss.reserved = 0;
   __asm__ volatile("ltr %0" ::"rm"((uint16_t)GDT_TSS_SELECTOR) : "memory");
-
-  // Update the IDT to become TSS aware
-  /*entries[2] = make_idt_entry(asm_dispatch_table[2], 1);
-  entries[8] = make_idt_entry(asm_dispatch_table[8], 3);
-  entries[14] = make_idt_entry(asm_dispatch_table[14], 2);
-  entries[18] = make_idt_entry(asm_dispatch_table[18], 4);
-  
-  // Then reload it
-  struct table_ptr idt_pointer;
-  idt_pointer.base = (uint64_t)entries;
-  idt_pointer.limit = sizeof(entries) - 1;
-  __asm__ volatile("lidt %0" ::"m"(idt_pointer));*/
 
   spinrelease(&reload_lock);
 }
@@ -147,7 +132,7 @@ static char* exc_table[] = { [0] = "Division by Zero",
                              [16] = "x87 Floating Point Exception",
                              [17] = "Alignment check",
                              [18] = "Machine check",
-                             [19] = "SIMD floating point Exception",
+                             [19] = "SIMD Floating Point Exception",
                              [20] = "Virtualization Exception",
                              [30] = "Security Exception" };
 

@@ -29,6 +29,7 @@ override CREALFLAGS := $(KERNEL_CFLAGS)           \
                        -std=gnu11                 \
                        -ffreestanding             \
                        -fpic                      \
+                       -Wno-attributes            \
                        -MMD                       \
                        -mno-red-zone              \
                        -fno-omit-frame-pointer    \
@@ -152,7 +153,7 @@ clean: extensions_clean
 	rm -rf $(ARCH_OBJECTS) $(ARCH_BLOBS) $(KERNEL) $(LAI_LIB) $(ARCH_LIB)
 
 distclean: clean
-	rm -rf $(BUILD_DIR)/{GNUmakefile,config.log,config.status,config.h} $(IMAGE)
+	rm -rf $(BUILD_DIR)/{GNUmakefile,config.log,config.status,config.h} $(IMAGE) $(INITRD)
 
 maintainer-clean: distclean
 	rm -rf $(SOURCE_DIR)/configure $(SOURCE_DIR)/install-sh $(SOURCE_DIR)/autom4te* 

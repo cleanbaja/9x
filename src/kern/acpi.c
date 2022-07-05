@@ -69,6 +69,21 @@ static void setup_ec(void) {
       if (lai_ns_get_node_type(child_node) == LAI_NODETYPE_OPREGION)
         lai_ns_override_opregion(child_node, &lai_ec_opregion_override, driver);
     }
+
+    lai_nsnode_t* reg = lai_resolve_path(node, "_REG");
+    if(reg) {
+      LAI_CLEANUP_VAR lai_variable_t r0 = {};
+      LAI_CLEANUP_VAR lai_variable_t r1 = {};
+
+      r0.type = LAI_INTEGER; r0.integer = 3;
+      r1.type = LAI_INTEGER; r1.integer = 1;
+
+      lai_api_error_t e = lai_eval_largs(NULL, reg, &state, &r0, &r1, NULL);
+      if(e != LAI_ERROR_NONE) {
+        klog("acpi: Failed to evaluate EC _REG(EmbeddedControl, 1) -> %s\n", lai_api_error_to_string(e));
+        continue;
+      }
+    }
   }
 }
 

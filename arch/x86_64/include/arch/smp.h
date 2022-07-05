@@ -18,6 +18,7 @@ struct percpu_info {
   uintptr_t kernel_stack, user_stack;
   thread_t* cur_thread;
   vm_space_t* cur_spc;
+  uint32_t errno;
   struct tss tss;
   bool yielded;
 } __attribute__((packed));

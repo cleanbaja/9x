@@ -118,7 +118,7 @@ void vm_space_destroy(vm_space_t* s) {
   hat_scrub_pde(s->root, cur_config->levels);
   for (int i = 0; i < s->mappings.length; i++) {
     struct vm_seg* sg = s->mappings.data[i];
-    sg->ops.remove(sg, true);
+    sg->ops.unmap(sg, sg->base, sg->len);
   }
 
   kfree(s);

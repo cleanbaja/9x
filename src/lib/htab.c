@@ -46,9 +46,13 @@ void htab_insert(struct hash_table *htab, void *key, size_t key_size, void *data
   uint64_t hash = fnv_hash(key, key_size);
   size_t index = hash & (htab->capacity - 1);
 
+  // We clone the key on insert, so that if the same key pointer is used
+  // twice (with different data), it doesn't return the same result!
   for(; index < htab->capacity; index++) {
     if(htab->keys[index] == NULL) {
-      htab->keys[index] = key;
+      void* cloned_key = kmalloc(key_size);
+      memcpy(cloned_key, key, key_size);
+      htab->keys[index] = cloned_key;
       htab->data[index] = data;
       return;
     }
@@ -67,9 +71,14 @@ void htab_insert(struct hash_table *htab, void *key, size_t key_size, void *data
     }
   }
 
-  // Destroy the old one, insert the elem, and update the old hashtable
+  // Destroy the cloned keys, before destroying the entire table
+  for (size_t i = 0; i < htab->capacity; i++)
+    if(htab->keys[i] != NULL)
+      kfree(htab->keys[index]);
   kfree(htab->keys);
   kfree(htab->data);
+
+  // Insert this element into the new table, and return the new table instead
   htab_insert(&new_table, key, key_size, data);
   *htab = new_table;
 }
@@ -77,7 +86,7 @@ void htab_insert(struct hash_table *htab, void *key, size_t key_size, void *data
 void htab_delete(struct hash_table *htab, void *key, size_t key_size) {
   if(htab->capacity == 0)
     return; // Empty table!
-		
+
   // Find the hash and index...
   uint64_t hash = fnv_hash(key, key_size);
   size_t index = hash & (htab->capacity - 1);
@@ -85,6 +94,7 @@ void htab_delete(struct hash_table *htab, void *key, size_t key_size) {
   // Finally, elimnate the element, if its actually in there...
   for(; index < htab->capacity; index++) {
     if(htab->keys[index] != NULL && memcmp(htab->keys[index], key, key_size) == 0) {
+      kfree(htab->keys[index]); // Free the cloned key
       htab->keys[index] = NULL;
       htab->data[index] = NULL;
       return;

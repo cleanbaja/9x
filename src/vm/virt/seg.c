@@ -1,6 +1,7 @@
 #include <arch/hat.h>
 #include <arch/smp.h>
 #include <lib/builtin.h>
+#include <lib/errno.h>
 #include <lib/kcon.h>
 #include <vm/phys.h>
 #include <vm/virt.h>
@@ -36,10 +37,8 @@ static int calculate_prot(int unix_prot) {
   return result;
 }
 static uintptr_t alloc_mmap_base(vm_space_t* spc, size_t len) {
-  // TODO: Throw this in the HAT's config
-  if (spc->mmap_base == 0) {
+  if (spc->mmap_base == 0)
     spc->mmap_base = hat_get_base(HAT_BASE_USEG);
-  }
 
   spc->mmap_base -= len;
   return spc->mmap_base;
@@ -119,7 +118,7 @@ static struct vm_seg* anon_clone(struct vm_seg* segment, void* space) {
   new_segment->context = segment;
   memset(&new_segment->pagelist, 0, sizeof(struct hash_table));
 
-  // Make sure we're not cloneing a anonymous segment
+  // Make sure the parent segment has permissions
   if (segment->prot & PROT_NONE) {
     klog("seg: attempt to clone a segment with no protection!");
     return segment;
@@ -134,16 +133,22 @@ static struct vm_seg* anon_clone(struct vm_seg* segment, void* space) {
       int flags = calculate_prot(segment->prot);
       if (segment->mode & MAP_PRIVATE)
         flags &= ~VM_PERM_WRITE; // Copy-on-Write
-      
+
       pg->refcount++;
       vm_map_range(space, (uintptr_t)pg->metadata, segment->base + i, cur_config->page_size, flags);
     }
   }
 }
 
-static void anon_remove(struct vm_seg* segment, bool delete) {
+static bool anon_unmap(struct vm_seg* segment, uintptr_t unmap_base, size_t unmap_len) {
+  // Run some sanity checks on the unmap base/len
+  if (unmap_base + unmap_len > segment->base + segment->len)
+    return false;
+  else if (unmap_base < segment->base || unmap_len > segment->len)
+    return false;
+
   // Iterate over all the pages, deleting/unref'ing them if needed!
-  for (size_t i = 0; i < segment->len; i += cur_config->page_size) {
+  for (size_t i = unmap_base; i < unmap_len; i += cur_config->page_size) {
     struct vm_page* pg = htab_find(&segment->pagelist, &i, sizeof(size_t));
     if (pg == NULL) {
       continue;
@@ -152,12 +157,9 @@ static void anon_remove(struct vm_seg* segment, bool delete) {
 
       if (pg->refcount != 0) {
         vm_unmap_range(this_cpu->cur_spc, segment->base + i, cur_config->page_size);
-	pg->unmapped = 1;
-	continue;
+        pg->unmapped = 1;
+        continue;
       }
-
-      if (delete)  
-        klog("seg: deleteing shared anonymous page!");
 
       vm_phys_free(pg->metadata, cur_config->page_size / VM_PAGE_SIZE);
       vm_unmap_range(this_cpu->cur_spc, segment->base + i, cur_config->page_size);
@@ -171,11 +173,11 @@ static struct vm_seg* anon_create(vm_space_t* space, uintptr_t hint, uint64_t le
   // Make sure the flags are valid
   if (mode & MAP_SHARED) {
     klog("vm/seg: MAP_SHARED is not yet supported for anonymous mappings!");
+    set_errno(ENOTSUP);
     return NULL;
   } else if (!(mode & MAP_PRIVATE)) {
-    klog(
-        "vm/seg: either MAP_PRIVATE or MAP_SHARED is required for a anonymous "
-        "mapping!");
+    klog("vm/seg: either MAP_PRIVATE or MAP_SHARED is required for a anonymous mapping!");
+	set_errno(EINVAL);
     return NULL;
   }
 
@@ -186,36 +188,22 @@ static struct vm_seg* anon_create(vm_space_t* space, uintptr_t hint, uint64_t le
   segment->mode = mode;
   segment->ops.fault = anon_fault;
   segment->ops.clone = anon_clone;
-  segment->ops.remove = anon_remove;
+  segment->ops.unmap = anon_unmap;
 
   // Find a suitable base for this segment
   if (!hint || !(mode & MAP_FIXED) || (hint % 0x1000 != 0)) {
     segment->base = alloc_mmap_base(space, len);
   } else {
     if (vm_find_seg(hint, NULL) != NULL) {
-      klog("vm/seg: (WARN) hint 0x%lx tried to overwrite existing mapping!",
-           hint);
+      klog("vm/seg: (WARN) hint 0x%lx tried to overwrite existing mapping!", hint);
       segment->base = alloc_mmap_base(space, len);
     } else {
       segment->base = hint;
     }
   }
 
-  if (mode & MAP_NODEMAND) {
-    for (uintptr_t i = 0; i < segment->len; i += 0x1000) {
-      uintptr_t phys_window = (uintptr_t)vm_phys_alloc(cur_config->page_size / 0x1000, VM_ALLOC_ZERO);
-      vm_map_range(space, phys_window, segment->base + i, cur_config->page_size, calculate_prot(segment->prot));
-      struct vm_page* pg = kmalloc(sizeof(struct vm_page));
-
-      htab_insert(&segment->pagelist, &i, sizeof(size_t), pg);
-      pg->metadata = (void*)phys_window;
-      pg->present  = 1;
-      pg->refcount = 1;
-	  klog("here!!!");
-	}
-  }
-
   // Add segment to the current space's mappings
+  memset(&segment->pagelist, 0, sizeof(struct hash_table));
   vec_push(&space->mappings, segment);
   return segment;
 }
@@ -251,12 +239,10 @@ struct vm_seg* vm_create_seg(int mode, ...) {
 
   // Gather the remaining args
   if (mode & MAP_FIXED)
-	hint = va_arg(va, uint64_t);
-  if (mode & MAP_CUSTOM_SPC)
-    space = (vm_space_t*)va_arg(va, uintptr_t);
+    hint = va_arg(va, uint64_t);
 
   if (mode & MAP_ANON) {
-	sg = anon_create(space, hint, len, prot, mode);
+    sg = anon_create(space, hint, len, prot, mode);
   }
 
   va_end(va);

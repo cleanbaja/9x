@@ -6,14 +6,15 @@
 #include <lib/cmdline.h>
 #include <lib/kcon.h>
 #include <lib/stivale2.h>
+#include <ninex/syscall.h>
 #include <ninex/acpi.h>
 
 // The bare miniumum to get a x86_64 build of ninex to the early console
 void arch_early_init() {
   // Initialize the kcon and parts of the CPU
   kcon_init();
-  cpu_early_init();
   tables_install();
+  cpu_early_init();
 
   // Finally, load the kernel cmdline
   struct stivale2_struct_tag_cmdline* cmdline_tag =
@@ -31,5 +32,19 @@ void arch_init() {
   // Boot all other cores, and calibrate the TSC/APIC Timer
   smp_startup();
   timer_cali();
+}
+
+void syscall_archctl(cpu_ctx_t* context) {
+  switch (context->rdi) {
+    case ARCHCTL_WRITE_FS:
+      asm_wrmsr(IA32_FS_BASE, context->rsi);
+      break;
+    case ARCHCTL_READ_MSR:
+      context->rax = asm_rdmsr(context->rsi);
+      break;
+    case ARCHCTL_WRITE_MSR:
+      asm_wrmsr(context->rsi, context->rdx);
+      break;
+  }
 }
 

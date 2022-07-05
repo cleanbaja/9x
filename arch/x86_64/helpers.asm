@@ -1,4 +1,5 @@
 [bits 64]
+section .text
 
 %macro asm_push_regs 0
     push rax
@@ -53,32 +54,24 @@ __intr_%1:
     jmp asm_handle_trap
 %endmacro
 
-section .text
-
 global asm_load_gdt
 asm_load_gdt:
   lgdt [rdi]
- 
-  mov rax, rdx
+  lea rax, [rel .update_segments]
+  push rsi
+  push rax
+  retfq
 
+.update_segments:
+  mov rax, rdx
   mov ds, ax
   mov es, ax
   mov fs, ax
   mov gs, ax
   mov ss, ax
- 
-  pop r10
-
-  push rdx
-  push rsp
-  pushf
-  push qword rsi
-  push r10
-
-  iretq
+  ret
 
 extern sys_dispatch_isr
-
 asm_handle_trap:
     cld
     asm_push_regs

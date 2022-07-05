@@ -179,7 +179,7 @@ void panic(void* frame, char* fmt, ...) {
   // Stop the scheduler on this CPU, and wait for ACPI interrupts
   timer_stop();
   for (;;) {
-    asm_halt(true);
+    asm_halt(false);
   }
 }
 
@@ -262,11 +262,5 @@ void klog_unlocked(char* fmt, ...) {
 
   // Clear both buffers and return
   memset64(format_buf, 0, 512);
-}
-
-#include <arch/irqchip.h>
-void syscall_debuglog(cpu_ctx_t* context) {
-  char* msg = (char*)context->rdi;
-  klog("%s", msg);
 }
 
