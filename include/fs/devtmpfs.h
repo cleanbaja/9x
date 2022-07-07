@@ -1,7 +1,7 @@
 #ifndef FS_DEVTMPFS_H
 #define FS_DEVTMPFS_H
 
-#include <fs/backing.h>
+#include <fs/handle.h>
 
 /* dev_t is layed out like this...
  * |--------------------------------|
@@ -16,7 +16,7 @@
 #define MKDEV(maj, min) (min | ((uint64_t)maj << 32))
 
 // Path has to be relative to /dev, like "dri/card0"
-struct backing* devtmpfs_create_device(char* path, int size);
+struct vnode* devtmpfs_create_device(char* path, int size);
 size_t devtmpfs_create_id(int subclass);
 
 void setup_unix_streams();

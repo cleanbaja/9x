@@ -1,25 +1,25 @@
-#include <fs/backing.h>
+#include <fs/handle.h>
 #include <fs/vfs.h>
 #include <lib/builtin.h>
 #include <vm/vm.h>
 
-struct tmpfs_backing {
-  struct backing;
+struct tmpfs_vnode {
+  struct vnode;
   size_t capacity;
   char* data;
 };
 
 // tmpfs starts out empty, so no need to populate
-static struct vfs_node* tmpfs_populate(struct vfs_node* node) {
+static struct vfs_ent* tmpfs_populate(struct vfs_ent* node) {
   (void)node;
   return NULL;
 }
 
-static ssize_t tmpfs_read(struct backing* bck,
+static ssize_t tmpfs_read(struct vnode* bck,
                           void* buf,
                           off_t offset,
                           size_t count) {
-  struct tmpfs_backing* b = (struct tmpfs_backing*)bck;
+  struct tmpfs_vnode* b = (struct tmpfs_vnode*)bck;
   spinlock(&b->lock);
 
   // Truncate the read if the size is too big!
@@ -32,11 +32,11 @@ static ssize_t tmpfs_read(struct backing* bck,
   return count;
 }
 
-static ssize_t tmpfs_write(struct backing* bck,
+static ssize_t tmpfs_write(struct vnode* bck,
                            const void* buf,
                            off_t offset,
                            size_t count) {
-  struct tmpfs_backing* b = (struct tmpfs_backing*)bck;
+  struct tmpfs_vnode* b = (struct tmpfs_vnode*)bck;
   spinlock(&b->lock);
 
   // Grow the file if needed!
@@ -55,8 +55,8 @@ static ssize_t tmpfs_write(struct backing* bck,
   return count;
 }
 
-static ssize_t tmpfs_resize(struct backing* bck, off_t new_size) {
-  struct tmpfs_backing* b = (struct tmpfs_backing*)bck;
+static ssize_t tmpfs_resize(struct vnode* bck, off_t new_size) {
+  struct tmpfs_vnode* b = (struct tmpfs_vnode*)bck;
   spinlock(&b->lock);
 
   // Prevent downsizing...
@@ -74,21 +74,21 @@ static ssize_t tmpfs_resize(struct backing* bck, off_t new_size) {
   return new_size;
 }
 
-static void tmpfs_close(struct backing* bck) {
+static void tmpfs_close(struct vnode* bck) {
   spinlock(&bck->lock);
   bck->refcount--;
   spinrelease(&bck->lock);
 }
 
-static struct backing* tmpfs_open(struct vfs_node* node,
+static struct vnode* tmpfs_open(struct vfs_ent* node,
                                   bool new_node,
                                   mode_t mode) {
   // We should only get called when creating a new resource/node
   if (!new_node)
     return NULL;
 
-  struct tmpfs_backing* bck =
-      (struct tmpfs_backing*)create_backing(sizeof(struct tmpfs_backing));
+  struct tmpfs_vnode* bck =
+      (struct tmpfs_vnode*)create_resource(sizeof(struct tmpfs_vnode));
 
   // Fill in the backing with proper values
   bck->capacity = 4096;
@@ -106,12 +106,12 @@ static struct backing* tmpfs_open(struct vfs_node* node,
   bck->resize = tmpfs_resize;
   bck->close = tmpfs_close;
 
-  return (struct backing*)bck;
+  return (struct vnode*)bck;
 }
 
-static struct backing* tmpfs_mkdir(struct vfs_node* node, mode_t mode) {
-  struct tmpfs_backing* bck =
-      (struct tmpfs_backing*)create_backing(sizeof(struct tmpfs_backing));
+static struct vnode* tmpfs_mkdir(struct vfs_ent* node, mode_t mode) {
+  struct tmpfs_vnode* bck =
+      (struct tmpfs_vnode*)create_resource(sizeof(struct tmpfs_vnode));
 
   bck->st.st_dev = 1;
   bck->st.st_size = 0;
@@ -121,12 +121,12 @@ static struct backing* tmpfs_mkdir(struct vfs_node* node, mode_t mode) {
   bck->st.st_mode = (mode & ~S_IFMT) | S_IFDIR;
   bck->st.st_nlink = 1;
 
-  return (struct backing*)bck;
+  return (struct vnode*)bck;
 }
 
-static struct backing* tmpfs_link(struct vfs_node* node, mode_t mode) {
-  struct tmpfs_backing* bck =
-      (struct tmpfs_backing*)create_backing(sizeof(struct tmpfs_backing));
+static struct vnode* tmpfs_link(struct vfs_ent* node, mode_t mode) {
+  struct tmpfs_vnode* bck =
+      (struct tmpfs_vnode*)create_resource(sizeof(struct tmpfs_vnode));
 
   bck->st.st_dev = 1;
   bck->st.st_size = 0;
@@ -136,10 +136,10 @@ static struct backing* tmpfs_link(struct vfs_node* node, mode_t mode) {
   bck->st.st_mode = (mode & ~S_IFMT) | S_IFLNK;
   bck->st.st_nlink = 1;
 
-  return (struct backing*)bck;
+  return (struct vnode*)bck;
 }
 
-static struct vfs_node* tmpfs_mount(const char* base, struct vfs_node* parent) {
+static struct vfs_ent* tmpfs_mount(const char* base, struct vfs_ent* parent) {
   parent->fs = &tmpfs;
   return vfs_create_node(base, parent);
 }

@@ -15,10 +15,10 @@ typedef struct process {
   vec_t(struct process*) children;
   vec_t(struct thread*) threads;
 
-  struct vfs_node* cwd;
-  struct hash_table files;
+  struct vfs_ent* cwd;
+  struct hash_table handles;
   vm_space_t* space;
-  uint8_t exit_code;
+  int fd_counter, status;
 } proc_t;
 
 typedef struct thread {

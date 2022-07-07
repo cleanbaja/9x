@@ -1,4 +1,5 @@
 #include <arch/irqchip.h>
+#include <arch/timer.h>
 #include <lib/cmdline.h>
 #include <lib/kcon.h>
 #include <ninex/acpi.h>
@@ -140,8 +141,10 @@ void acpi_enable() {
   size_t header_len = (xsdt_found) ? xsdt->header.length : rsdt->header.length;
   size_t entry_count =
     ((header_len - sizeof(acpi_header_t))) / ((xsdp->revision > 0) ? 8 : 4);
-  klog("acpi: a total of %u entries... (ACPI revision is %d)", entry_count,
-       xsdp->revision == 0 ? 1 : xsdp->revision);
+  klog("acpi: v%d, with a total of %d tables!", xsdp->revision == 0 ? 1 : xsdp->revision, entry_count);
+
+  if (!cmdline_get_bool("verbose", true))
+    return;
 
   for (size_t i = 0; i < entry_count; i++) {
     uint64_t table_addr =
@@ -177,7 +180,6 @@ void acpi_enter_ospm() {
 ////////////////////////////////////////////////
 // LAI (Lightweight ACPI Interpreter) Bindings
 ////////////////////////////////////////////////
-#define ARCH_INTERNAL
 #include <arch/asm.h>
 
 void* laihost_malloc(size_t size) {
@@ -323,16 +325,13 @@ void laihost_pci_writed(uint16_t seg,
 
 #endif  // __x86_64__
 
-// TODO: Actually sleep (with HPET?)
 void laihost_sleep(uint64_t ms) {
-  for (size_t i = 0; i < 1000 * ms; i++) {
-    asm_inb(0x80);
-  }
+  timer_msleep(ms);
 }
 
 // The following are stubs functions I keep in here, so that the linker dosen't
 // generate R_X86_64_GLOB_DAT relocations
-#define STUB_CALLED() klog("lai: STUB CALLED!!!")
+#define STUB_CALLED() klog("lai: function %s is a stub!!!", __func__)
 uint64_t laihost_timer() {
   STUB_CALLED();
   return 0;

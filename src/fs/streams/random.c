@@ -2,11 +2,12 @@
 #include <lib/kcon.h>
 #include <vm/vm.h>
 #ifdef __x86_64__
-#include <arch/cpuid.h> 
+#include <arch/asm.h>
+#include <arch/cpuid.h>
 #endif
 
-/* Mersenne Twister stolen from limine
- * https://github.com/limine-bootloader/limine
+/* Mersenne Twister implmentation, forgot where
+ * I got it from, so no credits...
  */
 
 #define n ((int)624)
@@ -54,7 +55,7 @@ uint32_t rand32(void) {
 }
 
 ssize_t
-random_read(struct backing* bck, void* buf, off_t offset, size_t count)
+random_read(struct vnode* bck, void* buf, off_t offset, size_t count)
 {
   // TODO: Find more sources of entropy, since /dev/random is supposed to be more secure
   srand((uintptr_t)buf);
@@ -77,7 +78,7 @@ random_read(struct backing* bck, void* buf, off_t offset, size_t count)
 }
 
 static ssize_t
-urandom_read(struct backing* bck, void* buf, off_t offset, size_t count)
+urandom_read(struct vnode* bck, void* buf, off_t offset, size_t count)
 {
   if (count % 4) {
     uint32_t* rand_buf = (uint32_t*)buf;
@@ -95,18 +96,18 @@ urandom_read(struct backing* bck, void* buf, off_t offset, size_t count)
 }
 
 static ssize_t
-null_write(struct backing* bck, const void* buf, off_t offset, size_t count)
+null_write(struct vnode* bck, const void* buf, off_t offset, size_t count)
 {
   (void)offset;
   (void)bck;
   (void)buf;
   (void)count;
-  
+
   return count;
 }
 
-static ssize_t 
-null_resize(struct backing* bck, off_t new_size)
+static ssize_t
+null_resize(struct vnode* bck, off_t new_size)
 {
   // The null device can't be resized
   (void)bck;
@@ -114,7 +115,7 @@ null_resize(struct backing* bck, off_t new_size)
   return 0;
 }
 
-static void null_close(struct backing* bck) {
+static void null_close(struct vnode* bck) {
   spinlock(&bck->lock);
   bck->refcount--;
   spinrelease(&bck->lock);
@@ -147,12 +148,12 @@ void setup_random_streams()
     klog("urandom: using RDRAND for additional entropy");
   }
 #endif // __x86_64__
-  
+
   // Init the RNG (Random Number Generator) and create the VFS nodes
   status = kmalloc(n * sizeof(uint32_t));
   srand(seed);
-  struct backing* urandom_bck = devtmpfs_create_device("urandom", 0);
-  struct backing* random_bck = devtmpfs_create_device("random", 0);
+  struct vnode* urandom_bck = devtmpfs_create_device("urandom", 0);
+  struct vnode* random_bck = devtmpfs_create_device("random", 0);
 
   // Setup '/dev/random'
   random_bck->st.st_dev     = devtmpfs_create_id(0);

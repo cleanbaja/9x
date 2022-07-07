@@ -1,8 +1,7 @@
-#define ARCH_INTERNAL
-#include <arch/asm.h>
 #include <fs/devtmpfs.h>
 #include <lib/kcon.h>
 #include <lib/builtin.h>
+#include <arch/asm.h>
 
 #include "serial_priv.h"
 
@@ -24,7 +23,7 @@ static ssize_t serial_read(struct backing* bck,
   for (int i = 0; i < count; i++) {
     while((asm_inb(port + 5) & 1) == 0);
 
-    // TODO: Find a more efficent way, rather 
+    // TODO: Find a more efficent way, rather
     // than waiting for every character
     ((char*)buf)[i] = asm_inb(port);
   }
@@ -43,7 +42,7 @@ static ssize_t serial_write(struct backing* bck,
   for (int i = 0; i < count; i++) {
     while((asm_inb(port + 5) & 0x20) == 0);
 
-    // TODO: Find a more efficent way, rather 
+    // TODO: Find a more efficent way, rather
     // than waiting for every character
     if (((char*)buf)[i] == '\n') {
       asm_outb(port, '\r');
@@ -92,7 +91,7 @@ void rs232_init() {
     active_ports |= (1 << i);
 
     char dev_name[25];
-    snprintf(dev_name, 25, "ttyS%d", i); 
+    snprintf(dev_name, 25, "ttyS%d", i);
 
     // Create the respective resource
     struct backing* dev = devtmpfs_create_device(dev_name, 0);

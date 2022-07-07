@@ -71,6 +71,7 @@ asm_syscall_entry:
   cli
   mov rax, qword [gs:54]  ; rax = gs.errno
   mov rsp, qword [gs:30]  ; rsp = gs.user_stack
+  mov qword [gs:54], 0    ; clear errno
   swapgs
   o64 sysret
 

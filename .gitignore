@@ -1,6 +1,7 @@
 # generated things
 *.o
 *.a
+*.d
 *.elf
 *.bin
 *.cache

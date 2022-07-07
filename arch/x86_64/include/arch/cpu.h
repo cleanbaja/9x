@@ -2,13 +2,6 @@
 #define ARCH_CPU_H
 
 #include <ninex/proc.h>
-
-// Define ARCH_INTERNAL if needed, since this code
-// could be imported from generic code
-#ifndef ARCH_INTERNAL
-#define ARCH_INTERNAL
-#endif // ARCH_INTERNAL
-
 #include <arch/asm.h>
 
 // List of CPU features recognized by 9x

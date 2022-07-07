@@ -68,7 +68,7 @@ void initramfs_populate(struct stivale2_struct_tag_modules* mods) {
         break;
       }
       case USTAR_FILE: {
-        struct backing* r =
+        struct vnode* r =
             vfs_open(NULL, hdr->name, true, parse_octal(hdr->mode));
         void* buf = (void*)hdr + 512;
         r->write(r, buf, 0, size);

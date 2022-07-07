@@ -15,8 +15,9 @@
 #define SYS_EXIT       4
 #define SYS_READ       5
 #define SYS_WRITE      6
-#define SYS_CLOSE      7
-#define SYS_ARCHCTL    8
+#define SYS_SEEK       7
+#define SYS_CLOSE      8
+#define SYS_ARCHCTL    9
 
 // Arch-Specific constants for SYS_ARCHCTL
 #ifdef __x86_64__

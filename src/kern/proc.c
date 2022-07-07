@@ -25,6 +25,7 @@ proc_t* create_process(proc_t* parent, vm_space_t* space, char* ttydev) {
     vec_push(&parent->children, process);
   } else {
     process->cwd = root_node;
+    process->fd_counter = 3;
   }
 
   // Setup the address space
@@ -67,7 +68,7 @@ bool load_elf(vm_space_t* space, const char* path, uintptr_t base, auxval_t* aux
     kfree(res.raw_string);
     return false;
   }
-  struct backing* file = res.target->backing;
+  struct vnode* file = res.target->backing;
 
   // Check the EHDR file header.
   Elf64_Ehdr ehdr;

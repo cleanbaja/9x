@@ -1,7 +1,7 @@
 #include <lib/builtin.h>
 #include <lib/lock.h>
 #include <lib/kcon.h>
-
+#include <stdbool.h>
 
 /*
  *  printf-family of functions ported to 9x
@@ -11,7 +11,7 @@
  *  License: MIT
  */
 
-// Customise printf to out liking (no floating point math in kernel)
+// Customise printf to our liking (no floating point math in kernel)
 #define PRINTF_NTOA_BUFFER_SIZE 64U
 #define PRINTF_SUPPORT_LONG_LONG
 #define PRINTF_SUPPORT_PTRDIFF_T

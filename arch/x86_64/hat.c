@@ -1,4 +1,5 @@
 #include <arch/asm.h>
+#include <arch/cpu.h>
 #include <arch/cpuid.h>
 #include <arch/hat.h>
 #include <arch/irqchip.h>
@@ -117,7 +118,7 @@ uint64_t hat_create_pte(vm_flags_t flags, uintptr_t phys, bool is_block) {
     pte_raw |= (1 << 7);
 
   if (!(flags & VM_PERM_READ))
-    klog("hat: (WARN) x86_64 does not support Read-Disabled mappings! (0x%x)",
+    klog("hat: (WARN) x86_64 does not support non-readable mappings! (0x%x)",
          flags);
 
   // Set proper cache type
@@ -149,7 +150,7 @@ void hat_invl(uintptr_t root, uintptr_t virt, uint32_t asid, int mode) {
     if (CPU_CHECK(CPU_FEAT_INVPCID)) {
       struct invpcid_descriptor {
         uint64_t pcid;
-	uint64_t addr;
+        uint64_t addr;
       } desc = { .pcid = asid, .addr = virt };
 
       __asm__ volatile("invpcid %1, %0" : : "r"((uint64_t)(mode - 0x10)), "m"(desc) : "memory");
@@ -161,13 +162,13 @@ void hat_invl(uintptr_t root, uintptr_t virt, uint32_t asid, int mode) {
         break;
 
       case INVL_SINGLE_ASID:
-	old_cr3 = asm_read_cr3();
-	new_cr3 = (uint16_t)asid | kernel_space.root;
+        old_cr3 = asm_read_cr3();
+        new_cr3 = (uint16_t)asid | kernel_space.root;
         new_cr3 &= ~(1ull << 63);  // Clear bit 63, to invalidate the PCID
 
         asm_write_cr3(new_cr3);
-	asm_write_cr3(old_cr3);
-	break;
+        asm_write_cr3(old_cr3);
+        break;
 
       case INVL_ALL_ASIDS:  // TODO: Find a way to invalidate all ASIDs, without invalidating global pages
       case INVL_ENTIRE_TLB:

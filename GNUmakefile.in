@@ -94,7 +94,7 @@ all: $(KERNEL)
 $(BUILD_DIR)/arch/@ARCH@/%.o: $(ARCH_DIR)/%.c
 	@$(COOL_PROMPT) " CC " $<
 	mkdir -p $(@D)
-	$(CC) $(CREALFLAGS) -D ARCH_INTERNAL -DSMP_INCLUDE_DIR=\"$(BUILD_DIR)/arch/@ARCH@\" -c -o $@ $<
+	$(CC) $(CREALFLAGS) -DSMP_INCLUDE_DIR=\"$(BUILD_DIR)/arch/@ARCH@\" -c -o $@ $<
 
 $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
 	@$(COOL_PROMPT) " CC " $<

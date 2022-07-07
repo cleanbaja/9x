@@ -2,11 +2,11 @@
 #include <lib/builtin.h>
 
 static ssize_t
-zero_read(struct backing* bck, void* buf, off_t offset, size_t count)
+zero_read(struct vnode* bck, void* buf, off_t offset, size_t count)
 {
   (void)offset;
   (void)bck;
-  
+
   // Use 64-bit memcpy when possible
   if (count % 8) {
     memset64(buf, 0, count);
@@ -18,7 +18,7 @@ zero_read(struct backing* bck, void* buf, off_t offset, size_t count)
 }
 
 static ssize_t
-null_read(struct backing* bck, void* buf, off_t offset, size_t count)
+null_read(struct vnode* bck, void* buf, off_t offset, size_t count)
 {
   (void)offset;
   (void)bck;
@@ -29,7 +29,7 @@ null_read(struct backing* bck, void* buf, off_t offset, size_t count)
 }
 
 static ssize_t
-null_write(struct backing* bck, const void* buf, off_t offset, size_t count)
+null_write(struct vnode* bck, const void* buf, off_t offset, size_t count)
 {
   (void)offset;
   (void)bck;
@@ -40,7 +40,7 @@ null_write(struct backing* bck, const void* buf, off_t offset, size_t count)
 }
 
 static ssize_t
-null_resize(struct backing* bck, off_t new_size)
+null_resize(struct vnode* bck, off_t new_size)
 {
   // The null device can't be resized
   (void)bck;
@@ -48,7 +48,7 @@ null_resize(struct backing* bck, off_t new_size)
   return 0;
 }
 
-static void null_close(struct backing* bck) {
+static void null_close(struct vnode* bck) {
   spinlock(&bck->lock);
   bck->refcount--;
   spinrelease(&bck->lock);
@@ -56,9 +56,9 @@ static void null_close(struct backing* bck) {
 
 void setup_unix_streams()
 {
-  struct backing* zero_bck = devtmpfs_create_device("zero", 0);
-  struct backing* null_bck = devtmpfs_create_device("null", 0);
-      
+  struct vnode* zero_bck = devtmpfs_create_device("zero", 0);
+  struct vnode* null_bck = devtmpfs_create_device("null", 0);
+
   // Setup '/dev/zero'
   zero_bck->st.st_dev     = devtmpfs_create_id(0);
   zero_bck->st.st_mode    = 0666 | S_IFCHR;

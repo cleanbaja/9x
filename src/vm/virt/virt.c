@@ -1,4 +1,5 @@
 #include <arch/hat.h>
+#include <arch/asm.h>
 #include <lib/builtin.h>
 #include <lib/kcon.h>
 #include <lib/stivale2.h>
@@ -12,10 +13,10 @@ vm_space_t kernel_space;
 //////////////////////////
 //   ASID Management
 //////////////////////////
-uint32_t asid_bitmap[VM_ASID_MAX / 8] = {0};
+uint32_t *asid_bitmap = NULL;
 
 static uint32_t alloc_asid() {
-  for (uint32_t i = 0; i < VM_ASID_MAX; i++) {
+  for (uint32_t i = 0; i < cur_config->asid_max; i++) {
     if (!BIT_TEST(asid_bitmap, i)) {
       BIT_SET(asid_bitmap, i);
       return i;
@@ -26,9 +27,9 @@ static uint32_t alloc_asid() {
   return 0;
 }
 static void free_asid(uint32_t asid) {
-  if (asid > VM_ASID_MAX)
+  if (asid > cur_config->asid_max)
     return;
- 
+
   BIT_CLEAR(asid_bitmap, asid);
 }
 
@@ -148,16 +149,17 @@ bool vm_fault(uintptr_t location, enum vm_fault flags) {
 
   return true;
 }
-
-
-#ifdef __x86_64__
 void vm_virt_init() {
+  // First off, allocate the ASID bitmap (reserve ASID #0 for the kernel)
+  asid_bitmap = kmalloc(sizeof(uint32_t) * (cur_config->asid_max / 8));
+  BIT_SET(asid_bitmap, 0);
+
   // Setup the kernel space
   kernel_space.root = (uintptr_t)vm_phys_alloc(1, VM_ALLOC_ZERO);
   kernel_space.asid = 0;
   kernel_space.active = true;
 
-  // Copy in the higher half...
+  // Copy in the higher half (from the bootloader)
   uint64_t* bootloader_cr3 = (uint64_t*)asm_read_cr3();
   for (int i = 256; i < 512; i++) {
     ((uint64_t*)kernel_space.root)[i] = bootloader_cr3[i];
@@ -169,4 +171,3 @@ void vm_virt_init() {
   // Scrub the TLB
   hat_invl(kernel_space.root, 0, 0, INVL_ENTIRE_TLB);
 }
-#endif  // __x86_64__

@@ -3,10 +3,6 @@
 
 #include "arch/irqchip.h"
 
-#ifndef ARCH_INTERNAL
-#error "Attempt to include internal code in a generic code file"
-#endif
-
 struct __attribute__((packed)) table_ptr
 {
   uint16_t limit;

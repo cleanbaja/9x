@@ -20,7 +20,7 @@ static uintptr_t find_base_for_mod(size_t req_len) {
   return ext_bump_base - req_len;
 }
 
-static struct kernel_extension* load_extension(struct backing* file) {
+static struct kernel_extension* load_extension(struct vnode* file) {
   uintptr_t base = find_base_for_mod(file->st.st_size);
 
   // Check the EHDR file header.
@@ -235,7 +235,7 @@ void kern_load_extensions() {
     }
   }
 
-  struct vfs_node* kext_parent = res.target;
+  struct vfs_ent* kext_parent = res.target;
   for (int i = 0; i < kext_parent->children.length; i++) {
     struct kernel_extension* ext =
         load_extension(kext_parent->children.data[i]->backing);

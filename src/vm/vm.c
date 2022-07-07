@@ -48,7 +48,7 @@ void vm_setup() {
   hat_init();
 
   // Dump all memmap entries
-  if (!(mm_tag->entries > 25) || cmdline_get_bool("verbose", false)) {
+  if ((mm_tag->entries < 25) || cmdline_get_bool("verbose", true)) {
     klog("vm/phys: Dumping memory map (entries: %d):", mm_tag->entries);
     for (int i = 0; i < mm_tag->entries; i++) {
       struct stivale2_mmap_entry entry = mm_tag->memmap[i];

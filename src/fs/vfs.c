@@ -4,7 +4,7 @@
 #include <lib/kcon.h>
 #include <vm/vm.h>
 
-struct vfs_node* root_node = NULL;
+struct vfs_ent* root_node = NULL;
 vec_t(struct filesystem*) fs_list;
 static lock_t vfs_lock;
 extern void initramfs_populate(struct stivale2_struct_tag_modules* mods);
@@ -26,8 +26,8 @@ static struct filesystem* find_fs(const char* name) {
   return NULL;
 }
 
-struct vfs_node* vfs_create_node(const char* basename, struct vfs_node* parent) {
-  struct vfs_node* nd = kmalloc(sizeof(struct vfs_node));
+struct vfs_ent* vfs_create_node(const char* basename, struct vfs_ent* parent) {
+  struct vfs_ent* nd = kmalloc(sizeof(struct vfs_ent));
   memcpy(nd->name, basename, strlen(basename));
   nd->parent = parent;
   nd->fs = parent->fs;
@@ -35,7 +35,7 @@ struct vfs_node* vfs_create_node(const char* basename, struct vfs_node* parent) 
   return nd;
 }
 
-static inline struct vfs_node* simplify_node(struct vfs_node* nd) {
+static inline struct vfs_ent* simplify_node(struct vfs_ent* nd) {
   if (nd->mountpoint) {
     return nd->mountpoint;
   } else if (nd->symlink_target && S_ISLNK(nd->backing->st.st_mode)) {
@@ -46,11 +46,11 @@ static inline struct vfs_node* simplify_node(struct vfs_node* nd) {
   }
 }
 
-static struct vfs_node* search_relative(struct vfs_node* parent, char* name, int flags) {
+static struct vfs_ent* search_relative(struct vfs_ent* parent, char* name, int flags) {
   if (!parent || !name)
     return NULL;
 
-  struct vfs_node* cur; int cnt;
+  struct vfs_ent* cur; int cnt;
   vec_foreach(&parent->children, cur, cnt) {
     if (memcmp(name, cur->name, strlen(name)) == 0)
       return simplify_node(cur);
@@ -66,7 +66,7 @@ static struct vfs_node* search_relative(struct vfs_node* parent, char* name, int
   }
 }
 
-struct vfs_resolved_node vfs_resolve(struct vfs_node* root, char* path, int flags) {
+struct vfs_resolved_node vfs_resolve(struct vfs_ent* root, char* path, int flags) {
   struct vfs_resolved_node result = {0};
   char* token = NULL;
   spinlock(&vfs_lock);
@@ -147,7 +147,7 @@ void vfs_mount(char* source, char* dest, char* fs) {
     return;
   } else {
     data.target->mountpoint = filesystem->mount(data.basename, data.parent);
-    struct vfs_node* new_point = data.target->mountpoint;
+    struct vfs_ent* new_point = data.target->mountpoint;
     new_point->backing = filesystem->mkdir(new_point, 0667);
     kfree(data.raw_string);
 
@@ -159,7 +159,7 @@ void vfs_mount(char* source, char* dest, char* fs) {
   }
 }
 
-void vfs_mkdir(struct vfs_node* parent, char* path, mode_t mode) {
+void vfs_mkdir(struct vfs_ent* parent, char* path, mode_t mode) {
   struct vfs_resolved_node res = vfs_resolve(parent, path, 0);
   if (res.success)
     return; // Directory already exists
@@ -167,13 +167,13 @@ void vfs_mkdir(struct vfs_node* parent, char* path, mode_t mode) {
     return; // Mysterious error :-(
 
   // Create the directory and insert it into the node space
-  struct vfs_node* new_dir = vfs_create_node(res.basename, res.parent);
+  struct vfs_ent* new_dir = vfs_create_node(res.basename, res.parent);
   new_dir->backing = new_dir->fs->mkdir(new_dir, mode);
   vec_push(&res.parent->children, new_dir);
   kfree(res.raw_string);
 }
 
-void vfs_symlink(struct vfs_node* root, char* target, char* source) {
+void vfs_symlink(struct vfs_ent* root, char* target, char* source) {
   int resolve_flags = RESOLVE_CREATE_SHALLOW | RESOLVE_FAIL_IF_EXISTS;
   struct vfs_resolved_node res = vfs_resolve(root, target, resolve_flags);
   if (!res.success)
@@ -184,7 +184,7 @@ void vfs_symlink(struct vfs_node* root, char* target, char* source) {
   res.target->backing = res.target->fs->link(res.target, 0777);
 }
 
-struct backing* vfs_open(struct vfs_node* root, char* path, bool create, mode_t creat_mode) {
+struct vnode* vfs_open(struct vfs_ent* root, char* path, bool create, mode_t creat_mode) {
   // TODO: Return EEXISTS if (creat_mode == (O_CREAT | O_EXCEL))
   struct vfs_resolved_node res = vfs_resolve(root, path, ((create) ? RESOLVE_CREATE_SHALLOW : 0));
   if (!res.success)
@@ -192,13 +192,13 @@ struct backing* vfs_open(struct vfs_node* root, char* path, bool create, mode_t 
 
   if (res.target->backing == NULL && create)
     res.target->backing = res.parent->fs->open(res.target, true, creat_mode);
-  
+
   res.target->refcount++;
   return res.target->backing;
 }
 
 /* A simple funciton I use for debugging the VFS tree...
-static void dump_all_nodes(struct vfs_node* node, int depth) {
+static void dump_all_nodes(struct vfs_ent* node, int depth) {
   if (node->mountpoint) {
     return dump_all_nodes(node->mountpoint, depth);
   } else if (node->symlink_target) { 
@@ -209,7 +209,7 @@ static void dump_all_nodes(struct vfs_node* node, int depth) {
   }
   
   if (S_ISDIR(node->backing->st.st_mode)) {  
-    struct vfs_node* cur; int cnt;
+    struct vfs_ent* cur; int cnt;
     vec_foreach(&node->children, cur, cnt) {
       dump_all_nodes(cur, depth+1);
     }
@@ -220,10 +220,10 @@ static void dump_all_nodes(struct vfs_node* node, int depth) {
 
 void vfs_setup() {
   // Create the root node...
-  root_node = kmalloc(sizeof(struct vfs_node));
+  root_node = kmalloc(sizeof(struct vfs_ent));
   memcpy(root_node->name, "/", 1);
   root_node->parent = root_node;
-  root_node->backing = create_backing(0);
+  root_node->backing = create_resource(0);
   root_node->backing->st.st_mode |= S_IFDIR;
 
   // Mount tmpfs to the VFS root

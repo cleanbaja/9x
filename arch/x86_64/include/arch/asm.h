@@ -4,10 +4,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#ifndef ARCH_INTERNAL
-#error "Attempt to include internal code in a generic code file"
-#endif
-
 // General asm routines
 #define asm_halt(enable_intrs)                                                 \
   ({                                                                           \

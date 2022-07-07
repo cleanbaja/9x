@@ -4,26 +4,26 @@
 #include <vm/vm.h>
 
 /* A complete copy of tmpfs, except we create some files on mount */
-struct devtmpfs_backing {
-  struct backing;
+struct devtmpfs_vnode {
+  struct vnode;
   size_t capacity;
   char* data;
 };
 
-static struct vfs_node* root_mount = NULL;
+static struct vfs_ent* root_mount = NULL;
 static int dev_counter = 1;
 
 // devtmpfs starts out empty, so no need to populate
-static struct vfs_node* devtmpfs_populate(struct vfs_node* node) {
+static struct vfs_ent* devtmpfs_populate(struct vfs_ent* node) {
   (void)node;
   return NULL;
 }
 
-static ssize_t devtmpfs_read(struct backing* bck,
+static ssize_t devtmpfs_read(struct vnode* bck,
                              void* buf,
                              off_t offset,
                              size_t count) {
-  struct devtmpfs_backing* b = (struct devtmpfs_backing*)bck;
+  struct devtmpfs_vnode* b = (struct devtmpfs_vnode*)bck;
   spinlock(&b->lock);
 
   // Truncate the read if the size is too big!
@@ -36,11 +36,11 @@ static ssize_t devtmpfs_read(struct backing* bck,
   return count;
 }
 
-static ssize_t devtmpfs_write(struct backing* bck,
+static ssize_t devtmpfs_write(struct vnode* bck,
                               const void* buf,
                               off_t offset,
                               size_t count) {
-  struct devtmpfs_backing* b = (struct devtmpfs_backing*)bck;
+  struct devtmpfs_vnode* b = (struct devtmpfs_vnode*)bck;
   spinlock(&b->lock);
 
   // Grow the file if needed!
@@ -59,8 +59,8 @@ static ssize_t devtmpfs_write(struct backing* bck,
   return count;
 }
 
-static ssize_t devtmpfs_resize(struct backing* bck, off_t new_size) {
-  struct devtmpfs_backing* b = (struct devtmpfs_backing*)bck;
+static ssize_t devtmpfs_resize(struct vnode* bck, off_t new_size) {
+  struct devtmpfs_vnode* b = (struct devtmpfs_vnode*)bck;
   spinlock(&b->lock);
 
   // Prevent downsizing...
@@ -78,21 +78,21 @@ static ssize_t devtmpfs_resize(struct backing* bck, off_t new_size) {
   return new_size;
 }
 
-static void devtmpfs_close(struct backing* bck) {
+static void devtmpfs_close(struct vnode* bck) {
   spinlock(&bck->lock);
   bck->refcount--;
   spinrelease(&bck->lock);
 }
 
-static struct backing* devtmpfs_open(struct vfs_node* node,
+static struct vnode* devtmpfs_open(struct vfs_ent* node,
                                      bool new_node,
                                      mode_t mode) {
   // We should only get called when creating a new resource/node
   if (!new_node)
     return NULL;
 
-  struct devtmpfs_backing* bck =
-      (struct devtmpfs_backing*)create_backing(sizeof(struct devtmpfs_backing));
+  struct devtmpfs_vnode* bck =
+      (struct devtmpfs_vnode*)create_resource(sizeof(struct devtmpfs_vnode));
 
   // Fill in the backing with proper values
   bck->capacity = 4096;
@@ -110,12 +110,12 @@ static struct backing* devtmpfs_open(struct vfs_node* node,
   bck->resize = devtmpfs_resize;
   bck->close = devtmpfs_close;
 
-  return (struct backing*)bck;
+  return (struct vnode*)bck;
 }
 
-static struct backing* devtmpfs_mkdir(struct vfs_node* node, mode_t mode) {
-  struct devtmpfs_backing* bck =
-      (struct devtmpfs_backing*)create_backing(sizeof(struct devtmpfs_backing));
+static struct vnode* devtmpfs_mkdir(struct vfs_ent* node, mode_t mode) {
+  struct devtmpfs_vnode* bck =
+      (struct devtmpfs_vnode*)create_resource(sizeof(struct devtmpfs_vnode));
 
   bck->st.st_dev = 1;
   bck->st.st_size = 0;
@@ -125,12 +125,12 @@ static struct backing* devtmpfs_mkdir(struct vfs_node* node, mode_t mode) {
   bck->st.st_mode = (mode & ~S_IFMT) | S_IFDIR;
   bck->st.st_nlink = 1;
 
-  return (struct backing*)bck;
+  return (struct vnode*)bck;
 }
 
-static struct backing* devtmpfs_link(struct vfs_node* node, mode_t mode) {
-  struct devtmpfs_backing* bck =
-      (struct devtmpfs_backing*)create_backing(sizeof(struct devtmpfs_backing));
+static struct vnode* devtmpfs_link(struct vfs_ent* node, mode_t mode) {
+  struct devtmpfs_vnode* bck =
+      (struct devtmpfs_vnode*)create_resource(sizeof(struct devtmpfs_vnode));
 
   bck->st.st_dev = 1;
   bck->st.st_size = 0;
@@ -140,11 +140,11 @@ static struct backing* devtmpfs_link(struct vfs_node* node, mode_t mode) {
   bck->st.st_mode = (mode & ~S_IFMT) | S_IFLNK;
   bck->st.st_nlink = 1;
 
-  return (struct backing*)bck;
+  return (struct vnode*)bck;
 }
 
-static struct vfs_node* devtmpfs_mount(const char* base,
-                                       struct vfs_node* parent) {
+static struct vfs_ent* devtmpfs_mount(const char* base,
+                                       struct vfs_ent* parent) {
   // TODO: Support multiple devtmpfs mounts
   if (root_mount)
     return NULL;
@@ -158,14 +158,14 @@ size_t devtmpfs_create_id(int subclass) {
   return MKDEV(dev_counter++, subclass);
 }
 
-struct backing* devtmpfs_create_device(char* path, int size) {
+struct vnode* devtmpfs_create_device(char* path, int size) {
   struct vfs_resolved_node res =
       vfs_resolve(root_mount, path, RESOLVE_CREATE_SHALLOW);
   if (!res.success)
     return NULL;
 
   kfree(res.raw_string);
-  res.target->backing = create_backing(size);
+  res.target->backing = create_resource(size);
   return res.target->backing;
 }
 

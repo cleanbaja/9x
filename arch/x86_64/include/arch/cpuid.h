@@ -3,10 +3,6 @@
 
 #include <stdint.h>
 
-#ifndef ARCH_INTERNAL
-#error "Attempt to include internal code in a generic code file"
-#endif
-
 /* CPUID bit definitions */
 #define CPUID_ECX_SSE3 (1U << 0U)
 #define CPUID_ECX_PCLMUL (1U << 1U)

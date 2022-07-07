@@ -5,10 +5,6 @@
 #include <arch/tables.h>
 #include <ninex/proc.h>
 #include <vm/virt.h>
-
-#ifndef ARCH_INTERNAL
-#define ARCH_INTERNAL
-#endif  // ARCH_INTERNAL
 #include <arch/asm.h>
 
 struct percpu_info {

@@ -27,11 +27,11 @@ void arch_init() {
   // Do some ACPI/APIC related stuff
   ic_enable();
   scan_madt();
-  acpi_enter_ospm();
 
   // Boot all other cores, and calibrate the TSC/APIC Timer
   smp_startup();
   timer_cali();
+  acpi_enter_ospm();
 }
 
 void syscall_archctl(cpu_ctx_t* context) {
