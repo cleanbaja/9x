@@ -1,7 +1,7 @@
 #include <ninex/proc.h>
 #include <arch/smp.h>
 #include <lib/builtin.h>
-#include <lib/posix.h>
+#include <lib/types.h>
 #include <lib/kcon.h>
 #include <fs/vfs.h>
 #include <vm/phys.h>
@@ -13,8 +13,6 @@ struct process* kernel_process;
 static proc_t* process_table[PROC_TABLE_SIZE];
 
 proc_t* create_process(proc_t* parent, vm_space_t* space, char* ttydev) {
-  (void)ttydev;
-
   // Setup the basics...
   proc_t* process = kmalloc(sizeof(proc_t));
   if (process == NULL) {
@@ -25,13 +23,22 @@ proc_t* create_process(proc_t* parent, vm_space_t* space, char* ttydev) {
     vec_push(&parent->children, process);
   } else {
     process->cwd = root_node;
-    process->fd_counter = 3;
   }
 
   // Setup the address space
   if (!space)
     space = vm_space_create();
   process->space = space;
+
+  // Insert the files
+  if (ttydev == NULL)
+    ttydev = "/dev/ttyS0";
+
+  for (int i = 0; i < 3; i++) {
+    struct handle* hnd = handle_open(process, ttydev, O_RDWR, 0);
+    htab_insert(&process->handles, &i, sizeof(int), hnd);
+    process->fd_counter++;
+  }
 
   // Finally, allocate a PID for this process
   uint64_t expected = 0;

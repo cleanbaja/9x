@@ -13,7 +13,7 @@ static uint16_t portmap[] = {
   0x5E8, 0x4E8
 };
 
-static ssize_t serial_read(struct backing* bck,
+static ssize_t serial_read(struct vnode* bck,
                              void* buf,
                              off_t offset,
                              size_t count) {
@@ -32,7 +32,7 @@ static ssize_t serial_read(struct backing* bck,
   return count;
 }
 
-static ssize_t serial_write(struct backing* bck,
+static ssize_t serial_write(struct vnode* bck,
                               const void* buf,
                               off_t offset,
                               size_t count) {
@@ -56,11 +56,11 @@ static ssize_t serial_write(struct backing* bck,
   return count;
 }
 
-static ssize_t serial_resize(struct backing* bck, off_t new_size) {
+static ssize_t serial_resize(struct vnode* bck, off_t new_size) {
   return 0;
 }
 
-static void serial_close(struct backing* bck) {
+static void serial_close(struct vnode* bck) {
   spinlock(&bck->lock);
   bck->refcount--;
   spinrelease(&bck->lock);
@@ -94,7 +94,7 @@ void rs232_init() {
     snprintf(dev_name, 25, "ttyS%d", i);
 
     // Create the respective resource
-    struct backing* dev = devtmpfs_create_device(dev_name, 0);
+    struct vnode* dev = devtmpfs_create_device(dev_name, 0);
     dev->st.st_dev = MKDEV(SERIAL_DEV_CLASS, i+1);
     dev->st.st_size = 0;
     dev->st.st_blocks = 0;
@@ -107,12 +107,6 @@ void rs232_init() {
     dev->write  = serial_write;
     dev->resize = serial_resize;
     dev->close  = serial_close;
-
-    // Finally, print a small greeting...
-    char greeting[128];
-    memset(greeting, 0, 128);
-    snprintf(greeting, 128, "\n9x Kernel on /dev/%s\n\n", dev_name);
-    dev->write(dev, greeting, 0, 128);
   }
 
 

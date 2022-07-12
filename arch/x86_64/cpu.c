@@ -2,6 +2,7 @@
 #include <arch/irqchip.h>
 #include <arch/smp.h>
 #include <arch/tables.h>
+#include <arch/arch.h>
 #include <lib/builtin.h>
 #include <lib/kcon.h>
 #include <ninex/proc.h>
@@ -274,6 +275,10 @@ void cpu_early_init() {
   if (CPU_CHECK(CPU_FEAT_PCID))
     cr4 |= (1 << 17);
 
+  // Enable SMAP
+  if (CPU_CHECK(CPU_FEAT_SMAP))
+    cr4 |= (1 << 21);
+
   // Enable X{SAVE,RSTOR} instructions
   if (CPU_CHECK(CPU_FEAT_XSAVE))
     cr4 |= (1 << 18);
@@ -366,6 +371,7 @@ void cpu_create_uctx(thread_t* thrd, struct exec_args args) {
   // Push the SYSV mandated elements to the stack, starting with
   // all the raw strings
   size_t narg = 0, nenv = 0;
+  mg_disable();
   char* sptr = (char*)(stack_base + (8 * VM_PAGE_SIZE) + VM_MEM_OFFSET);
   uint64_t* stack;
 
@@ -412,5 +418,6 @@ void cpu_create_uctx(thread_t* thrd, struct exec_args args) {
 
   // Finalize RSP and return
   context->rsp = ((uintptr_t)stack - VM_MEM_OFFSET - stack_base) + THREAD_STACK_BASE;
+  mg_enable();
 }
 

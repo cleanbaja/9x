@@ -31,7 +31,7 @@ struct vfs_ent* vfs_create_node(const char* basename, struct vfs_ent* parent) {
   memcpy(nd->name, basename, strlen(basename));
   nd->parent = parent;
   nd->fs = parent->fs;
-  
+
   return nd;
 }
 
@@ -86,17 +86,16 @@ struct vfs_resolved_node vfs_resolve(struct vfs_ent* root, char* path, int flags
       result.success  = true;
     }
 
-    klog("vfs: support parsing single character paths!");
     spinrelease(&vfs_lock);
     return result;
   } else if (path == NULL) {
-    klog("vfs: NULL path was passed to vfs_resolve!");
+    klog("vfs: NULL path was passed to vfs_resolve()!");
   }
   char* real_str = strdup(path);
   char* context = real_str;
   token = strtok_r(context, "/", &context);
 
-  // Use strtok to tokenize the path, and decent the node tree
+  // Use strtok to tokenize the path, and decend the node tree
   while (token) {
     result.basename = token;
     result.parent = result.target;
@@ -154,9 +153,30 @@ void vfs_mount(char* source, char* dest, char* fs) {
     if (filesystem->needs_backing) {
       klog("vfs: Mounted '%s' to '%s' using filesystem '%s'", source, dest, filesystem->name);
     } else {
-      klog("vfs: Mounted '%s' to '%s'", filesystem->name, dest);  
+      klog("vfs: Mounted '%s' to '%s'", filesystem->name, dest);
     }
   }
+}
+
+char* vfs_get_path(struct vfs_ent* node) {
+  vec_t(struct vfs_ent*) nodes = { 0 };
+  char *result = kmalloc(512); // TODO: allocate dynamically
+
+  while(node) {
+    vec_push(&nodes, node);
+    node = node->parent;
+  }
+
+  for(size_t i = nodes.length; i-- > 0;) {
+    if(S_ISDIR(nodes.data[i]->backing->st.st_mode)) {
+      snprintf(result + strlen(result), 256, "%s/", nodes.data[i]->name);
+    } else {
+      snprintf(result + strlen(result), 256, "%s", nodes.data[i]->name);
+    }
+  }
+
+  vec_deinit(&nodes);
+  return ++result;
 }
 
 void vfs_mkdir(struct vfs_ent* parent, char* path, mode_t mode) {
@@ -177,7 +197,7 @@ void vfs_symlink(struct vfs_ent* root, char* target, char* source) {
   int resolve_flags = RESOLVE_CREATE_SHALLOW | RESOLVE_FAIL_IF_EXISTS;
   struct vfs_resolved_node res = vfs_resolve(root, target, resolve_flags);
   if (!res.success)
-    klog("ERROR!!!");
+    return;
 
   memcpy(res.target->name, res.basename, strlen(res.basename));
   res.target->symlink_target = strdup(source);
@@ -197,18 +217,18 @@ struct vnode* vfs_open(struct vfs_ent* root, char* path, bool create, mode_t cre
   return res.target->backing;
 }
 
-/* A simple funciton I use for debugging the VFS tree...
+// A simple funciton I use for debugging the VFS tree...
 static void dump_all_nodes(struct vfs_ent* node, int depth) {
   if (node->mountpoint) {
     return dump_all_nodes(node->mountpoint, depth);
-  } else if (node->symlink_target) { 
+  } else if (node->symlink_target) {
     klog("%*s%s -| (link)", depth, "", node->name);
     return;
   } else {
     klog("%*s%s -|", depth, "", node->name);
   }
-  
-  if (S_ISDIR(node->backing->st.st_mode)) {  
+
+  if (S_ISDIR(node->backing->st.st_mode)) {
     struct vfs_ent* cur; int cnt;
     vec_foreach(&node->children, cur, cnt) {
       dump_all_nodes(cur, depth+1);
@@ -216,7 +236,7 @@ static void dump_all_nodes(struct vfs_ent* node, int depth) {
     return;
   }
 }
-*/
+
 
 void vfs_setup() {
   // Create the root node...

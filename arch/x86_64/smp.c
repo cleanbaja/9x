@@ -44,7 +44,7 @@ static void hello_ap(struct percpu_info* info) {
     hat_init();
     load_tss((uintptr_t)&this_cpu->tss);
     timer_cali();
-    sched_setup();
+    enter_scheduler();
   }
   spinrelease(&smp_lock);
 

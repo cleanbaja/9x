@@ -70,7 +70,12 @@ void dispatch_edge_irq(cpu_ctx_t* c, struct irq_resource* res, int irq) {
 
 void respond_irq(cpu_ctx_t* context, int irq_num) {
   struct irq_resource* cur_irq = get_irq_handler(irq_num);
-  spinlock(&cur_irq->lock);
+  if (cur_irq == NULL) {
+    klog("spurrious IRQ #%d has no resource???", irq_num);
+    return;
+  } else {
+    spinlock(&cur_irq->lock);
+  }
 
   // Check if we can't respond to the IRQ
   if ((cur_irq->status & IRQ_DISABLED) || (cur_irq->status & IRQ_INPROGRESS) ||
@@ -101,7 +106,7 @@ void respond_irq(cpu_ctx_t* context, int irq_num) {
       dispatch_edge_irq(context, cur_irq, irq_num);
       break;
 
-    case EOI_MODE_TIMER:
+     case EOI_MODE_TIMER:
       // Timer IRQs are diffrent, since they return their own way...
       ic_eoi(irq_num);
       spinrelease(&cur_irq->lock);

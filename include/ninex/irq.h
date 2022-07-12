@@ -13,7 +13,8 @@
 struct irq_resource {
   void (*HandlerFunc)(cpu_ctx_t*);
   enum { EOI_MODE_UNKNOWN, EOI_MODE_LEVEL = 10, EOI_MODE_EDGE, EOI_MODE_TIMER } eoi_strategy;
-  volatile int status, lock;
+  volatile int status;
+  volatile int lock;
 
   // Extra information (for debugging and tracking)
   char* procfs_name;

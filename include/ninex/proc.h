@@ -4,7 +4,8 @@
 #include <arch/irqchip.h>
 #include <lib/htab.h>
 #include <lib/vec.h>
-#include <lib/elf.h>
+#include <lib/types.h>
+#include <lib/queue.h>
 #include <vm/virt.h>
 
 #define DEFAULT_TIMESLICE 20 // A default timeslice of 20 milleseconds
@@ -33,6 +34,7 @@ typedef struct thread {
 #ifdef __x86_64__
   uintptr_t client_fs, client_gs;
 #endif
+  TAILQ_ENTRY(thread) queue;
 } thread_t;
 
 struct exec_args {

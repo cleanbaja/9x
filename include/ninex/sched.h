@@ -3,20 +3,15 @@
 
 #include <ninex/proc.h>
 
-struct thread_node {
-  thread_t *value;
-  struct thread_node *next;
-};
-
-struct thread_queue {
-  int n_elem;
-  struct thread_node *head;
-  struct thread_node *tail;
-};
+// Define a threadlist as a TAILQ of threads
+TAILQ_HEAD(threadlist, thread);
 
 void sched_queue(thread_t* thread);
 void sched_dequeue(thread_t* thread);
-void sched_leave();
-void sched_setup();
+void sched_die(thread_t* target);
+void sched_dequeue_and_yield();
+void sched_yield();
+
+void enter_scheduler();
 
 #endif // NINEX_SCHED_H

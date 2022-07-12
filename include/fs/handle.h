@@ -1,7 +1,7 @@
 #ifndef FS_BACKING_H
 #define FS_BACKING_H
 
-#include <lib/posix.h>
+#include <lib/types.h>
 #include <lib/lock.h>
 #include <stddef.h>
 
@@ -9,11 +9,13 @@
  * Unix/Posix definitions...
  */
 #define O_ACCMODE 0x0007
-#define O_EXEC 1
-#define O_RDONLY 2
-#define O_RDWR 3
-#define O_SEARCH 4
-#define O_WRONLY 5
+#define O_EXEC    0b1000
+#define O_RDONLY  0b0100
+#define O_RDWR    0b1100
+#define O_SEARCH  0b0010
+#define O_WRONLY  0b1010
+#define CAN_READ(x)  ((x & O_RDONLY) || (x & O_RDWR))
+#define CAN_WRITE(x)  ((x & O_WRONLY) || (x & O_RDWR))
 
 #define O_APPEND 0x0008
 #define O_CREAT 0x0010
@@ -108,7 +110,8 @@ struct handle {
   int64_t refcount, offset;
 };
 
+struct process;
 struct vnode* create_resource(size_t extra_bytes);
-struct handle* handle_open(const char* path, int flags, int creat_mode);
+struct handle* handle_open(struct process* proc, const char* path, int flags, int creat_mode);
 
 #endif // FS_BACKING_H

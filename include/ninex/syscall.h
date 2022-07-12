@@ -13,11 +13,15 @@
 #define SYS_VM_MAP     2
 #define SYS_VM_UNMAP   3
 #define SYS_EXIT       4
-#define SYS_READ       5
-#define SYS_WRITE      6
-#define SYS_SEEK       7
-#define SYS_CLOSE      8
-#define SYS_ARCHCTL    9
+#define SYS_ARCHCTL    5
+#define SYS_READ       6
+#define SYS_WRITE      7
+#define SYS_SEEK       8
+#define SYS_CLOSE      9
+#define SYS_GETPID     10
+#define SYS_GETPPID    11
+#define SYS_FCNTL      12
+#define SYS_IOCTL      13
 
 // Arch-Specific constants for SYS_ARCHCTL
 #ifdef __x86_64__

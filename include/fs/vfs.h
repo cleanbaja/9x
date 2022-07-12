@@ -39,6 +39,7 @@ struct vfs_ent
 void vfs_register_filesystem(struct filesystem* fs);
 void vfs_init(struct stivale2_struct_tag_modules* mods);
 void vfs_mount(char* source, char* dest, char* fs);
+char* vfs_get_path(struct vfs_ent* node);
 
 // The heart of the VFS subsystem, the resolving function, which
 // turns paths to nodes

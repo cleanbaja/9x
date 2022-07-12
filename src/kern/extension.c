@@ -1,7 +1,7 @@
 #include <arch/hat.h>
 #include <fs/vfs.h>
 #include <lib/builtin.h>
-#include <lib/elf.h>
+#include <lib/types.h>
 #include <lib/kcon.h>
 #include <ninex/extension.h>
 #include <vm/phys.h>

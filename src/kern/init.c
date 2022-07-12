@@ -1,5 +1,4 @@
 #include <arch/arch.h>
-#include <arch/irqchip.h>
 #include <fs/vfs.h>
 #include <lib/kcon.h>
 #include <ninex/acpi.h>
@@ -8,6 +7,8 @@
 #include <ninex/extension.h>
 #include <vm/vm.h>
 #include <arch/smp.h>
+
+#include "config.h"
 
 ///////////////////////////
 //  Stivale2 Interface
@@ -74,9 +75,7 @@ static void kern_stage2()  {
   // Setup the init thread's args...
   const char *argv[] = { "/bin/dash", NULL };
   const char *envp[] = {
-    "HOME=/",
-    "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
-    "TERM=linux",
+    "NINEX_VERSION=" NINEX_VERSION,
     NULL
   };
 
@@ -90,8 +89,8 @@ static void kern_stage2()  {
   } else {
     sched_queue(init_thread);
 
-    // Now that our job is done, leave the init thread
-    sched_leave();
+    // Now that our job is done, kill the init thread
+    sched_die(NULL);
   }
 }
 
@@ -114,7 +113,7 @@ void kern_entry(struct stivale2_struct* bootdata) {
   // initialization, and to launch userspace!
   thread_t* init_thread = kthread_create((uintptr_t)kern_stage2, 0);
   sched_queue(init_thread);
-  sched_setup();
+  enter_scheduler();
 
   // DO NOT PUT ANYTHING HERE, USE THE INIT THREAD INSTEAD!
   for (;;) {

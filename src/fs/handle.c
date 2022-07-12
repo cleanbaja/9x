@@ -5,9 +5,9 @@
 #include <vm/vm.h>
 
 ssize_t
-default_read(struct vnode* b, void* buf, off_t loc, size_t count)
+default_read(struct vnode* v, void* buf, off_t loc, size_t count)
 {
-  (void)b;
+  (void)v;
   (void)buf;
   (void)loc;
   (void)count;
@@ -16,9 +16,9 @@ default_read(struct vnode* b, void* buf, off_t loc, size_t count)
 }
 
 ssize_t
-default_write(struct vnode* b, const void* buf, off_t loc, size_t count)
+default_write(struct vnode* v, const void* buf, off_t loc, size_t count)
 {
-  (void)b;
+  (void)v;
   (void)buf;
   (void)loc;
   (void)count;
@@ -27,19 +27,20 @@ default_write(struct vnode* b, const void* buf, off_t loc, size_t count)
 }
 
 ssize_t
-default_ioctl(struct vnode* b, int64_t req, void* argp)
+default_ioctl(struct vnode* v, int64_t req, void* argp)
 {
-  (void)b;
+  (void)v;
   (void)req;
   (void)argp;
 
+  set_errno(EINVAL);
   return -1;
 }
 
 ssize_t
-default_resize(struct vnode* b, off_t new_size)
+default_resize(struct vnode* v, off_t new_size)
 {
-  (void)b;
+  (void)v;
   (void)new_size;
 
   return -1;
@@ -47,27 +48,27 @@ default_resize(struct vnode* b, off_t new_size)
 
 struct vnode*
 create_resource(size_t extra_bytes) {
-  struct vnode* bk = NULL;
+  struct vnode* vk = NULL;
   if (extra_bytes == 0) {
-    bk = (struct vnode*)kmalloc(sizeof(struct vnode));
+    vk = (struct vnode*)kmalloc(sizeof(struct vnode));
   } else if (extra_bytes >= sizeof(struct vnode)) {
-    bk = (struct vnode*)kmalloc(extra_bytes);
+    vk = (struct vnode*)kmalloc(extra_bytes);
   } else {
     return NULL;
   }
 
-  bk->read = default_read;
-  bk->write = default_write;
-  bk->ioctl = default_ioctl;
-  bk->resize = default_resize;
-  bk->refcount = 1;
+  vk->read = default_read;
+  vk->write = default_write;
+  vk->ioctl = default_ioctl;
+  vk->resize = default_resize;
+  vk->refcount = 1;
 
-  return bk;
+  return vk;
 }
 
-struct handle* handle_open(const char* path, int flags, int creat_mode) {
+struct handle* handle_open(struct process* proc, const char* path, int flags, int creat_mode) {
   bool create = flags & O_CREAT;
-  struct vfs_resolved_node res = vfs_resolve(this_cpu->cur_thread->parent->cwd, (char*)path, ((create) ? RESOLVE_CREATE_SHALLOW : 0));
+  struct vfs_resolved_node res = vfs_resolve(proc->cwd, (char*)path, ((create) ? RESOLVE_CREATE_SHALLOW : 0));
   if (!res.success) {
     set_errno(ENOENT);
     goto failed;
