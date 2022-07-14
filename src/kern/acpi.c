@@ -213,9 +213,14 @@ void* laihost_scan(const char* signature, size_t index) {
   if (!memcmp(signature, "DSDT", 4)) {
     // Scan for the FADT
     acpi_fadt_t* fadt = (acpi_fadt_t*)acpi_query("FACP", 0);
-    void* dsdt = (char*)((size_t)fadt->dsdt + VM_MEM_OFFSET);
+    void* dsdt  = (char*)((size_t)fadt->dsdt + VM_MEM_OFFSET);
+    void* xdsdt = (char*)((size_t)fadt->x_dsdt + VM_MEM_OFFSET);
 
-    return dsdt;
+    // Always use the X-DSDT when possible
+    if (xdsdt)
+      return xdsdt;
+    else
+      return dsdt;
   } else {
     return acpi_query(signature, index);
   }

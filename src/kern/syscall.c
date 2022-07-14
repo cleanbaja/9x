@@ -5,9 +5,9 @@
 #include <lib/kcon.h>
 #include <arch/hat.h>
 #include <arch/smp.h>
-#include <fs/handle.h>
+#include <arch/arch.h>
+#include <fs/vfs.h>
 #include <vm/seg.h>
-
 
 ////////////////////////
 //   Syscall Helpers
@@ -29,14 +29,14 @@ static char* user_strdup(uintptr_t str) {
 }
 
 // Small macro for writing to a usermode pointer
-#define sc_write(pointer, data, type) ({             \
-  if (!mg_validate((void*)pointer, sizeof(type))) {  \
-    set_errno(EFAULT);                               \
-    return;                                          \
-  }                                                  \
-  mg_disable();                                      \
-  *((type*)pointer) = data;                          \
-  mg_enable();                                       \
+#define sc_write(pointer, data, type) ({                 \
+  if (!mg_validate((uintptr_t)pointer, sizeof(type))) {  \
+    set_errno(EFAULT);                                   \
+    return;                                              \
+  }                                                      \
+  mg_disable();                                          \
+  *((type*)pointer) = (type)data;                        \
+  mg_enable();                                           \
 })
 
 // Another small macro to help with fd to handle conversion
@@ -81,8 +81,6 @@ static void sys_vm_map(cpu_ctx_t* context) {
   void** window = (void**)ARG0(context);
   uint64_t flg = ARG1(context);
   size_t size = ARG2(context);
-  int fd = ARG3(context);
-  size_t offset = ARG4(context);
   uintptr_t hint = ARG5(context);
 
   if (!(GET_FLAGS(flg) & MAP_ANON)) {
@@ -128,6 +126,7 @@ static void sys_open(cpu_ctx_t* context) {
     sc_write(ARG3(context), -1, int);
     return;
   }
+  klog("opening path %s", path);
 
   // mlibc's rtdl opens with flags as 0, which is not allowed
   // therefore, assume O_RDWR when flags are 0
@@ -165,7 +164,7 @@ static void sys_read(cpu_ctx_t* context) {
     mg_disable(); // Disable SMAP/PAN instead of using a scratch buffer
   }
 
-  size_t bytes_read = result->data.res->read(result->data.res, (void*)ARG1(context), result->offset, ARG2(context));
+  size_t bytes_read = result->node->read(result->node, (void*)ARG1(context), result->offset, ARG2(context));
   result->offset += bytes_read;
   sc_write(ARG3(context), bytes_read, size_t);
   mg_enable();
@@ -187,7 +186,7 @@ static void sys_write(cpu_ctx_t* context) {
     mg_disable();
   }
 
-  size_t bytes_written = result->data.res->write(result->data.res, (void*)ARG1(context), result->offset, ARG2(context));
+  size_t bytes_written = result->node->write(result->node, (void*)ARG1(context), result->offset, ARG2(context));
   result->offset += bytes_written;
   sc_write(ARG3(context), bytes_written, size_t);
   mg_enable();
@@ -207,7 +206,7 @@ static void sys_seek(cpu_ctx_t* context) {
       result->offset += ARG1(context);
       break;
     case SEEK_END:
-      result->offset = ARG1(context) + result->data.res->st.st_size;
+      result->offset = ARG1(context) + result->node->st.st_size;
       break;
     default:
       set_errno(EINVAL);
@@ -217,9 +216,11 @@ static void sys_seek(cpu_ctx_t* context) {
   sc_write(ARG3(context), result->offset, size_t);
 }
 
+
+
 static void sys_close(cpu_ctx_t* context) {
   struct handle* result = openfd(ARG0(context));
-  result->data.res->close(result->data.res);
+  result->node->close(result->node);
   result->refcount--;
 
   htab_delete(&this_cpu->cur_thread->parent->handles, &ARG0(context), sizeof(int));
@@ -256,12 +257,17 @@ static void sys_exit(cpu_ctx_t* context) {
     if (hl == NULL)
       continue;
 
-    hl->data.res->close(hl->data.res);
+    hl->node->close(hl->node);
     hl->refcount--;
 
     if (hl->refcount == 0)
       kfree(hl);
   }
+
+  // Then switch to the kernel's space, and destroy the user's
+  vm_space_t* proc_space = process->space;
+  vm_space_load(&kernel_space);
+  vm_space_destroy(proc_space);
 
   // Finally, kill the thread we're currently running on
   process->status = status | 0x200;
@@ -279,8 +285,24 @@ static void sys_ioctl(cpu_ctx_t* context) {
     return;
   }
 
-  int result = hnd->data.res->ioctl(hnd->data.res, ARG1(context), ARG2(context));
+  int result = hnd->node->ioctl(hnd->node, ARG1(context), (void*)ARG2(context));
   sc_write(ARG3(context), result, int);
+}
+
+static void sys_getcwd(cpu_ctx_t* context) {
+  if (!mg_validate(ARG0(context), ARG1(context))) {
+    set_errno(EFAULT);
+    return;
+  }
+
+  char* result = vfs_get_path(this_cpu->cur_thread->parent->cwd);
+  if (strlen(result) > ARG1(context)) {
+    set_errno(ERANGE);
+  } else {
+    mg_copy_to_user((void*)ARG0(context), result, strlen(result));
+  }
+
+  kfree(result);
 }
 
 uintptr_t syscall_table[] = {
@@ -297,7 +319,8 @@ uintptr_t syscall_table[] = {
   [SYS_GETPPID]   = (uintptr_t)sys_get_ppid,
   [SYS_ARCHCTL]   = (uintptr_t)syscall_archctl,
   [SYS_FCNTL]     = (uintptr_t)sys_fcntl,
-  [SYS_IOCTL]     = (uintptr_t)sys_ioctl
+  [SYS_IOCTL]     = (uintptr_t)sys_ioctl,
+  [SYS_GETCWD]    = (uintptr_t)sys_getcwd
 };
 uintptr_t nr_syscalls = ARRAY_LEN(syscall_table);
 

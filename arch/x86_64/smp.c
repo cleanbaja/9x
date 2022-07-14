@@ -28,7 +28,7 @@ static void hello_ap(struct percpu_info* info) {
   asm volatile("xor %rbp, %rbp");
 
   // Let the BSP know that we're online
-  online_cores++;
+  ATOMIC_INC(&online_cores);
 
   // Run all the necissary init functions
   spinlock(&smp_lock);
@@ -82,6 +82,8 @@ void smp_startup() {
     percpu->kernel_stack = (uint64_t)vm_phys_alloc(16, VM_ALLOC_ZERO) +
                            VM_MEM_OFFSET + (VM_PAGE_SIZE * 16);
     percpu->tss.rsp0 = percpu->kernel_stack;
+    percpu->tss.ist1 = (uint64_t)vm_phys_alloc(16, VM_ALLOC_ZERO) +
+                       VM_MEM_OFFSET + (VM_PAGE_SIZE * 16);
 
     if (!(cur_lapic->flags & 1)) {
       klog("smp: CPU core %d is disabled!", cur_lapic->processor_id);

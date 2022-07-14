@@ -9,23 +9,22 @@
 #define MAX_NAME_LEN 256
 
 // A collection of API calls and decls that make up a filesystem
+struct vfs_ent;
 struct filesystem
 {
   const char* name;
   bool needs_backing;
 
-  struct vfs_ent*  (*populate)(struct vfs_ent* node);
-  struct vnode*  (*open)(struct vfs_ent* node, bool new_node, mode_t mode);
-  struct vnode*  (*mkdir)(struct vfs_ent* node, mode_t mode);
-  struct vnode*  (*link)(struct vfs_ent* node, mode_t mode);
-  struct vfs_ent*  (*mount)(const char*, struct vfs_ent*);
+  struct vnode*    (*open)(struct vfs_ent* node, bool new_node, mode_t mode);
+  struct vnode*    (*mkdir)(struct vfs_ent* node, mode_t mode);
+  struct vnode*    (*link)(struct vfs_ent* node, mode_t mode);
+  struct vfs_ent*  (*mount)(const char*, mode_t, struct vfs_ent*, struct vfs_ent*);
 };
 
 // Repersents a virtual filesystem node
 struct vfs_ent
 {
   char    name[MAX_NAME_LEN];
-  int64_t refcount;
   char*   symlink_target;
   struct  vnode* backing;
   struct  filesystem* fs;
@@ -38,7 +37,7 @@ struct vfs_ent
 // General routines
 void vfs_register_filesystem(struct filesystem* fs);
 void vfs_init(struct stivale2_struct_tag_modules* mods);
-void vfs_mount(char* source, char* dest, char* fs);
+void vfs_mount(char* source, char* dest, char* fst, mode_t perms);
 char* vfs_get_path(struct vfs_ent* node);
 
 // The heart of the VFS subsystem, the resolving function, which

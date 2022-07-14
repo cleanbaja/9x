@@ -109,6 +109,12 @@ load_tss(uintptr_t address)
   main_gdt.tss.reserved = 0;
   __asm__ volatile("ltr %0" ::"rm"((uint16_t)GDT_TSS_SELECTOR) : "memory");
 
+  // Next, update the pf handler, and give it its own IST
+  entries[14] = make_idt_entry(asm_dispatch_table[14], 1);
+  table_pointer.base = (uint64_t)entries;
+  table_pointer.limit = sizeof(entries) - 1;
+  __asm__ volatile("lidt %0" ::"m"(table_pointer));
+
   spinrelease(&reload_lock);
 }
 

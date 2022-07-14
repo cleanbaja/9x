@@ -13,12 +13,6 @@ struct devtmpfs_vnode {
 static struct vfs_ent* root_mount = NULL;
 static int dev_counter = 1;
 
-// devtmpfs starts out empty, so no need to populate
-static struct vfs_ent* devtmpfs_populate(struct vfs_ent* node) {
-  (void)node;
-  return NULL;
-}
-
 static ssize_t devtmpfs_read(struct vnode* bck,
                              void* buf,
                              off_t offset,
@@ -143,14 +137,17 @@ static struct vnode* devtmpfs_link(struct vfs_ent* node, mode_t mode) {
   return (struct vnode*)bck;
 }
 
-static struct vfs_ent* devtmpfs_mount(const char* base,
-                                       struct vfs_ent* parent) {
-  // TODO: Support multiple devtmpfs mounts
+static struct vfs_ent* devtmpfs_mount(const char* basename,
+                                   mode_t mount_perms,
+                                   struct vfs_ent* parent,
+                                   struct vfs_ent* source) {
+  (void)source;
   if (root_mount)
-    return NULL;
+    return NULL; // Multiple mounts not allowed!
 
-  parent->fs = &devtmpfs;
-  root_mount = vfs_create_node(base, parent);
+  root_mount = vfs_create_node(basename, parent);
+  root_mount->backing = devtmpfs_mkdir(root_mount, mount_perms);
+  root_mount->fs = &devtmpfs;
   return root_mount;
 }
 
@@ -171,7 +168,6 @@ struct vnode* devtmpfs_create_device(char* path, int size) {
 
 struct filesystem devtmpfs = {.name = "devtmpfs",
                               .needs_backing = false,
-                              .populate = devtmpfs_populate,
                               .open = devtmpfs_open,
                               .mkdir = devtmpfs_mkdir,
                               .link = devtmpfs_link,

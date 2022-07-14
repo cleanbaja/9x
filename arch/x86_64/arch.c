@@ -60,16 +60,16 @@ void mg_disable() {
     asm volatile ("stac" ::: "cc");
 }
 
-bool mg_validate(void* ptr, size_t len) {
+bool mg_validate(uintptr_t ptr, size_t len) {
   if (len <= VM_PAGE_SIZE) {
     // TODO: Check if range is mapped
     if ((uintptr_t)ptr > VM_MEM_OFFSET)
       return false;
-    else if (ptr == NULL)
+    else if (ptr == 0x0)
       return false;
   } else {
     for (size_t i = 0; i < len; i += VM_PAGE_SIZE) {
-      if (!mg_validate(i, VM_PAGE_SIZE))
+      if (!mg_validate(ptr + i, VM_PAGE_SIZE))
         return false;
     }
   }
@@ -81,7 +81,7 @@ bool mg_copy_to_user(void* usrptr, void* srcptr, size_t len) {
   mg_disable();
 
   // Check the entire address range we access, in uint32_t chunks
-  if (!mg_validate(usrptr, len))
+  if (!mg_validate((uintptr_t)usrptr, len))
     return false;
 
   memcpy(usrptr, srcptr, len);
@@ -93,7 +93,7 @@ bool mg_copy_from_user(void* kernptr, void* srcptr, size_t len) {
   mg_disable();
 
   // Check the entire address range we access, in uint32_t chunks
-  if (!mg_validate(srcptr, len))
+  if (!mg_validate((uintptr_t)srcptr, len))
     return false;
 
   memcpy(kernptr, srcptr, len);

@@ -73,8 +73,11 @@ static void kern_stage2()  {
   klog("init: completed all targets, entering userspace!");
 
   // Setup the init thread's args...
-  const char *argv[] = { "/bin/dash", NULL };
+  const char *argv[] = { "/bin/dash", "-l", NULL };
   const char *envp[] = {
+    "HOME=/",
+    "PATH=/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "TERM=linux",
     "NINEX_VERSION=" NINEX_VERSION,
     NULL
   };

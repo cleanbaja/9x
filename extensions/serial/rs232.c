@@ -13,32 +13,33 @@ static uint16_t portmap[] = {
   0x5E8, 0x4E8
 };
 
-static ssize_t serial_read(struct vnode* bck,
+static ssize_t serial_read(struct vnode* vn,
                              void* buf,
                              off_t offset,
                              size_t count) {
-  spinlock(&bck->lock);
+  spinlock(&vn->lock);
 
-  uint16_t port = portmap[EXTRACT_DEVICE_MINOR(bck->st.st_dev) - 1];
+  uint16_t port = portmap[EXTRACT_DEVICE_MINOR(vn->st.st_dev) - 1];
   for (int i = 0; i < count; i++) {
     while((asm_inb(port + 5) & 1) == 0);
 
     // TODO: Find a more efficent way, rather
     // than waiting for every character
     ((char*)buf)[i] = asm_inb(port);
+    klog("read %c", ((char*)buf)[i]);
   }
 
-  spinrelease(&bck->lock);
+  spinrelease(&vn->lock);
   return count;
 }
 
-static ssize_t serial_write(struct vnode* bck,
+static ssize_t serial_write(struct vnode* vn,
                               const void* buf,
                               off_t offset,
                               size_t count) {
-  spinlock(&bck->lock);
+  spinlock(&vn->lock);
 
-  uint16_t port = portmap[EXTRACT_DEVICE_MINOR(bck->st.st_dev) - 1];
+  uint16_t port = portmap[EXTRACT_DEVICE_MINOR(vn->st.st_dev) - 1];
   for (int i = 0; i < count; i++) {
     while((asm_inb(port + 5) & 0x20) == 0);
 
@@ -52,18 +53,28 @@ static ssize_t serial_write(struct vnode* bck,
     }
   }
 
-  spinrelease(&bck->lock);
+  spinrelease(&vn->lock);
   return count;
 }
 
-static ssize_t serial_resize(struct vnode* bck, off_t new_size) {
+static ssize_t serial_resize(struct vnode* vn, off_t new_size) {
   return 0;
 }
 
-static void serial_close(struct vnode* bck) {
-  spinlock(&bck->lock);
-  bck->refcount--;
-  spinrelease(&bck->lock);
+static void serial_close(struct vnode* vn) {
+  spinlock(&vn->lock);
+  vn->refcount--;
+  spinrelease(&vn->lock);
+}
+
+// TODO: stop stubbing for isatty, and add the TTY ioctls in
+static ssize_t serial_ioctl(struct vnode* v, int64_t req, void* argp)
+{
+  (void)v;
+  (void)req;
+  (void)argp;
+
+  return 0;
 }
 
 void rs232_init() {
@@ -106,6 +117,7 @@ void rs232_init() {
     dev->read   = serial_read;
     dev->write  = serial_write;
     dev->resize = serial_resize;
+    dev->ioctl  = serial_ioctl;
     dev->close  = serial_close;
   }
 

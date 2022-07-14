@@ -3,6 +3,7 @@
 
 #include <lib/types.h>
 #include <lib/lock.h>
+#include <lib/vec.h>
 #include <stddef.h>
 
 /*
@@ -63,7 +64,7 @@ struct stat
   dev_t st_dev;
   ino_t st_ino;
   mode_t st_mode;
-  nlink_t st_nlink;
+  uint32_t st_nlink;
   uid_t st_uid;
   gid_t st_gid;
   dev_t st_rdev;
@@ -100,10 +101,11 @@ struct vnode {
 };
 
 struct handle {
+  struct vfs_ent* file;
   union {
-    struct vfs_node* dirent;
-    struct vnode* res;
-  } data;
+    vec_t(struct dirent*)* dirents;
+    struct vnode* node;
+  };
 
   uint32_t flags;
   lock_t lock;
@@ -113,5 +115,6 @@ struct handle {
 struct process;
 struct vnode* create_resource(size_t extra_bytes);
 struct handle* handle_open(struct process* proc, const char* path, int flags, int creat_mode);
+struct handle* handle_clone(struct handle* parent);
 
 #endif // FS_BACKING_H

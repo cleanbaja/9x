@@ -9,12 +9,6 @@ struct tmpfs_vnode {
   char* data;
 };
 
-// tmpfs starts out empty, so no need to populate
-static struct vfs_ent* tmpfs_populate(struct vfs_ent* node) {
-  (void)node;
-  return NULL;
-}
-
 static ssize_t tmpfs_read(struct vnode* bck,
                           void* buf,
                           off_t offset,
@@ -139,14 +133,19 @@ static struct vnode* tmpfs_link(struct vfs_ent* node, mode_t mode) {
   return (struct vnode*)bck;
 }
 
-static struct vfs_ent* tmpfs_mount(const char* base, struct vfs_ent* parent) {
-  parent->fs = &tmpfs;
-  return vfs_create_node(base, parent);
+static struct vfs_ent* tmpfs_mount(const char* basename,
+                                   mode_t mount_perms,
+                                   struct vfs_ent* parent,
+                                   struct vfs_ent* source) {
+  (void)source;
+  struct vfs_ent* newent = vfs_create_node(basename, parent);
+  newent->backing = tmpfs_mkdir(newent, mount_perms);
+  newent->fs = &tmpfs;
+  return newent;
 }
 
 struct filesystem tmpfs = {.name = "tmpfs",
                            .needs_backing = false,
-                           .populate = tmpfs_populate,
                            .open = tmpfs_open,
                            .mkdir = tmpfs_mkdir,
                            .link = tmpfs_link,

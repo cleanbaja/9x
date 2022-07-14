@@ -22,6 +22,7 @@
 #define SYS_GETPPID    11
 #define SYS_FCNTL      12
 #define SYS_IOCTL      13
+#define SYS_GETCWD     14
 
 // Arch-Specific constants for SYS_ARCHCTL
 #ifdef __x86_64__

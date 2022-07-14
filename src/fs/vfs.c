@@ -103,7 +103,6 @@ struct vfs_resolved_node vfs_resolve(struct vfs_ent* root, char* path, int flags
 
     token = strtok_r(context, "/", &context);
     if (!token && !result.target && (flags & RESOLVE_CREATE_SHALLOW)) {
-      // Create the final node, if needed
       result.target = vfs_create_node(result.basename, result.parent);
       vec_push(&result.parent->children, result.target);
       flags &= ~(RESOLVE_FAIL_IF_EXISTS);
@@ -124,43 +123,64 @@ struct vfs_resolved_node vfs_resolve(struct vfs_ent* root, char* path, int flags
   return result;
 }
 
-void vfs_mount(char* source, char* dest, char* fs) {
-  struct filesystem* filesystem = find_fs(fs);
-  if (!filesystem) {
-    klog("vfs: unknown filesystem '%s'", fs);
+void vfs_mount(char* source, char* dest, char* fst, mode_t perms) {
+  struct filesystem* fs = find_fs(fst);
+  struct vfs_ent* source_node = NULL;
+  if (!fs) {
+    klog("vfs: unknown filesystem '%s'", fst);
     return;
   }
 
-  // We don't support physical filesystems at the moment...
-  if (filesystem->needs_backing) {
-    klog("vfs: (TODO) support filesystems that need physical backings!");
-    return;
-  }
-
-  struct vfs_resolved_node data = vfs_resolve(NULL, dest, 0);
-  if (!data.success) {
-    klog("vfs: non-existent mount destination '%s'!", dest);
-    return;
-  } else if (!S_ISDIR(data.target->backing->st.st_mode)) {
-    klog("vfs: '%s' is not a valid mountpoint!", dest);
-    return;
-  } else {
-    data.target->mountpoint = filesystem->mount(data.basename, data.parent);
-    struct vfs_ent* new_point = data.target->mountpoint;
-    new_point->backing = filesystem->mkdir(new_point, 0667);
-    kfree(data.raw_string);
-
-    if (filesystem->needs_backing) {
-      klog("vfs: Mounted '%s' to '%s' using filesystem '%s'", source, dest, filesystem->name);
-    } else {
-      klog("vfs: Mounted '%s' to '%s'", filesystem->name, dest);
+  if (fs->needs_backing) {
+    struct vfs_resolved_node rs = vfs_resolve(NULL, source, 0);
+    if (!rs.success) {
+      klog("vfs: mount source '%s' does not exist!", source);
+      kfree(rs.raw_string);
+      return;
     }
+    source_node = rs.target;
+    kfree(rs.raw_string);
   }
+
+  struct vfs_resolved_node res = vfs_resolve(NULL, dest, 0);
+  if (!res.success) {
+    klog("vfs: mount destination '%s' does not exist!", source);
+    goto out;
+  } else if (!S_ISDIR(res.target->backing->st.st_mode)) {
+    klog("vfs: mount destination '%s' is not a directory!", source);
+    goto out;
+  }
+
+  struct vfs_ent* target_node = res.target;
+  target_node->mountpoint = fs->mount(res.basename, perms, res.parent, source_node);
+  if (target_node->mountpoint == NULL) {
+    klog("vfs: mounting %s to '%s' failed!", fst, dest);
+    goto out;
+  }
+
+  if (fs->needs_backing) {
+    klog("vfs: Mounted '%s' to '%s' (%s)", source, dest, fs->name);
+  } else {
+    klog("vfs: Mounted '%s' to '%s'", fs->name, dest);
+  }
+
+out:
+  kfree(res.raw_string);
+  return;
 }
 
 char* vfs_get_path(struct vfs_ent* node) {
-  vec_t(struct vfs_ent*) nodes = { 0 };
-  char *result = kmalloc(512); // TODO: allocate dynamically
+  vec_t(struct vfs_ent*) nodes;
+  vec_init(&nodes);
+
+  char* path = NULL;
+  if (node == root_node) {
+    path = kmalloc(2);
+    *path = '/';
+    return path;
+  } else {
+    path = kmalloc(512);
+  }
 
   while(node) {
     vec_push(&nodes, node);
@@ -169,28 +189,27 @@ char* vfs_get_path(struct vfs_ent* node) {
 
   for(size_t i = nodes.length; i-- > 0;) {
     if(S_ISDIR(nodes.data[i]->backing->st.st_mode)) {
-      snprintf(result + strlen(result), 256, "%s/", nodes.data[i]->name);
+      snprintf(path + strlen(path), 512, "%s/", nodes.data[i]->name);
     } else {
-      snprintf(result + strlen(result), 256, "%s", nodes.data[i]->name);
+      snprintf(path + strlen(path), 512, "%s", nodes.data[i]->name);
     }
   }
 
   vec_deinit(&nodes);
-  return ++result;
+  return ++path;
 }
 
 void vfs_mkdir(struct vfs_ent* parent, char* path, mode_t mode) {
-  struct vfs_resolved_node res = vfs_resolve(parent, path, 0);
-  if (res.success)
-    return; // Directory already exists
-  else if (res.basename == NULL || res.parent == NULL)
-    return; // Mysterious error :-(
+  struct vfs_resolved_node target = vfs_resolve(parent, path, 0);
+  if (target.success)
+    goto cleanup;
 
-  // Create the directory and insert it into the node space
-  struct vfs_ent* new_dir = vfs_create_node(res.basename, res.parent);
-  new_dir->backing = new_dir->fs->mkdir(new_dir, mode);
-  vec_push(&res.parent->children, new_dir);
-  kfree(res.raw_string);
+  struct vfs_ent* dir = vfs_create_node(target.basename, target.parent);
+  dir->backing = dir->fs->mkdir(dir, mode);
+  vec_push(&target.parent->children, dir);
+
+cleanup:
+  kfree(target.raw_string);
 }
 
 void vfs_symlink(struct vfs_ent* root, char* target, char* source) {
@@ -205,7 +224,6 @@ void vfs_symlink(struct vfs_ent* root, char* target, char* source) {
 }
 
 struct vnode* vfs_open(struct vfs_ent* root, char* path, bool create, mode_t creat_mode) {
-  // TODO: Return EEXISTS if (creat_mode == (O_CREAT | O_EXCEL))
   struct vfs_resolved_node res = vfs_resolve(root, path, ((create) ? RESOLVE_CREATE_SHALLOW : 0));
   if (!res.success)
     return NULL;
@@ -213,11 +231,11 @@ struct vnode* vfs_open(struct vfs_ent* root, char* path, bool create, mode_t cre
   if (res.target->backing == NULL && create)
     res.target->backing = res.parent->fs->open(res.target, true, creat_mode);
 
-  res.target->refcount++;
+  res.target->backing->refcount++;
   return res.target->backing;
 }
 
-// A simple funciton I use for debugging the VFS tree...
+/* A simple funciton I use for debugging the VFS tree...
 static void dump_all_nodes(struct vfs_ent* node, int depth) {
   if (node->mountpoint) {
     return dump_all_nodes(node->mountpoint, depth);
@@ -235,8 +253,7 @@ static void dump_all_nodes(struct vfs_ent* node, int depth) {
     }
     return;
   }
-}
-
+}*/
 
 void vfs_setup() {
   // Create the root node...
@@ -248,12 +265,12 @@ void vfs_setup() {
 
   // Mount tmpfs to the VFS root
   vfs_register_fs(&tmpfs);
-  vfs_mount(NULL, "/", "tmpfs");
+  vfs_mount(NULL, "/", "tmpfs", 0755);
 
   // Then mount the devfs to /dev
   vfs_register_fs(&devtmpfs);
   vfs_mkdir(NULL, "/dev", 0775);
-  vfs_mount(NULL, "/dev", "devtmpfs");
+  vfs_mount(NULL, "/dev", "devtmpfs", 0755);
 
   // Populate the tmpfs (via the initramfs) and the devtmpfs
   struct stivale2_struct_tag_modules* mods =

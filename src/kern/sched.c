@@ -98,6 +98,7 @@ static void reschedule(struct cpu_context *ctx) {
 
     if (cur_thread == NULL) {
         timer_oneshot(DEFAULT_TIMESLICE, resched_slot);
+        vm_space_load(&kernel_space);
         spinrelease(&queue_lock);
 
         asm ("sti");

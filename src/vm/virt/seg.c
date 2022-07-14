@@ -138,6 +138,8 @@ static struct vm_seg* anon_clone(struct vm_seg* segment, void* space) {
       vm_map_range(space, (uintptr_t)pg->metadata, segment->base + i, cur_config->page_size, flags);
     }
   }
+
+  return new_segment;
 }
 
 static bool anon_unmap(struct vm_seg* segment, uintptr_t unmap_base, size_t unmap_len) {
@@ -167,6 +169,8 @@ static bool anon_unmap(struct vm_seg* segment, uintptr_t unmap_base, size_t unma
       kfree(pg);
     }
   }
+
+  return true;
 }
 
 static struct vm_seg* anon_create(vm_space_t* space, uintptr_t hint, uint64_t len, int prot, int mode) {

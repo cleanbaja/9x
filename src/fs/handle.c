@@ -1,4 +1,5 @@
 #include <lib/errno.h>
+#include <lib/builtin.h>
 #include <fs/handle.h>
 #include <fs/vfs.h>
 #include <arch/smp.h>
@@ -67,8 +68,8 @@ create_resource(size_t extra_bytes) {
 }
 
 struct handle* handle_open(struct process* proc, const char* path, int flags, int creat_mode) {
-  bool create = flags & O_CREAT;
-  struct vfs_resolved_node res = vfs_resolve(proc->cwd, (char*)path, ((create) ? RESOLVE_CREATE_SHALLOW : 0));
+  // TODO: Return EEXISTS if (creat_mode == (O_CREAT | O_EXCEL))
+  struct vfs_resolved_node res = vfs_resolve(proc->cwd, (char*)path, ((flags & O_CREAT) ? RESOLVE_CREATE_SHALLOW : 0));
   if (!res.success) {
     set_errno(ENOENT);
     goto failed;
@@ -77,16 +78,28 @@ struct handle* handle_open(struct process* proc, const char* path, int flags, in
     goto failed;
   }
 
-  res.target->refcount++;
-  if (res.target->backing == NULL && create)
+  res.target->backing->refcount++;
+  kfree(res.raw_string);
+  if (res.target->backing == NULL && (flags & O_CREAT))
     res.target->backing = res.parent->fs->open(res.target, true, creat_mode);
 
   struct handle* hnd = kmalloc(sizeof(struct handle));
-  hnd->data.res = res.target->backing;
+  hnd->node = res.target->backing;
+  hnd->file = res.target;
   hnd->flags = flags;
   hnd->refcount = 1;
   return hnd;
 
 failed:
+  kfree(res.raw_string);
   return NULL;
+}
+
+struct handle* handle_clone(struct handle* parent) {
+  struct handle* hnd = kmalloc(sizeof(struct handle));
+  memcpy(hnd, parent, sizeof(struct handle));
+  hnd->refcount = 1;
+  parent->refcount++;
+
+  return hnd;
 }

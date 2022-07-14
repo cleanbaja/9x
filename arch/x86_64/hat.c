@@ -61,7 +61,6 @@ uint64_t* hat_translate_addr(uintptr_t root,
                              bool create,
                              int depth) {
   uint64_t* cur = (uint64_t*)(root + VM_MEM_OFFSET);
-  uintptr_t cur_index = 0;
   uint64_t idx_map[] = {
 #define INDEX(shift) ((virt & ((uint64_t)0x1ff << shift)) >> shift)
       INDEX(48), INDEX(39), INDEX(30), INDEX(21), INDEX(12)
@@ -124,13 +123,13 @@ uint64_t hat_create_pte(vm_flags_t flags, uintptr_t phys, bool is_block) {
   // Set proper cache type
   switch (flags & VM_CACHE_MASK) {
     case VM_CACHE_UNCACHED:
-      pte_raw |= ~(1 << is_block ? 12 : 7) | (1 << 4) | (1 << 3);
+      pte_raw |= ~(1 << (is_block ? 12 : 7)) | (1 << 4) | (1 << 3);
       break;
     case VM_CACHE_WRITE_COMBINING:
-      pte_raw |= (1 << is_block ? 12 : 7) | (1 << 4) | (1 << 3);
+      pte_raw |= (1 << (is_block ? 12 : 7)) | (1 << 4) | (1 << 3);
       break;
     case VM_CACHE_WRITE_PROTECT:
-      pte_raw |= (1 << is_block ? 12 : 7) | (1 << 4) | ~(1 << 3);
+      pte_raw |= (1 << (is_block ? 12 : 7)) | (1 << 4) | ~(1 << 3);
       break;
     default:
       break;  // Use the default memory type (Write Back),

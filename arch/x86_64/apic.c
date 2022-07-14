@@ -81,6 +81,9 @@ void ic_send_ipi(uint8_t vec, uint32_t cpu, enum ipi_mode mode) {
       break;
     case IPI_SELF:
       cpu = 0;
+      break;
+    case IPI_SPECIFIC:
+      break; // Do nothing, flags are already in place
   }
 
   // Encode and send the IPI...
@@ -186,9 +189,6 @@ void ic_timer_oneshot(uint64_t ms, uint16_t vec) {
     // Stop the LAPIC timer
     xapic_write(LAPIC_TIMER_INIT, 0x0);
     xapic_write(LAPIC_TIMER_LVT, (1 << 16));
-
-    // Calculate the total ticks we need
-    uint64_t ticks = ms * this_cpu->lapic_freq;
 
     // Setup the registers
     xapic_write(LAPIC_TIMER_LVT, (xapic_read(LAPIC_TIMER_LVT) & ~(0b11 << 17)));
