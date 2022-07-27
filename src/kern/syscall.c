@@ -126,7 +126,6 @@ static void sys_open(cpu_ctx_t* context) {
     sc_write(ARG3(context), -1, int);
     return;
   }
-  klog("opening path %s", path);
 
   // mlibc's rtdl opens with flags as 0, which is not allowed
   // therefore, assume O_RDWR when flags are 0
@@ -216,8 +215,6 @@ static void sys_seek(cpu_ctx_t* context) {
   sc_write(ARG3(context), result->offset, size_t);
 }
 
-
-
 static void sys_close(cpu_ctx_t* context) {
   struct handle* result = openfd(ARG0(context));
   result->node->close(result->node);
@@ -274,8 +271,26 @@ static void sys_exit(cpu_ctx_t* context) {
   sched_die(NULL);
 }
 
+#define F_DUPFD 1
+#define F_SETFD 4
 static void sys_fcntl(cpu_ctx_t* context) {
-  set_errno(ENOSYS);
+  struct handle* hnd = openfd(ARG0(context));
+
+  switch (ARG1(context)) {
+  case F_DUPFD:
+    int new_fd = this_cpu->cur_thread->parent->fd_counter++;
+    struct handle* new_hnd = kmalloc(sizeof(struct handle));
+    sc_write(ARG3(context), new_fd, int);
+    memcpy(new_hnd, hnd, sizeof(struct handle));
+    htab_insert(&this_cpu->cur_thread->parent->handles, &new_fd, sizeof(int), new_hnd);
+    break;
+  case F_SETFD:
+    // Ignore, since we don't listen to CLOEXEC anyways
+    break;
+  default:
+    set_errno(ENOSYS);
+    break;
+  }
 }
 
 static void sys_ioctl(cpu_ctx_t* context) {
@@ -305,6 +320,56 @@ static void sys_getcwd(cpu_ctx_t* context) {
   kfree(result);
 }
 
+static void sys_stat(cpu_ctx_t* context) {
+  struct stat* statbuf = (struct stat*)ARG1(context);
+  if (!mg_validate((uintptr_t)statbuf, sizeof(struct stat))) {
+    set_errno(EFAULT);
+    return;
+  }
+
+  if (ARG0(context)) {
+    // FD stat
+    struct handle* hnd = openfd(ARG2(context));
+    mg_copy_to_user(statbuf, &hnd->node->st, sizeof(struct stat));
+  } else {
+    // File stat
+    char* real_path = user_strdup(ARG2(context));
+    struct vfs_resolved_node res = vfs_resolve(this_cpu->cur_thread->parent->cwd, real_path, 0);
+    if (!res.success) {
+      set_errno(ENOENT);
+      return;
+    }
+
+    mg_copy_to_user(statbuf, &res.target->backing->st, sizeof(struct stat));
+  }
+
+  return;
+}
+
+static void sys_fork(cpu_ctx_t* context) {
+  struct exec_args __dummy_arg = {0};
+  vm_space_t* new_space = vm_space_create();
+  vm_space_fork(this_cpu->cur_thread->parent->space, new_space);
+
+  proc_t* child_process = create_process(this_cpu->cur_thread->parent, new_space, NULL);
+  thread_t* child_thread = uthread_create(child_process, NULL, __dummy_arg, false);
+
+#ifdef __x86_64__
+  uint64_t old_cs = child_thread->context.cs;
+  uint64_t old_ss = child_thread->context.ss;
+  memcpy(&child_thread->context, context, sizeof(cpu_ctx_t));
+  child_thread->context.cs = old_cs;
+  child_thread->context.ss = old_ss;
+  child_thread->context.rsp = context->rsp;
+  child_thread->context.rax = 0;
+#else
+  memcpy(&child_thread->context, context, sizeof(cpu_ctx_t));
+#endif
+
+  sched_queue(child_thread);
+  sc_write(ARG0(context), child_process->pid, pid_t);
+}
+
 uintptr_t syscall_table[] = {
   [SYS_DEBUG_LOG] = (uintptr_t)sys_debug_log,
   [SYS_OPEN]      = (uintptr_t)sys_open,
@@ -320,7 +385,9 @@ uintptr_t syscall_table[] = {
   [SYS_ARCHCTL]   = (uintptr_t)syscall_archctl,
   [SYS_FCNTL]     = (uintptr_t)sys_fcntl,
   [SYS_IOCTL]     = (uintptr_t)sys_ioctl,
-  [SYS_GETCWD]    = (uintptr_t)sys_getcwd
+  [SYS_GETCWD]    = (uintptr_t)sys_getcwd,
+  [SYS_STAT]      = (uintptr_t)sys_stat,
+  [SYS_FORK]      = (uintptr_t)sys_fork
 };
 uintptr_t nr_syscalls = ARRAY_LEN(syscall_table);
 

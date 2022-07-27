@@ -56,7 +56,7 @@ proc_t* create_process(proc_t* parent, vm_space_t* space, char* ttydev) {
 
 thread_t* kthread_create(uintptr_t entry, uint64_t arg1) {
   if (kernel_process == NULL)
-    kernel_process = create_process(NULL, NULL, "/dev/ttyS0");
+    kernel_process = create_process(NULL, &kernel_space, "/dev/ttyS0");
 
   thread_t* new_thread = kmalloc(sizeof(thread_t));
   new_thread->parent   = kernel_process;
@@ -118,20 +118,26 @@ bool load_elf(vm_space_t* space, const char* path, uintptr_t base, auxval_t* aux
     if (phdrs[i].p_type != PT_LOAD)
       continue;
 
-	// TODO(cleanbaja): use the segment API to map the executable
+    // TODO(cleanbaja): use the segment API to map the executable
     uintptr_t misalign = phdrs[i].p_vaddr & (VM_PAGE_SIZE - 1);
     if (phdrs[i].p_memsz <= 0) {
       klog("proc: invalid p_memsz for %s?", path);
       goto cleanup;
     }
 
-    // Map pages for the segment...
-	int pf = VM_PERM_READ | VM_PERM_USER;
-	if (phdrs[i].p_flags & PF_W)
-	  pf |= VM_PERM_WRITE;
-	if (phdrs[i].p_flags & PF_X)
-	  pf |= VM_PERM_EXEC;
+    // Translate prot to ninex format
+    int pf = VM_PERM_READ | VM_PERM_USER;
+    if (phdrs[i].p_flags & PF_W)
+      pf |= VM_PERM_WRITE;
+    if (phdrs[i].p_flags & PF_X)
+      pf |= VM_PERM_EXEC;
 
+    // Create the segment object that corresponds to this region
+    struct vm_seg* n_seg = vm_create_seg(MAP_ANON | __MAP_EMBED_ONLY | MAP_PRIVATE,
+                                         phdrs[i].p_flags, ALIGN_UP(misalign + phdrs[i].p_memsz, 0x1000));
+    vec_push(&space->mappings, n_seg);
+
+    // Map pages for the segment...
     uintptr_t pa = (uintptr_t)vm_phys_alloc(
         DIV_ROUNDUP(misalign + phdrs[i].p_memsz, 0x1000), VM_ALLOC_ZERO);
     uintptr_t va = (base + phdrs[i].p_vaddr) & ~(VM_PAGE_SIZE - 1);
@@ -142,6 +148,19 @@ bool load_elf(vm_space_t* space, const char* path, uintptr_t base, auxval_t* aux
     memset((void*)(pa + VM_MEM_OFFSET + misalign), 0, phdrs[i].p_memsz);
     file->read(file, (void*)(pa + VM_MEM_OFFSET + misalign), phdrs[i].p_offset,
              phdrs[i].p_filesz);
+
+    // Finally, fill in the pagelist of the segment object
+    for (int i = 0; i < n_seg->len; i += VM_PAGE_SIZE) {
+      struct vm_page* pg = kmalloc(sizeof(struct vm_page));
+      uintptr_t spot = i * 0x1000;
+
+      htab_insert(&n_seg->pagelist, &spot, sizeof(size_t), pg);
+      pg->metadata = (void*)(pa + spot);
+      pg->refcount = 1;
+      pg->present  = 1;
+    }
+
+    n_seg->base = va;
   }
 
   // Set the auxval, and mark success
@@ -156,22 +175,28 @@ cleanup:
   return status;
 }
 
-thread_t* uthread_create(proc_t* parent, const char* filepath, struct exec_args arg) {
+thread_t* uthread_create(proc_t* parent, const char* filepath, struct exec_args arg, bool elf) {
   auxval_t aux;
   uintptr_t entry = 0;
-  if (!load_elf(parent->space, filepath, 0, &aux, &entry)) {
-    klog("proc: failed to load %s!", filepath);
-    return NULL;
+
+  if (elf) {
+    if (!load_elf(parent->space, filepath, 0, &aux, &entry)) {
+      klog("proc: failed to load %s!", filepath);
+      return NULL;
+    }
   }
 
   thread_t* new_thread = kmalloc(sizeof(thread_t));
   new_thread->parent   = parent;
   new_thread->tid      = parent->children.length;
   vec_push(&parent->threads, new_thread);
-  arg.entry = entry;
-  arg.vec = aux;
 
-  cpu_create_uctx(new_thread, arg);
+  if (elf) {
+    arg.entry = entry;
+    arg.vec = aux;
+  }
+
+  cpu_create_uctx(new_thread, arg, elf);
   return new_thread;
 }
 

@@ -125,6 +125,13 @@ void vm_space_destroy(vm_space_t* s) {
   kfree(s);
 }
 
+void vm_space_fork(vm_space_t* old, vm_space_t* cur) {
+  for (int i = 0; i < old->mappings.length; i++) {
+    struct vm_seg* sg = old->mappings.data[i];
+    sg->ops.clone(sg, cur);
+  }
+}
+
 //////////////////////////
 //    Misc Functions
 //////////////////////////
@@ -149,6 +156,7 @@ bool vm_fault(uintptr_t location, enum vm_fault flags) {
 
   return true;
 }
+
 void vm_virt_init() {
   // First off, allocate the ASID bitmap (reserve ASID #0 for the kernel)
   asid_bitmap = kmalloc(sizeof(uint32_t) * (cur_config->asid_max / 8));

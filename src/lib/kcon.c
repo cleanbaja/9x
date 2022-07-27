@@ -38,10 +38,15 @@ void stivale2_console_setup(const char* initial_buffer) {
 
 void stivale2_console_write(const char* message) {
   uint64_t saved_cr3 = asm_read_cr3();
-  asm_write_cr3(limine_pagemap);
+  bool re_enable = asm_check_intr();
+  asm_disable_intr();
 
+  asm_write_cr3(limine_pagemap);
   stivale2_term_write(message, strlen(message));
   asm_write_cr3(saved_cr3);
+
+  if (re_enable)
+    asm_enable_intr();
 }
 
 void stivale2_console_flush() {
@@ -92,12 +97,14 @@ static struct kcon_sink bxdbg_term_sink = {
 
 static uint16_t num_sinks;
 static struct kcon_sink* sinks[MAX_KCON_SINKS];
-static lock_t kcon_lock;
+static lock_t kcon_lock = 0;
 
 void kcon_register_sink(struct kcon_sink* sink) {
   spinlock(&kcon_lock);
-  if (num_sinks >= MAX_KCON_SINKS)
+  if (num_sinks >= MAX_KCON_SINKS) {
+    spinlock(&kcon_lock);
     return;
+  }
 
   sinks[num_sinks++] = sink;
   spinrelease(&kcon_lock);

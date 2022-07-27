@@ -23,6 +23,8 @@
 #define SYS_FCNTL      12
 #define SYS_IOCTL      13
 #define SYS_GETCWD     14
+#define SYS_STAT       15
+#define SYS_FORK       16
 
 // Arch-Specific constants for SYS_ARCHCTL
 #ifdef __x86_64__

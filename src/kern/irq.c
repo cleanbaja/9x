@@ -5,6 +5,7 @@
 
 static struct irq_resource irq_table[ARCH_NUM_IRQS] = {0};
 static int last_vector = ARCH_LOWEST_IRQ;
+static lock_t global_irq_lock = 0;
 
 static int alloc_irq_vector() {
   // Make sure we don't give out reserved vectors
@@ -69,11 +70,14 @@ void dispatch_edge_irq(cpu_ctx_t* c, struct irq_resource* res, int irq) {
 }
 
 void respond_irq(cpu_ctx_t* context, int irq_num) {
+  spinlock(&global_irq_lock);
   struct irq_resource* cur_irq = get_irq_handler(irq_num);
   if (cur_irq == NULL) {
     klog("spurrious IRQ #%d has no resource???", irq_num);
+    spinrelease(&global_irq_lock);
     return;
   } else {
+    spinrelease(&global_irq_lock);
     spinlock(&cur_irq->lock);
   }
 

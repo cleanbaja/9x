@@ -194,7 +194,7 @@ void hat_invl(uintptr_t root, uintptr_t virt, uint32_t asid, int mode) {
       break;
 
     default:
-      klog("hat: Invalidation mode %d is not supported!", mode); 
+      klog("hat: Invalidation mode %d is not supported!", mode);
     }
   }
 
@@ -236,25 +236,7 @@ void vm_space_load(vm_space_t* s) {
 void handle_pf(cpu_ctx_t* context) {
   uint32_t ec = context->ec;
   uintptr_t address = asm_read_cr2();
-
-  // For more information on the bits of the error code,
-  // see Intel x86_64 SDM Volume 3a Chapter 4.7
-  if (log_pagefault) {
-    klog("hat: Page Fault at 0x%lx! (%s) (%s) %s", address,
-         (ec & (1 << 1)) ? "write" : "read", (ec & (1 << 2)) ? "user" : "kmode",
-         (ec & (1 << 4)) ? "(ifetch)" : "");
-
-    if (ec & (1 << 0))
-      klog("  -> Cause: Page Protection Violation!");
-    else if (ec & (1 << 3))
-      klog("  -> Cause: Reserved Bit set!");
-    else if (ec & (1 << 5))
-      klog("  -> Cause: Protection Key Violation");
-    else if (ec & (1 << 15))
-      klog("  -> Cause: Intel(r) SGX Violation!");
-    else
-      klog("  -> Cause: Page Not Present!");
-  }
+  bool do_panic = false;
 
   // Fill in the vm_fault flags...
   enum vm_fault vf = VM_FAULT_NONE;
@@ -272,7 +254,29 @@ void handle_pf(cpu_ctx_t* context) {
   // Call the kernel page fault handler, and
   // make sure the page fault was fixed
   if (!vm_fault(address, vf))
-    PANIC(context, NULL);  // PANIC for now, since we can't send signals/kill threads
+    do_panic = true; // PANIC for now, since we can't send signals/kill threads
+
+  // For more information on the bits of the error code,
+  // see Intel x86_64 SDM Volume 3a Chapter 4.7
+  if (log_pagefault || do_panic) {
+    klog("hat: Page Fault at 0x%lx! (%s) (%s) %s", address,
+         (ec & (1 << 1)) ? "write" : "read", (ec & (1 << 2)) ? "user" : "kmode",
+         (ec & (1 << 4)) ? "(ifetch)" : "");
+
+    if (ec & (1 << 0))
+      klog("  -> Cause: Page Protection Violation!");
+    else if (ec & (1 << 3))
+      klog("  -> Cause: Reserved Bit set!");
+    else if (ec & (1 << 5))
+      klog("  -> Cause: Protection Key Violation");
+    else if (ec & (1 << 15))
+      klog("  -> Cause: Intel(r) SGX Violation!");
+    else
+      klog("  -> Cause: Page Not Present!");
+
+    if (do_panic)
+      PANIC(context, NULL);
+  }
 
   // Now that the page fault is successfully handled, switch GS back
   if (context->cs & 3)

@@ -176,7 +176,8 @@ char* vfs_get_path(struct vfs_ent* node) {
   char* path = NULL;
   if (node == root_node) {
     path = kmalloc(2);
-    *path = '/';
+    *path++ = '/';
+    *path = 0;
     return path;
   } else {
     path = kmalloc(512);

@@ -187,12 +187,16 @@ static struct vm_seg* anon_create(vm_space_t* space, uintptr_t hint, uint64_t le
 
   // Create the initial segment
   struct vm_seg* segment = kmalloc(sizeof(struct vm_seg));
+  memset(&segment->pagelist, 0, sizeof(struct hash_table));
   segment->len = len;
   segment->prot = prot;
   segment->mode = mode;
   segment->ops.fault = anon_fault;
   segment->ops.clone = anon_clone;
   segment->ops.unmap = anon_unmap;
+
+  if (mode & __MAP_EMBED_ONLY)
+    return segment;
 
   // Find a suitable base for this segment
   if (!hint || !(mode & MAP_FIXED) || (hint % 0x1000 != 0)) {
@@ -207,7 +211,6 @@ static struct vm_seg* anon_create(vm_space_t* space, uintptr_t hint, uint64_t le
   }
 
   // Add segment to the current space's mappings
-  memset(&segment->pagelist, 0, sizeof(struct hash_table));
   vec_push(&space->mappings, segment);
   return segment;
 }

@@ -45,7 +45,9 @@ void vm_unmap_range(vm_space_t* space, uintptr_t virt, size_t len);
 // Functions related to the VM address space
 void vm_space_load(vm_space_t* space);
 void vm_space_destroy(vm_space_t* space);
+void vm_space_fork(vm_space_t* old, vm_space_t* cur);
 vm_space_t* vm_space_create();
+
 
 // Misc virt functions...
 void vm_invl(vm_space_t* spc, uintptr_t addr, size_t len);

@@ -7,6 +7,7 @@
 #include <ninex/extension.h>
 #include <vm/vm.h>
 #include <arch/smp.h>
+#include <ninex/tty.h>
 
 #include "config.h"
 
@@ -85,7 +86,7 @@ static void kern_stage2()  {
   // Load in the init process
   struct exec_args args = { .argp = argv, .envp = envp  };
   proc_t* init_proc = create_process(NULL, vm_space_create(), "/dev/ttyS0");
-  thread_t* init_thread = uthread_create(init_proc, argv[0], args);
+  thread_t* init_thread = uthread_create(init_proc, argv[0], args, true);
 
   if (init_thread == NULL) {
     PANIC(NULL, "PID 1 '%s' is missing from initrd!\n", argv[0]);

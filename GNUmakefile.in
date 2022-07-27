@@ -1,5 +1,5 @@
 # Set some defaults first
-override COOL_PROMPT := printf '[\e[1;31m%s\e[m] \e[1;32m%s\e[m\n'
+override COOL_PROMPT := printf '[\e[1;94m%s\e[m] \e[1;32m%s\e[m\n'
 override SOURCE_DIR  := @srcdir@
 override BUILD_DIR   := @BUILDDIR@
 override ARCH_DIR    := @srcdir@/arch/@ARCH@
@@ -87,8 +87,8 @@ else ifeq ($(ARCH), aarch64)
 endif
 
 # Build the kernel by default
-.PHONY: all clean distclean maintainer-clean
-all: $(KERNEL)
+.PHONY: all phony_target clean distclean maintainer-clean
+all: phony_target
 
 # Targets for compiling the kernel
 $(BUILD_DIR)/arch/@ARCH@/%.o: $(ARCH_DIR)/%.c
@@ -133,10 +133,13 @@ $(KERNEL): $(LAI_LIB) $(ARCH_LIB) $(OBJECTS)
 	$(COOL_PROMPT) "LINK" $@
 	$(LD) $(LDREALFLAGS) -pie -T $(ARCH_DIR)/kernel.ld -o $@ $(OBJECTS) $(LAI_LIB) $(ARCH_LIB) kern_symbols.o
 
-# Initrd (contains drivers, and sometimes init)
-$(INITRD): $(REQUIRED_DRIVERS)
+# A target for building the kernel and drivers in one go
+phony_target: $(REQUIRED_EXTENSIONS) $(KERNEL)
+
+# Initrd (contains drivers, and might one day contiain the init)
+$(INITRD): $(REQUIRED_EXTENSIONS)
 	$(COOL_PROMPT) "GEN " $@
-	mkdir initrd && cp $(REQUIRED_DRIVERS) initrd
+	mkdir initrd && cp $(REQUIRED_EXTENSIONS) initrd
 	tar -cf initrd.tar initrd &> /dev/null
 	gzip initrd.tar && mv initrd.tar.gz $(INITRD)
 	rm -rf initrd
@@ -145,6 +148,7 @@ $(INITRD): $(REQUIRED_DRIVERS)
 override HEADER_DEPS := $(addprefix $(BUILD_DIR), $(patsubst %.c, %.d, $(KERNEL_SOURCE:$(SOURCE_DIR)%=%)))
 override HEADER_DEPS += $(addprefix $(BUILD_DIR), $(patsubst %.c, %.d, $(LAI_SOURCE:$(SOURCE_DIR)%=%)))
 override HEADER_DEPS += $(addprefix $(BUILD_DIR), $(patsubst %.c, %.d, $(ARCH_SOURCE:$(SOURCE_DIR)%=%)))
+override HEADER_DEPS += $(EXT_HDR_DEPS)
 -include $(HEADER_DEPS)
 
 # Cleaning targets
@@ -156,23 +160,23 @@ distclean: clean
 	rm -rf $(BUILD_DIR)/{GNUmakefile,config.log,config.status,config.h} $(IMAGE) $(INITRD)
 
 maintainer-clean: distclean
-	rm -rf $(SOURCE_DIR)/configure $(SOURCE_DIR)/install-sh $(SOURCE_DIR)/autom4te* 
+	rm -rf $(SOURCE_DIR)/configure $(SOURCE_DIR)/install-sh $(SOURCE_DIR)/autom4te*
 	rm -rf $(SOURCE_DIR)/*'~' $(SOURCE_DIR)/third_party
 
 # Installation/Distribution targets
 .PHONY: install install-strip dist
-install: $(KERNEL) $(REQUIRED_DRIVERS)
+install: $(KERNEL) $(REQUIRED_EXTENSIONS)
 	@INSTALL@ -d "$(DESTDIR)$(PREFIX)/kernel"
 	@INSTALL@ -s $(KERNEL) "$(DESTDIR)$(PREFIX)/kernel"
-	@INSTALL@ -d "$(DESTDIR)/lib/extensions/"
-	@INSTALL@ -t "$(DESTDIR)/lib/extensions/" $(REQUIRED_DRIVERS)
+	@INSTALL@ -d "$(DESTDIR)/lib/"
+	@INSTALL@ -t "$(DESTDIR)/lib/" $(REQUIRED_EXTENSIONS)
 
 
-install-strip: $(KERNEL) $(REQUIRED_DRIVERS)
+install-strip: $(KERNEL) $(REQUIRED_EXTENSIONS)
 	@INSTALL@ -d "$(DESTDIR)$(PREFIX)/kernel"
 	@INSTALL@ -s $(KERNEL) "$(DESTDIR)$(PREFIX)/kernel"
-	@INSTALL@ -d "$(DESTDIR)/lib/extensions/"
-	@INSTALL@ -t "$(DESTDIR)/lib/extensions/" -s $(REQUIRED_DRIVERS)
+	@INSTALL@ -d "$(DESTDIR)/lib/"
+	@INSTALL@ -t "$(DESTDIR)/lib/" -s $(REQUIRED_EXTENSIONS)
 
 dist:
 	rm -rf "ninex-$(VERSION)"
@@ -200,7 +204,7 @@ $(IMAGE): $(KERNEL) $(INITRD) $(SOURCE_DIR)/misc/limine.cfg
 	$(SOURCE_DIR)/third_party/limine/limine-deploy $(IMAGE)
 
 .PHONY: run run-kvm
-override QEMU_BASE_FLAGS += -smp `nproc` -m 1G -M q35 -drive file=$(IMAGE),if=none,id=nvm -device nvme,serial=deadbeef,drive=nvm -debugcon stdio
+override QEMU_BASE_FLAGS += -smp `nproc` -m 1G -M q35 -drive file=$(IMAGE),if=none,id=nvmdev -device nvme,serial=fa01fa02,drive=nvmdev -debugcon stdio
 run: $(IMAGE)
 	qemu-system-x86_64 $(QEMU_BASE_FLAGS) -cpu max,+rdtscp
 run-kvm: $(IMAGE)

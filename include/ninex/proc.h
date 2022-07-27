@@ -45,6 +45,6 @@ struct exec_args {
 
 proc_t* create_process(proc_t* parent, vm_space_t* space, char* ttydev);
 thread_t* kthread_create(uintptr_t entry, uint64_t arg1);
-thread_t* uthread_create(proc_t* parent, const char* filepath, struct exec_args arg);
+thread_t* uthread_create(proc_t* parent, const char* filepath, struct exec_args arg, bool elf);
 
 #endif // NINEX_PROC_H

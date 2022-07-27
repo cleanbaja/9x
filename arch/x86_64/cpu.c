@@ -319,6 +319,7 @@ void cpu_restore_thread(cpu_ctx_t* context) {
     vm_space_load(thrd->parent->space);
     this_cpu->cur_spc = thrd->parent->space;
   }
+
   this_cpu->kernel_stack = thrd->syscall_stack;
   cpu_ctx_t* new_context = &this_cpu->cur_thread->context;
 
@@ -349,13 +350,16 @@ void cpu_create_kctx(thread_t* thrd, uintptr_t entry, uint64_t arg1) {
   push(ptr, tag);                  \
 });
 
-void cpu_create_uctx(thread_t* thrd, struct exec_args args) {
+void cpu_create_uctx(thread_t* thrd, struct exec_args args, bool elf) {
   cpu_ctx_t* context = &thrd->context;
 
   // Create a 32KB user stack (mapped at 0x70000000000)...
-  uintptr_t stack_base = (uintptr_t)vm_phys_alloc(8, VM_ALLOC_ZERO);
-  vm_map_range(thrd->parent->space, stack_base, (uintptr_t)THREAD_STACK_BASE,
-               8 * VM_PAGE_SIZE, VM_PERM_READ | VM_PERM_WRITE | VM_PERM_USER);
+  uintptr_t stack_base = 0x0;
+  if (elf) {
+    stack_base = (uintptr_t)vm_phys_alloc(8, VM_ALLOC_ZERO);
+    vm_map_range(thrd->parent->space, stack_base, (uintptr_t)THREAD_STACK_BASE,
+                 8 * VM_PAGE_SIZE, VM_PERM_READ | VM_PERM_WRITE | VM_PERM_USER);
+  }
 
   // And a 16KB kernel stack
   thrd->syscall_stack = (uintptr_t)vm_phys_alloc(16, VM_ALLOC_ZERO);
@@ -367,6 +371,9 @@ void cpu_create_uctx(thread_t* thrd, struct exec_args args) {
   context->rflags = 0x202;
   context->rsp = THREAD_STACK_BASE + (8 * VM_PAGE_SIZE);
   context->rip = args.entry;
+
+  if (!elf)
+    return;
 
   // Push the SYSV mandated elements to the stack, starting with
   // all the raw strings

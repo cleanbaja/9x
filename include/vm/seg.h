@@ -18,6 +18,9 @@
 #define MAP_ANONYMOUS  0x08
 #define MAP_NODEMAND   0x10
 
+// Used by proc.c to get anon seg (without insertion)
+#define __MAP_EMBED_ONLY 0x20
+
 enum vm_fault {
   VM_FAULT_NONE = 0,
   VM_FAULT_WRITE = (1 << 2),

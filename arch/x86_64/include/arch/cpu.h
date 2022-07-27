@@ -27,7 +27,7 @@ void fpu_restore(uint8_t* zone);
 
 // Proc related functions
 void cpu_create_kctx(thread_t* thrd, uintptr_t entry, uint64_t arg1);
-void cpu_create_uctx(thread_t* thrd, struct exec_args args);
+void cpu_create_uctx(thread_t* thrd, struct exec_args args, bool elf);
 void cpu_save_thread(cpu_ctx_t* context);
 void cpu_restore_thread(cpu_ctx_t* context);
 

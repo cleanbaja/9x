@@ -13,5 +13,6 @@ void sched_dequeue_and_yield();
 void sched_yield();
 
 void enter_scheduler();
+void reschedule(struct cpu_context *ctx);
 
 #endif // NINEX_SCHED_H

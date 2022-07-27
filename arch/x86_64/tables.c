@@ -5,6 +5,7 @@
 #include <lib/kcon.h>
 #include <lib/lock.h>
 #include <ninex/irq.h>
+#include <ninex/sched.h>
 
 static struct gdt main_gdt = { 0 };
 static struct idt_entry entries[256] = { 0 };
@@ -176,6 +177,7 @@ dump_context(cpu_ctx_t* regs)
           regs->ss);
 }
 
+extern int resched_slot;
 cpu_ctx_t* sys_dispatch_isr(cpu_ctx_t* context) {
   uint32_t vec = context->int_no;
 
@@ -183,6 +185,9 @@ cpu_ctx_t* sys_dispatch_isr(cpu_ctx_t* context) {
     handle_pf(context);
   } else if (vec < 32) {
     PANIC(context, NULL);
+  } else if (vec == resched_slot) {
+    ic_eoi();
+    reschedule(context);
   } else {
     respond_irq(context, vec);
   }

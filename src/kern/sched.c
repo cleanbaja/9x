@@ -8,11 +8,12 @@
 
 static struct threadlist threadq;
 static struct threadlist deadq;
-static int resched_slot = 0;
 static lock_t queue_lock;
+int resched_slot = 0;
 
 void sched_queue(thread_t* thread) {
   spinlock(&queue_lock);
+  thread->no_queue = false;
   TAILQ_INSERT_TAIL(&threadq, thread, queue);
   spinrelease(&queue_lock);
 }
@@ -64,13 +65,13 @@ void sched_die(thread_t* target) {
   // TODO: do an IPI if a CPU is running this thread (that's not us)
 }
 
-static void reschedule(struct cpu_context *ctx) {
+void reschedule(struct cpu_context *ctx) {
 #ifdef __x86_64__
     if (ctx->cs & 3)
       asm_swapgs();
 #endif // __x86_64__
 
-    if (!trylock(&queue_lock)) {
+    if (trylock(&queue_lock)) {
         timer_oneshot(DEFAULT_TIMESLICE, resched_slot);
         #ifdef __x86_64__
         if (ctx->cs & 3)
@@ -99,6 +100,7 @@ static void reschedule(struct cpu_context *ctx) {
     if (cur_thread == NULL) {
         timer_oneshot(DEFAULT_TIMESLICE, resched_slot);
         vm_space_load(&kernel_space);
+        this_cpu->cur_spc = &kernel_space;
         spinrelease(&queue_lock);
 
         asm ("sti");

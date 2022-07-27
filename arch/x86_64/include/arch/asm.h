@@ -9,13 +9,15 @@
   ({                                                                           \
     if (enable_intrs) {                                                        \
       asm volatile ("sti");                                                    \
-	} else {                                                                   \
+    } else {                                                                   \
       asm volatile("cli");                                                     \
-	}                                                                          \
+    }                                                                          \
     for (;;) {                                                                 \
       asm volatile("hlt");                                                     \
     }                                                                          \
   })
+#define asm_enable_intr()  ({ asm volatile ("sti"); })
+#define asm_disable_intr() ({ asm volatile ("cli"); })
 #define asm_invlpg(k) ({ asm volatile("invlpg %0" ::"m"(k) : "memory"); })
 #define asm_swapgs()  ({ asm volatile("swapgs" ::: "memory"); })
 
@@ -89,6 +91,16 @@ static inline void asm_wrxcr(uint32_t reg, uint64_t value) {
                   :
                   : "a" (eax), "d" (edx), "c" (reg)
                   : "memory");
+}
+
+// Checks if interrupts are enabled
+static inline bool asm_check_intr() {
+  volatile uint64_t rflags = 0;
+  asm volatile ("pushf\n\t"
+                "pop %0\n\t"
+                : "=rm" (rflags) :: "memory", "cc");
+
+  return ((rflags & 0x200) != 0);
 }
 
 // Reading of the TSC

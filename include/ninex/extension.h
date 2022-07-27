@@ -1,13 +1,19 @@
 #ifndef NINEX_EXTENSION_H
 #define NINEX_EXTENSION_H
 
+#include <stdint.h>
 #include <stdbool.h>
 
 struct kernel_extension {
   char *name, *version;
 
   bool (*init)();
-  void (*deinit)(); 
+  void (*deinit)();
+
+  // NOTE: drivers should not set these below
+  // variables, they are reserved for the kernel
+  // extension loader
+  uintptr_t load_base, load_end;
 };
 
 #define DEFINE_EXTENSION(nam, ver, ini, fini)          \
