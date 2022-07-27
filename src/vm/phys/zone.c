@@ -3,44 +3,38 @@
 #include <vm/phys.h>
 #include <vm/vm.h>
 
-struct vm_zone* head_zone = NULL;
+struct vm_zone *head_zone = NULL;
 
-bool
-vm_zone_possible(uintptr_t base, uint64_t len)
-{
+bool vm_zone_possible(uintptr_t base, uint64_t len) {
   // Try to align the zone to 2MB
   uintptr_t aligned_base = (base + 0x1FFFFF) & ~(0x1FFFFF);
   uintptr_t top = base + len;
 
   // Make sure the alignment dosen't exceed the range
-  if (aligned_base >= top)
-    return false;
+  if (aligned_base >= top) return false;
 
   // Now, everything should be page aligned.
   if (((aligned_base % VM_PAGE_SIZE) != 0) || ((top % VM_PAGE_SIZE) != 0))
     return false;
 
   // Finally, make sure that the zone is big enough to work with
-  if ((top - aligned_base) < (32 * 0x100000))
-    return false;
+  if ((top - aligned_base) < (32 * 0x100000)) return false;
 
   // The zone should be fit for use
   return true;
 }
 
-void
-vm_create_zone(uintptr_t base, uint64_t len)
-{
+void vm_create_zone(uintptr_t base, uint64_t len) {
   // NOTE: it is assumed that the zone has passed all checks already
   uintptr_t aligned_base = (base + 0x1FFFFF) & ~(0x1FFFFF);
   uintptr_t limit = base + len;
   uint64_t bitmap_size = DIV_ROUNDUP((limit - aligned_base), VM_PAGE_SIZE) / 8;
 
   // Create the zone and bitmap, then realign the base
-  struct vm_zone* zone = (struct vm_zone*)(aligned_base + VM_MEM_OFFSET);
+  struct vm_zone *zone = (struct vm_zone *)(aligned_base + VM_MEM_OFFSET);
   memset(zone, 0, sizeof(struct vm_zone));
   aligned_base += sizeof(struct vm_zone);
-  zone->bitmap = (uint8_t*)(aligned_base + VM_MEM_OFFSET);
+  zone->bitmap = (uint8_t *)(aligned_base + VM_MEM_OFFSET);
   aligned_base += bitmap_size;
   aligned_base = (aligned_base + 0x1FFFFF) & ~(0x1FFFFF);
 
@@ -56,7 +50,7 @@ vm_create_zone(uintptr_t base, uint64_t len)
   if (head_zone == NULL) {
     head_zone = zone;
   } else {
-    struct vm_zone* last_zone = head_zone;
+    struct vm_zone *last_zone = head_zone;
     while (last_zone->next != NULL)
       last_zone = last_zone->next;
 
@@ -67,9 +61,7 @@ vm_create_zone(uintptr_t base, uint64_t len)
        zone->limit, (zone->limit - aligned_base) / 1000 / 1000);
 }
 
-void*
-vm_zone_alloc(struct vm_zone* zn, size_t pages, size_t align)
-{
+void *vm_zone_alloc(struct vm_zone *zn, size_t pages, size_t align) {
   spinlock(&zn->lck);
 
   // Align the previous allocation to our align
@@ -102,7 +94,7 @@ vm_zone_alloc(struct vm_zone* zn, size_t pages, size_t align)
         spinrelease(&zn->lck);
         zn->last_index = (real_base - zn->base) / VM_PAGE_SIZE;
         zn->last_index += pages;
-        return (void*)real_base;
+        return (void *)real_base;
       }
     }
   }
@@ -112,9 +104,7 @@ vm_zone_alloc(struct vm_zone* zn, size_t pages, size_t align)
   return NULL;
 }
 
-void
-vm_zone_free(struct vm_zone* zn, void* ptr, size_t pages)
-{
+void vm_zone_free(struct vm_zone *zn, void *ptr, size_t pages) {
   spinlock(&zn->lck);
 
   uintptr_t idx = (uintptr_t)ptr / VM_PAGE_SIZE;

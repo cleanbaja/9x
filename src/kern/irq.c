@@ -15,7 +15,7 @@ static int alloc_irq_vector() {
     return -1;
   } else if (irq_table[last_vector].HandlerFunc) {
     // Loop until we find a open handler
-    struct irq_resource* cur_irq = &irq_table[++last_vector];
+    struct irq_resource *cur_irq = &irq_table[++last_vector];
     while (cur_irq->HandlerFunc)
       cur_irq = &irq_table[++last_vector];
   }
@@ -23,14 +23,13 @@ static int alloc_irq_vector() {
   return last_vector++;
 }
 
-struct irq_resource* get_irq_handler(int irq_num) {
-  if ((irq_num - ARCH_LOWEST_IRQ) > ARCH_NUM_IRQS)
-    return NULL;
+struct irq_resource *get_irq_handler(int irq_num) {
+  if ((irq_num - ARCH_LOWEST_IRQ) > ARCH_NUM_IRQS) return NULL;
 
   return &irq_table[irq_num - ARCH_LOWEST_IRQ];
 }
 
-struct irq_resource* alloc_irq_handler(int* result) {
+struct irq_resource *alloc_irq_handler(int *result) {
   if (!result) {
     klog("irq: can't allocate a handler without providing a slot pointer!");
     return NULL;
@@ -40,7 +39,7 @@ struct irq_resource* alloc_irq_handler(int* result) {
   }
 }
 
-void dispatch_level_irq(cpu_ctx_t* c, struct irq_resource* res, int irq) {
+void dispatch_level_irq(cpu_ctx_t *c, struct irq_resource *res, int irq) {
   mask_ack_irq(irq);
   res->status |= IRQ_INPROGRESS;
 
@@ -54,7 +53,7 @@ void dispatch_level_irq(cpu_ctx_t* c, struct irq_resource* res, int irq) {
   return;
 }
 
-void dispatch_edge_irq(cpu_ctx_t* c, struct irq_resource* res, int irq) {
+void dispatch_edge_irq(cpu_ctx_t *c, struct irq_resource *res, int irq) {
   ic_eoi(irq);
   res->status |= IRQ_INPROGRESS;
 
@@ -69,9 +68,9 @@ void dispatch_edge_irq(cpu_ctx_t* c, struct irq_resource* res, int irq) {
   return;
 }
 
-void respond_irq(cpu_ctx_t* context, int irq_num) {
+void respond_irq(cpu_ctx_t *context, int irq_num) {
   spinlock(&global_irq_lock);
-  struct irq_resource* cur_irq = get_irq_handler(irq_num);
+  struct irq_resource *cur_irq = get_irq_handler(irq_num);
   if (cur_irq == NULL) {
     klog("spurrious IRQ #%d has no resource???", irq_num);
     spinrelease(&global_irq_lock);
@@ -110,7 +109,7 @@ void respond_irq(cpu_ctx_t* context, int irq_num) {
       dispatch_edge_irq(context, cur_irq, irq_num);
       break;
 
-     case EOI_MODE_TIMER:
+    case EOI_MODE_TIMER:
       // Timer IRQs are diffrent, since they return their own way...
       ic_eoi(irq_num);
       spinrelease(&cur_irq->lock);

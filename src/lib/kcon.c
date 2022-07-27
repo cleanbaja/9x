@@ -1,32 +1,34 @@
 #include <arch/smp.h>
 #include <arch/timer.h>
-#include <lib/lock.h>
 #include <lib/builtin.h>
 #include <lib/kcon.h>
+#include <lib/lock.h>
 #include <ninex/irq.h>
 #include <vm/vm.h>
 
 #include "config.h"
 
 #ifdef LIMINE_EARLYCONSOLE
-#include <lib/stivale2.h>
 #include <arch/asm.h>
+#include <lib/stivale2.h>
 #endif
 
 #define MAX_KCON_SINKS 10
 
 // Define the stivale2 console sink, if wanted
 #ifdef LIMINE_EARLYCONSOLE
-static void (*stivale2_term_write)(const char *string, size_t length); 
+static void (*stivale2_term_write)(const char *string, size_t length);
 static uint64_t limine_pagemap;
 
-void stivale2_console_setup(const char* initial_buffer) {
+void stivale2_console_setup(const char *initial_buffer) {
   struct stivale2_struct_tag_terminal *term_str_tag;
   term_str_tag = stivale2_find_tag(STIVALE2_STRUCT_TAG_TERMINAL_ID);
 
   if (term_str_tag == NULL) {
     // What now, PANIC???
-    for (;;) { asm_halt(false); }
+    for (;;) {
+      asm_halt(false);
+    }
   }
 
   void *term_write_ptr = (void *)term_str_tag->term_write;
@@ -36,7 +38,7 @@ void stivale2_console_setup(const char* initial_buffer) {
   limine_pagemap = asm_read_cr3();
 }
 
-void stivale2_console_write(const char* message) {
+void stivale2_console_write(const char *message) {
   uint64_t saved_cr3 = asm_read_cr3();
   bool re_enable = asm_check_intr();
   asm_disable_intr();
@@ -45,8 +47,7 @@ void stivale2_console_write(const char* message) {
   stivale2_term_write(message, strlen(message));
   asm_write_cr3(saved_cr3);
 
-  if (re_enable)
-    asm_enable_intr();
+  if (re_enable) asm_enable_intr();
 }
 
 void stivale2_console_flush() {
@@ -54,19 +55,17 @@ void stivale2_console_flush() {
   return;
 }
 
-static struct kcon_sink stivale2_term_sink = {
-  .setup = stivale2_console_setup,
-  .write = stivale2_console_write,
-  .flush = stivale2_console_flush
-};
+static struct kcon_sink stivale2_term_sink = {.setup = stivale2_console_setup,
+                                              .write = stivale2_console_write,
+                                              .flush = stivale2_console_flush};
 
-#endif // LIMINE_EARLYCONSOLE
+#endif  // LIMINE_EARLYCONSOLE
 
 // Define the BOCHS debugport output, if we're on x86_64
 #ifdef __x86_64__
 #include <arch/asm.h>
 
-void bxdbg_console_write(const char* message) {
+void bxdbg_console_write(const char *message) {
   while (*message != 0) {
     asm_outb(0xE9, *message);
     message++;
@@ -78,28 +77,26 @@ void bxdbg_console_flush() {
   return;
 }
 
-void bxdbg_console_setup(const char* initial_buffer) {
+void bxdbg_console_setup(const char *initial_buffer) {
   // Not needed for BOCHS debug console
   return;
 }
 
-static struct kcon_sink bxdbg_term_sink = {
-  .setup = bxdbg_console_setup,
-  .write = bxdbg_console_write,
-  .flush = bxdbg_console_flush
-};
+static struct kcon_sink bxdbg_term_sink = {.setup = bxdbg_console_setup,
+                                           .write = bxdbg_console_write,
+                                           .flush = bxdbg_console_flush};
 
-#endif // __x86_64__
+#endif  // __x86_64__
 
 //////////////////////////////////////////////////
 // Generic Kernel Console routines
 //////////////////////////////////////////////////
 
 static uint16_t num_sinks;
-static struct kcon_sink* sinks[MAX_KCON_SINKS];
+static struct kcon_sink *sinks[MAX_KCON_SINKS];
 static lock_t kcon_lock = 0;
 
-void kcon_register_sink(struct kcon_sink* sink) {
+void kcon_register_sink(struct kcon_sink *sink) {
   spinlock(&kcon_lock);
   if (num_sinks >= MAX_KCON_SINKS) {
     spinlock(&kcon_lock);
@@ -110,7 +107,7 @@ void kcon_register_sink(struct kcon_sink* sink) {
   spinrelease(&kcon_lock);
 }
 
-static void halt_ipi(cpu_ctx_t* context) {
+static void halt_ipi(cpu_ctx_t *context) {
   (void)context;
 
   for (;;) {
@@ -119,13 +116,13 @@ static void halt_ipi(cpu_ctx_t* context) {
 }
 
 void kcon_init() {
-  // Register the sinks
-  #ifdef __x86_64__
+// Register the sinks
+#ifdef __x86_64__
   kcon_register_sink(&bxdbg_term_sink);
-  #endif
-  #ifdef LIMINE_EARLYCONSOLE
+#endif
+#ifdef LIMINE_EARLYCONSOLE
   kcon_register_sink(&stivale2_term_sink);
-  #endif
+#endif
 
   // Bootup all the sinks
   for (int i = 0; i < num_sinks; i++) {
@@ -135,19 +132,19 @@ void kcon_init() {
   }
 
   // Print the 9x banner
-  struct stivale2_struct* info = stivale2_get_struct();
+  struct stivale2_struct *info = stivale2_get_struct();
   klog("9x (%s) (%s) - A project by cleanbaja", NINEX_VERSION, NINEX_ARCH);
   klog("Bootloader: %s [%s]", info->bootloader_brand, info->bootloader_version);
 
   // Set the HALT IPI handler...
-  struct irq_resource* halt_irq = get_irq_handler(IPI_HALT);
-  halt_irq->procfs_name  = "cpu_halt";
-  halt_irq->HandlerFunc  = halt_ipi;
+  struct irq_resource *halt_irq = get_irq_handler(IPI_HALT);
+  halt_irq->procfs_name = "cpu_halt";
+  halt_irq->HandlerFunc = halt_ipi;
   halt_irq->eoi_strategy = EOI_MODE_EDGE;
 }
 
-void panic(void* frame, char* fmt, ...) {
-  cpu_ctx_t* stack_frame = (cpu_ctx_t*)frame;
+void panic(void *frame, char *fmt, ...) {
+  cpu_ctx_t *stack_frame = (cpu_ctx_t *)frame;
   static int in_panic = 0;
 
   // See if we're already in a panic
@@ -165,14 +162,14 @@ void panic(void* frame, char* fmt, ...) {
   // Log all the information possible
   klog_unlocked("\n--- KERNEL PANIC on CPU #%d ---\n", cpu_num);
   if (fmt) {
-      va_list va;
-      va_start(va, fmt);
+    va_list va;
+    va_start(va, fmt);
 
-      char realstr[512];
-      vsnprintf(realstr, 512, fmt, va);
-      va_end(va);
+    char realstr[512];
+    vsnprintf(realstr, 512, fmt, va);
+    va_end(va);
 
-      klog_unlocked(realstr);
+    klog_unlocked(realstr);
   }
 
   // Dump CPU contexts and stacktraces
@@ -197,12 +194,12 @@ void panic(void* frame, char* fmt, ...) {
 static uint8_t initial_buffer[4096];
 static bool console_locked = false;
 uint64_t kcon_cursor = 0, kcon_size = 4096;
-char* log_buf = (char*)initial_buffer;
+char *log_buf = (char *)initial_buffer;
 static char format_buf[512], big_buf[512];
 
 static void __buf_grow() {
   if ((uintptr_t)log_buf == (uintptr_t)initial_buffer) {
-    void* new_buf = kmalloc(8192);
+    void *new_buf = kmalloc(8192);
     memcpy(new_buf, log_buf, 4096);
     log_buf = new_buf;
     kcon_size = 8192;
@@ -212,18 +209,17 @@ static void __buf_grow() {
   }
 }
 
-static void __buf_write(char* str) {
+static void __buf_write(char *str) {
   if ((kcon_cursor + strlen(str)) >= kcon_size) {
     __buf_grow();
   }
 
-  memcpy((char*)(log_buf + kcon_cursor), str, strlen(str));
+  memcpy((char *)(log_buf + kcon_cursor), str, strlen(str));
   kcon_cursor += strlen(str);
 }
 
-void klog(char* fmt, ...) {
-  if (ATOMIC_READ(&console_locked))
-    return;
+void klog(char *fmt, ...) {
+  if (ATOMIC_READ(&console_locked)) return;
 
   // Grab the spinlock and setup the va_args
   spinlock(&kcon_lock);
@@ -249,7 +245,7 @@ void klog(char* fmt, ...) {
   spinrelease(&kcon_lock);
 }
 
-void klog_unlocked(char* fmt, ...) {
+void klog_unlocked(char *fmt, ...) {
   va_list va;
   va_start(va, fmt);
 
@@ -270,4 +266,3 @@ void klog_unlocked(char* fmt, ...) {
   // Clear both buffers and return
   memset64(format_buf, 0, 512);
 }
-

@@ -21,9 +21,8 @@ int vec_expand_(char **data, int *length, int *capacity, int memsz) {
   return 0;
 }
 
-
 int vec_reserve_(char **data, int *length, int *capacity, int memsz, int n) {
-  (void) length;
+  (void)length;
   if (n > *capacity) {
     void *ptr = krealloc(*data, n * memsz);
     if (ptr == NULL) return -1;
@@ -33,16 +32,17 @@ int vec_reserve_(char **data, int *length, int *capacity, int memsz, int n) {
   return 0;
 }
 
-
-int vec_reserve_po2_(
-  char **data, int *length, int *capacity, int memsz, int n
-) {
+int vec_reserve_po2_(char **data,
+                     int *length,
+                     int *capacity,
+                     int memsz,
+                     int n) {
   int n2 = 1;
   if (n == 0) return 0;
-  while (n2 < n) n2 <<= 1;
+  while (n2 < n)
+    n2 <<= 1;
   return vec_reserve_(data, length, capacity, memsz, n2);
 }
-
 
 int vec_compact_(char **data, int *length, int *capacity, int memsz) {
   if (*length == 0) {
@@ -61,49 +61,49 @@ int vec_compact_(char **data, int *length, int *capacity, int memsz) {
   return 0;
 }
 
-
-int vec_insert_(char **data, int *length, int *capacity, int memsz,
-                 int idx
-) {
+int vec_insert_(char **data, int *length, int *capacity, int memsz, int idx) {
   int err = vec_expand_(data, length, capacity, memsz);
   if (err) return err;
-  memmove(*data + (idx + 1) * memsz,
-          *data + idx * memsz,
+  memmove(*data + (idx + 1) * memsz, *data + idx * memsz,
           (*length - idx) * memsz);
   return 0;
 }
 
-
-void vec_splice_(char **data, int *length, int *capacity, int memsz,
-                 int start, int count
-) {
-  (void) capacity;
-  memmove(*data + start * memsz,
-          *data + (start + count) * memsz,
+void vec_splice_(char **data,
+                 int *length,
+                 int *capacity,
+                 int memsz,
+                 int start,
+                 int count) {
+  (void)capacity;
+  memmove(*data + start * memsz, *data + (start + count) * memsz,
           (*length - start - count) * memsz);
 }
 
-
-void vec_swapsplice_(char **data, int *length, int *capacity, int memsz,
-                     int start, int count
-) {
-  (void) capacity;
-  memmove(*data + start * memsz,
-          *data + (*length - count) * memsz,
+void vec_swapsplice_(char **data,
+                     int *length,
+                     int *capacity,
+                     int memsz,
+                     int start,
+                     int count) {
+  (void)capacity;
+  memmove(*data + start * memsz, *data + (*length - count) * memsz,
           count * memsz);
 }
 
-
-void vec_swap_(char **data, int *length, int *capacity, int memsz,
-               int idx1, int idx2 
-) {
+void vec_swap_(char **data,
+               int *length,
+               int *capacity,
+               int memsz,
+               int idx1,
+               int idx2) {
   unsigned char *a, *b, tmp;
   int count;
-  (void) length;
-  (void) capacity;
+  (void)length;
+  (void)capacity;
   if (idx1 == idx2) return;
-  a = (unsigned char*) *data + idx1 * memsz;
-  b = (unsigned char*) *data + idx2 * memsz;
+  a = (unsigned char *)*data + idx1 * memsz;
+  b = (unsigned char *)*data + idx2 * memsz;
   count = memsz;
   while (count--) {
     tmp = *a;
@@ -112,4 +112,3 @@ void vec_swap_(char **data, int *length, int *capacity, int memsz,
     a++, b++;
   }
 }
-

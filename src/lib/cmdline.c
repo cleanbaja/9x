@@ -1,7 +1,7 @@
-#include <lib/cmdline.h>
 #include <lib/builtin.h>
+#include <lib/cmdline.h>
 #include <lib/kcon.h>
-#include <stdbool.h> 
+#include <stdbool.h>
 
 #define CMDLINE_BUF_SZ 4096
 char __kernel_cmdline[CMDLINE_BUF_SZ];
@@ -10,13 +10,12 @@ unsigned __kernel_cmdline_count;
 
 // Simple command-line parser I stole from zircon
 // https://fuchsia.googlesource.com/
-void cmdline_load(const char* data) {
+void cmdline_load(const char *data) {
   unsigned i = __kernel_cmdline_size;
   unsigned max = CMDLINE_BUF_SZ - 2;
 
   // Stivale2 can give us a NULL cmdline, so be ready...
-  if (data == NULL)
-    return;
+  if (data == NULL) return;
 
   bool found_equal = false;
   while (i < max) {
@@ -63,12 +62,11 @@ void cmdline_load(const char* data) {
   __kernel_cmdline_size = i;
 }
 
-const char* cmdline_get(const char* key) {
-  if (!key)
-    return __kernel_cmdline;
+const char *cmdline_get(const char *key) {
+  if (!key) return __kernel_cmdline;
 
   unsigned sz = strlen(key);
-  const char* ptr = __kernel_cmdline;
+  const char *ptr = __kernel_cmdline;
   for (;;) {
     if (!memcmp(ptr, key, sz) && (ptr[sz] == '=' || ptr[sz] == '\0')) {
       break;
@@ -80,16 +78,14 @@ const char* cmdline_get(const char* key) {
   }
 
   ptr += sz;
-  if (*ptr == '=')
-    ptr++;
+  if (*ptr == '=') ptr++;
 
   return ptr;
 }
 
-bool cmdline_get_bool(const char* key, bool expected) {
-  const char* value = cmdline_get(key);
-  if (value == NULL)
-    return expected;
+bool cmdline_get_bool(const char *key, bool expected) {
+  const char *value = cmdline_get(key);
+  if (value == NULL) return expected;
 
   if ((strcmp(value, "0") == 0) || (strcmp(value, "false") == 0) ||
       (strcmp(value, "off") == 0)) {
@@ -99,28 +95,24 @@ bool cmdline_get_bool(const char* key, bool expected) {
   return true;
 }
 
-uint32_t cmdline_get32(const char* key, uint32_t expected) {
-  const char* value_str = cmdline_get(key);
-  if (value_str == NULL || *value_str == '\0')
-    return expected;
+uint32_t cmdline_get32(const char *key, uint32_t expected) {
+  const char *value_str = cmdline_get(key);
+  if (value_str == NULL || *value_str == '\0') return expected;
 
-  char* end;
+  char *end;
   long int value = strtol(value_str, &end, 0);
-  if (*end != '\0')
-    return expected;
+  if (*end != '\0') return expected;
 
   return value;
 }
 
-uint64_t cmdline_get64(const char* key, uint64_t expected) {
-  const char* value_str = cmdline_get(key);
-  if (value_str == NULL || *value_str == '\0')
-    return expected;
+uint64_t cmdline_get64(const char *key, uint64_t expected) {
+  const char *value_str = cmdline_get(key);
+  if (value_str == NULL || *value_str == '\0') return expected;
 
-  char* end;
+  char *end;
   long long value = strtoll(value_str, &end, 0);
-  if (*end != '\0')
-    return expected;
+  if (*end != '\0') return expected;
 
   return value;
 }

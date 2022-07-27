@@ -1,0 +1,10 @@
+﻿---
+BasedOnStyle: Chromium
+AllowShortFunctionsOnASingleLine: All
+AllowShortIfStatementsOnASingleLine: Always
+PointerAlignment: Right
+ReflowComments: 'false'
+SortIncludes: 'true'
+TabWidth: '4'
+
+...

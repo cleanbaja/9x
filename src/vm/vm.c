@@ -6,9 +6,7 @@
 #include <vm/virt.h>
 #include <vm/vm.h>
 
-static char*
-mem_to_str(int mem_type)
-{
+static char *mem_to_str(int mem_type) {
   switch (mem_type) {
     case STIVALE2_MMAP_USABLE:
       return "usable";
@@ -41,7 +39,7 @@ mem_to_str(int mem_type)
 }
 
 void vm_setup() {
-  struct stivale2_struct_tag_memmap* mm_tag =
+  struct stivale2_struct_tag_memmap *mm_tag =
       stivale2_find_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID);
 
   // Setup the HAT first
@@ -52,10 +50,8 @@ void vm_setup() {
     klog("vm/phys: Dumping memory map (entries: %d):", mm_tag->entries);
     for (int i = 0; i < mm_tag->entries; i++) {
       struct stivale2_mmap_entry entry = mm_tag->memmap[i];
-      klog("    (0x%016lx-0x%016lx) %s",
-          entry.base,
-          entry.base + entry.length,
-          mem_to_str(entry.type));
+      klog("    (0x%016lx-0x%016lx) %s", entry.base, entry.base + entry.length,
+           mem_to_str(entry.type));
     }
   }
 

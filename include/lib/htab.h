@@ -11,7 +11,10 @@ struct hash_table {
 };
 
 void *htab_find(struct hash_table *htab, void *key, size_t key_size);
-void htab_insert(struct hash_table *htab, void *key, size_t key_size, void *data);
+void htab_insert(struct hash_table *htab,
+                 void *key,
+                 size_t key_size,
+                 void *data);
 void htab_delete(struct hash_table *htab, void *key, size_t key_size);
 
-#endif // LIB_HTAB_H
+#endif  // LIB_HTAB_H

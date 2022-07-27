@@ -1,34 +1,34 @@
 #ifndef LIB_BUILTIN_H
 #define LIB_BUILTIN_H
 
-#include <stdint.h>
-#include <stddef.h>
 #include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
 
 // Memset functions
-void memset(void* ptr, uint64_t val, int len);
-void memset64(void* ptr, uint64_t val, int len);
+void memset(void *ptr, uint64_t val, int len);
+void memset64(void *ptr, uint64_t val, int len);
 
 // Other memory-related functions
-void memcpy(void* dest, const void* src, int len);
-int memcmp(const void* ptr1, const void* ptr2, int len);
-void* memmove(void *dest, const void *src, size_t n);
+void memcpy(void *dest, const void *src, int len);
+int memcmp(const void *ptr1, const void *ptr2, int len);
+void *memmove(void *dest, const void *src, size_t n);
 
 // String functions
-int strlen(const char* str);
-int strcmp(const char* s1, const char* s2);
-int snprintf(char* buffer, size_t count, const char* format, ...);
-char* strtok_r(char* s, const char* del, char** m);
+int strlen(const char *str);
+int strcmp(const char *s1, const char *s2);
+int snprintf(char *buffer, size_t count, const char *format, ...);
+char *strtok_r(char *s, const char *del, char **m);
 
 // Other string related functions
-char* strchr(const char* s, int n);
-char* strcpy(char *dst, const char *src);
-char* strdup(const char* s);
-int vsnprintf(char* buffer, size_t count, const char* format, va_list va);
+char *strchr(const char *s, int n);
+char *strcpy(char *dst, const char *src);
+char *strdup(const char *s);
+int vsnprintf(char *buffer, size_t count, const char *format, va_list va);
 
 // Conversion functions
-uint32_t strtol(const char* nptr, char** endptr, int base);
-uint64_t strtoll(const char* nptr, char** endptr, int base);
+uint32_t strtol(const char *nptr, char **endptr, int base);
+uint64_t strtoll(const char *nptr, char **endptr, int base);
 
 // Bitwise functions
 #define BIT_SET(bitmap, __bit) (bitmap[(__bit) / 8] |= (1 << ((__bit) % 8)))
@@ -65,7 +65,6 @@ uint64_t strtoll(const char* nptr, char** endptr, int base);
 // Stack tracing functions
 void strace_unwind();
 void strace_load(uint64_t ptr);
-uintptr_t strace_get_symbol(char* name);
+uintptr_t strace_get_symbol(char *name);
 
-#endif // LIB_BUILTIN_H
-
+#endif  // LIB_BUILTIN_H

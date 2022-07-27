@@ -1,10 +1,10 @@
 #ifndef VM_PHYS_H
 #define VM_PHYS_H
 
-#include "lib/lock.h"
 #include <stdbool.h>
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
+#include "lib/lock.h"
 
 // The kernel physical memory allocator is underpinned
 // by a zone-based allocation scheme, in which every free part
@@ -43,9 +43,7 @@ extern struct vm_zone *head_zone, *tail_zone;
 #define VM_ALLOC_HUGE (1 << 11)
 
 // The actual functions
-void*
-vm_phys_alloc(uint64_t pages, int flags);
-void
-vm_phys_free(void* start, uint64_t pages);
+void *vm_phys_alloc(uint64_t pages, int flags);
+void vm_phys_free(void *start, uint64_t pages);
 
-#endif // VM_PHYS_H
+#endif  // VM_PHYS_H

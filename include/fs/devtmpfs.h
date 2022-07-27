@@ -16,11 +16,10 @@
 #define MKDEV(maj, min) (min | ((uint64_t)maj << 32))
 
 // Path has to be relative to /dev, like "dri/card0"
-struct vnode* devtmpfs_create_device(char* path, int size);
+struct vnode *devtmpfs_create_device(char *path, int size);
 size_t devtmpfs_create_id(int subclass);
 
 void setup_unix_streams();
 void setup_random_streams();
 
-#endif // FS_DEVTMPFS_H
-
+#endif  // FS_DEVTMPFS_H

@@ -33,7 +33,7 @@ enum {
   USTAR_FIFO = '6'
 };
 
-static uint64_t parse_octal(const char* str) {
+static uint64_t parse_octal(const char *str) {
   uint64_t res = 0;
 
   while (*str) {
@@ -45,7 +45,7 @@ static uint64_t parse_octal(const char* str) {
   return res;
 }
 
-void initramfs_populate(struct stivale2_struct_tag_modules* mods) {
+void initramfs_populate(struct stivale2_struct_tag_modules *mods) {
   if (mods == NULL || mods->module_count < 1) {
     klog("vfs: initramfs missing, kernel might fail on real hardware!");
     return;
@@ -56,10 +56,9 @@ void initramfs_populate(struct stivale2_struct_tag_modules* mods) {
   klog("initramfs: initrd found at 0x%lx with %u bytes", initramfs_base,
        initramfs_size);
 
-  struct ustar_header* hdr = (struct ustar_header*)initramfs_base;
+  struct ustar_header *hdr = (struct ustar_header *)initramfs_base;
   for (;;) {
-    if (memcmp(hdr->signature, "ustar", 5) != 0)
-      break;
+    if (memcmp(hdr->signature, "ustar", 5) != 0) break;
 
     uintptr_t size = parse_octal(hdr->size);
     switch (hdr->type) {
@@ -68,9 +67,9 @@ void initramfs_populate(struct stivale2_struct_tag_modules* mods) {
         break;
       }
       case USTAR_FILE: {
-        struct vnode* r =
+        struct vnode *r =
             vfs_open(NULL, hdr->name, true, parse_octal(hdr->mode));
-        void* buf = (void*)hdr + 512;
+        void *buf = (void *)hdr + 512;
         r->write(r, buf, 0, size);
         r->close(r);
         break;
@@ -81,8 +80,7 @@ void initramfs_populate(struct stivale2_struct_tag_modules* mods) {
       }
     }
 
-    hdr = (void*)hdr + 512 + ALIGN_UP(size, 512);
-    if ((uintptr_t)hdr >= initramfs_base + initramfs_size)
-      break;
+    hdr = (void *)hdr + 512 + ALIGN_UP(size, 512);
+    if ((uintptr_t)hdr >= initramfs_base + initramfs_size) break;
   }
 }

@@ -1,14 +1,14 @@
 #include <arch/hat.h>
 #include <fs/vfs.h>
 #include <lib/builtin.h>
-#include <lib/types.h>
 #include <lib/kcon.h>
+#include <lib/types.h>
 #include <ninex/extension.h>
 #include <vm/phys.h>
 #include <vm/virt.h>
 #include <vm/vm.h>
 
-static vec_t(struct kernel_extension*) extensions;
+static vec_t(struct kernel_extension *) extensions;
 static uintptr_t ext_bump_base = 0;
 
 static uintptr_t find_base_for_mod(size_t req_len) {
@@ -20,7 +20,7 @@ static uintptr_t find_base_for_mod(size_t req_len) {
   return ext_bump_base - req_len;
 }
 
-static struct kernel_extension* load_extension(struct vnode* file) {
+static struct kernel_extension *load_extension(struct vnode *file) {
   uintptr_t base = find_base_for_mod(file->st.st_size);
   uintptr_t load_end = base;
 
@@ -34,7 +34,7 @@ static struct kernel_extension* load_extension(struct vnode* file) {
   }
 
   // Load all PHDRs.
-  struct Elf64_Dyn* dynamic = NULL;
+  struct Elf64_Dyn *dynamic = NULL;
 
   for (int i = 0; i < ehdr.e_phnum; i++) {
     Elf64_Phdr phdr;
@@ -50,8 +50,7 @@ static struct kernel_extension* load_extension(struct vnode* file) {
 
       // Map pages for the segment...
       int pf = VM_PERM_READ | VM_PERM_WRITE;
-      if (phdr.p_flags & PF_X)
-        pf |= VM_PERM_EXEC;
+      if (phdr.p_flags & PF_X) pf |= VM_PERM_EXEC;
 
       uintptr_t pa = (uintptr_t)vm_phys_alloc(
           DIV_ROUNDUP(misalign + phdr.p_memsz, 0x1000), VM_ALLOC_ZERO);
@@ -60,13 +59,15 @@ static struct kernel_extension* load_extension(struct vnode* file) {
                    ALIGN_UP(misalign + phdr.p_memsz, 0x1000), pf);
 
       // Fill the segment.
-      file->read(file, (void*)(base + phdr.p_vaddr), phdr.p_offset,
+      file->read(file, (void *)(base + phdr.p_vaddr), phdr.p_offset,
                  phdr.p_filesz);
 
       // Now, we can remove write permissions, if they aren't needed.
       if (!(phdr.p_flags & PF_W)) {
-        vm_unmap_range(&kernel_space, va, ALIGN_UP(misalign + phdr.p_memsz, 0x1000));
-        vm_map_range(&kernel_space, pa, va, ALIGN_UP(misalign + phdr.p_memsz, 0x1000),
+        vm_unmap_range(&kernel_space, va,
+                       ALIGN_UP(misalign + phdr.p_memsz, 0x1000));
+        vm_map_range(&kernel_space, pa, va,
+                     ALIGN_UP(misalign + phdr.p_memsz, 0x1000),
                      pf & ~VM_PERM_WRITE);
       }
 
@@ -74,7 +75,7 @@ static struct kernel_extension* load_extension(struct vnode* file) {
       if (load_end < va + ALIGN_UP(misalign + phdr.p_memsz, 0x1000))
         load_end = va + ALIGN_UP(misalign + phdr.p_memsz, 0x1000);
     } else if (phdr.p_type == PT_DYNAMIC) {
-      dynamic = (struct Elf64_Dyn*)(base + phdr.p_vaddr);
+      dynamic = (struct Elf64_Dyn *)(base + phdr.p_vaddr);
     } else if (phdr.p_type == PT_NOTE || phdr.p_type == PT_GNU_EH_FRAME ||
                phdr.p_type == PT_GNU_STACK || phdr.p_type == PT_GNU_RELRO ||
                phdr.p_type == PT_GNU_PROPERTY) {
@@ -86,29 +87,29 @@ static struct kernel_extension* load_extension(struct vnode* file) {
   }
 
   // Extract symbol & relocation tables from DYNAMIC.
-  char* str_tab = NULL;
-  struct Elf64_Sym* sym_tab = NULL;
-  const Elf64_Word* hash_tab = NULL;
-  const char* plt_rels = NULL;
+  char *str_tab = NULL;
+  struct Elf64_Sym *sym_tab = NULL;
+  const Elf64_Word *hash_tab = NULL;
+  const char *plt_rels = NULL;
   size_t plt_rel_sectionsize = 0;
   uint64_t rela_offset = 0;
   uint64_t rela_size = 0;
 
   for (size_t i = 0; dynamic[i].d_tag != DT_NULL; i++) {
-    struct Elf64_Dyn* ent = dynamic + i;
+    struct Elf64_Dyn *ent = dynamic + i;
     switch (ent->d_tag) {
       // References to sections that we need to extract:
       case DT_STRTAB:
-        str_tab = (char*)(base + ent->d_ptr);
+        str_tab = (char *)(base + ent->d_ptr);
         break;
       case DT_SYMTAB:
-        sym_tab = (struct Elf64_Sym*)(base + ent->d_ptr);
+        sym_tab = (struct Elf64_Sym *)(base + ent->d_ptr);
         break;
       case DT_HASH:
-        hash_tab = (const Elf64_Word*)(base + ent->d_ptr);
+        hash_tab = (const Elf64_Word *)(base + ent->d_ptr);
         break;
       case DT_JMPREL:
-        plt_rels = (char*)(base + ent->d_ptr);
+        plt_rels = (char *)(base + ent->d_ptr);
         break;
 
       // Data that we need to extract:
@@ -135,7 +136,8 @@ static struct kernel_extension* load_extension(struct vnode* file) {
 
       case DT_RELAENT:
         if (ent->d_val != sizeof(struct Elf64_Rela)) {
-          klog("kext: ent->d_val has an improper size of %u! (DT_RELAENT)", ent->d_val);
+          klog("kext: ent->d_val has an improper size of %u! (DT_RELAENT)",
+               ent->d_val);
           return NULL;
         }
         break;
@@ -159,12 +161,14 @@ static struct kernel_extension* load_extension(struct vnode* file) {
   }
 
   // Perform Relocations.
-  for (uint64_t offset = 0; offset < rela_size; offset += sizeof(struct Elf64_Rela)) {
+  for (uint64_t offset = 0; offset < rela_size;
+       offset += sizeof(struct Elf64_Rela)) {
     struct Elf64_Rela relocation;
-    file->read(file, &relocation, rela_offset + offset, sizeof(struct Elf64_Rela));
+    file->read(file, &relocation, rela_offset + offset,
+               sizeof(struct Elf64_Rela));
 
-    struct Elf64_Sym* symbol = sym_tab + ELF64_R_SYM(relocation.r_info);
-    uint64_t* target = (uint64_t*)(base + relocation.r_offset);
+    struct Elf64_Sym *symbol = sym_tab + ELF64_R_SYM(relocation.r_info);
+    uint64_t *target = (uint64_t *)(base + relocation.r_offset);
     switch (ELF64_R_TYPE(relocation.r_info)) {
       case R_X86_64_RELATIVE: {
         *target = base + relocation.r_addend;
@@ -179,7 +183,8 @@ static struct kernel_extension* load_extension(struct vnode* file) {
         break;
       }
       default:
-        klog("kext: unknown relocation type 0x%x!", ELF64_R_TYPE(relocation.r_info));
+        klog("kext: unknown relocation type 0x%x!",
+             ELF64_R_TYPE(relocation.r_info));
         break;
     }
   }
@@ -187,15 +192,16 @@ static struct kernel_extension* load_extension(struct vnode* file) {
   // Perform Patch-Ins of functions.
   for (size_t off = 0; off < plt_rel_sectionsize;
        off += sizeof(struct Elf64_Rela)) {
-    const struct Elf64_Rela* reloc = (const struct Elf64_Rela*)(plt_rels + off);
+    const struct Elf64_Rela *reloc =
+        (const struct Elf64_Rela *)(plt_rels + off);
     if (ELF64_R_TYPE(reloc->r_info) != R_X86_64_JUMP_SLOT) {
       klog("kext: non-JUMP_SLOT relocation in '.rela.plt'");
       return NULL;
     }
 
-    uint64_t* patch_ptr = (uint64_t*)(base + reloc->r_offset);
-    struct Elf64_Sym* symbol = sym_tab + ELF64_R_SYM(reloc->r_info);
-    char* sym_name = str_tab + symbol->st_name;
+    uint64_t *patch_ptr = (uint64_t *)(base + reloc->r_offset);
+    struct Elf64_Sym *symbol = sym_tab + ELF64_R_SYM(reloc->r_info);
+    char *sym_name = str_tab + symbol->st_name;
     *patch_ptr = strace_get_symbol(sym_name);
 
     if (*patch_ptr == 0x0) {
@@ -205,7 +211,7 @@ static struct kernel_extension* load_extension(struct vnode* file) {
 
   // Look up sections.
   Elf64_Shdr shstr_tab;
-  struct kernel_extension* ext_info = NULL;
+  struct kernel_extension *ext_info = NULL;
   file->read(file, &shstr_tab,
              ehdr.e_shoff + ehdr.e_shstrndx * ehdr.e_shentsize,
              sizeof(Elf64_Shdr));
@@ -220,23 +226,24 @@ static struct kernel_extension* load_extension(struct vnode* file) {
     name[5] = 0;
 
     if (memcmp(name, ".kext", 5) == 0) {
-      ext_info = (struct kernel_extension*)(base + shdr.sh_addr);
+      ext_info = (struct kernel_extension *)(base + shdr.sh_addr);
       break;
     }
   }
 
   if (ext_info != NULL) {
     ext_info->load_base = base;
-    ext_info->load_end  = load_end;
+    ext_info->load_end = load_end;
   }
   return ext_info;
 }
 
-static void unload_extension(struct kernel_extension* et) {
+static void unload_extension(struct kernel_extension *et) {
   et->deinit();
 
   // TODO: stop memory leak!
-  for (uintptr_t ptr = et->load_base; ptr < et->load_end; ptr += cur_config->page_size) {
+  for (uintptr_t ptr = et->load_base; ptr < et->load_end;
+       ptr += cur_config->page_size) {
     vm_unmap_range(&kernel_space, ptr, cur_config->page_size);
   }
 
@@ -252,14 +259,14 @@ void kern_load_extensions() {
     res = vfs_resolve(NULL, "/lib/extensions", 0);
     if (res.target == NULL || res.target->children.length == 0) {
       kfree(res.raw_string);
-      return; // No idea where the extensions are, so bail out
+      return;  // No idea where the extensions are, so bail out
     }
   }
 
-  struct vfs_ent* kext_parent = res.target;
+  struct vfs_ent *kext_parent = res.target;
   for (int i = 0; i < kext_parent->children.length; i++) {
     klog("trying to load %s", kext_parent->children.data[i]->name);
-    struct kernel_extension* ext =
+    struct kernel_extension *ext =
         load_extension(kext_parent->children.data[i]->backing);
     if (ext == NULL || !ext->init()) {
       klog("kext: failed to load %s!", kext_parent->children.data[i]->name);
@@ -273,4 +280,3 @@ void kern_load_extensions() {
   kfree(res.raw_string);
   return;
 }
-

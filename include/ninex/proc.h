@@ -3,31 +3,31 @@
 
 #include <arch/irqchip.h>
 #include <lib/htab.h>
-#include <lib/vec.h>
-#include <lib/types.h>
 #include <lib/queue.h>
+#include <lib/types.h>
+#include <lib/vec.h>
 #include <vm/virt.h>
 
-#define DEFAULT_TIMESLICE 20 // A default timeslice of 20 milleseconds
+#define DEFAULT_TIMESLICE 20  // A default timeslice of 20 milleseconds
 
 struct thread;
 typedef struct process {
   uint32_t pid, ppid;
-  vec_t(struct process*) children;
-  vec_t(struct thread*) threads;
+  vec_t(struct process *) children;
+  vec_t(struct thread *) threads;
 
-  struct vfs_ent* cwd;
+  struct vfs_ent *cwd;
   struct hash_table handles;
-  vm_space_t* space;
+  vm_space_t *space;
   int fd_counter, status;
 } proc_t;
 
 typedef struct thread {
-  struct process* parent;
+  struct process *parent;
   uint32_t tid;
 
   cpu_ctx_t context;
-  void* fpu_save_area;
+  void *fpu_save_area;
   bool no_queue;
   uintptr_t syscall_stack;
 
@@ -43,8 +43,11 @@ struct exec_args {
   uintptr_t entry;
 };
 
-proc_t* create_process(proc_t* parent, vm_space_t* space, char* ttydev);
-thread_t* kthread_create(uintptr_t entry, uint64_t arg1);
-thread_t* uthread_create(proc_t* parent, const char* filepath, struct exec_args arg, bool elf);
+proc_t *create_process(proc_t *parent, vm_space_t *space, char *ttydev);
+thread_t *kthread_create(uintptr_t entry, uint64_t arg1);
+thread_t *uthread_create(proc_t *parent,
+                         const char *filepath,
+                         struct exec_args arg,
+                         bool elf);
 
-#endif // NINEX_PROC_H
+#endif  // NINEX_PROC_H

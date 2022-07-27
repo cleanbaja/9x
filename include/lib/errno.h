@@ -117,8 +117,8 @@
 // Arch-Specific function for setting errno
 #ifdef __x86_64__
 static __attribute__((always_inline)) void set_errno(uint32_t errno) {
-  asm ("mov %0, %%gs:54" :: "r"(errno));
+  asm("mov %0, %%gs:54" ::"r"(errno));
 }
-#endif // __x86_64__
+#endif  // __x86_64__
 
-#endif // LIB_ERRNO_H
+#endif  // LIB_ERRNO_H

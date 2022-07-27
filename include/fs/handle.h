@@ -1,8 +1,8 @@
 #ifndef FS_BACKING_H
 #define FS_BACKING_H
 
-#include <lib/types.h>
 #include <lib/lock.h>
+#include <lib/types.h>
 #include <lib/vec.h>
 #include <stddef.h>
 
@@ -10,13 +10,13 @@
  * Unix/Posix definitions...
  */
 #define O_ACCMODE 0x0007
-#define O_EXEC    0b1000
-#define O_RDONLY  0b0100
-#define O_RDWR    0b1100
-#define O_SEARCH  0b0010
-#define O_WRONLY  0b1010
-#define CAN_READ(x)  ((x & O_RDONLY) || (x & O_RDWR))
-#define CAN_WRITE(x)  ((x & O_WRONLY) || (x & O_RDWR))
+#define O_EXEC 0b1000
+#define O_RDONLY 0b0100
+#define O_RDWR 0b1100
+#define O_SEARCH 0b0010
+#define O_WRONLY 0b1010
+#define CAN_READ(x) ((x & O_RDONLY) || (x & O_RDWR))
+#define CAN_WRITE(x) ((x & O_WRONLY) || (x & O_RDWR))
 
 #define O_APPEND 0x0008
 #define O_CREAT 0x0010
@@ -59,8 +59,7 @@
 #define DT_SOCK 12
 #define DT_WHT 14
 
-struct stat
-{
+struct stat {
   dev_t st_dev;
   ino_t st_ino;
   mode_t st_mode;
@@ -76,8 +75,7 @@ struct stat
   blkcnt_t st_blocks;
 };
 
-struct dirent
-{
+struct dirent {
   ino_t d_ino;
   off_t d_off;
   unsigned short d_reclen;
@@ -89,22 +87,22 @@ struct dirent
  * 9x internal definitions
  */
 struct vnode {
-  ssize_t (*read)(struct vnode*, void*, off_t, size_t);
-  ssize_t (*write)(struct vnode*, const void*, off_t, size_t);
-  ssize_t (*ioctl)(struct vnode*, int64_t, void*);
-  ssize_t (*resize)(struct vnode*, off_t);
-  void    (*close)(struct vnode* bck);
+  ssize_t (*read)(struct vnode *, void *, off_t, size_t);
+  ssize_t (*write)(struct vnode *, const void *, off_t, size_t);
+  ssize_t (*ioctl)(struct vnode *, int64_t, void *);
+  ssize_t (*resize)(struct vnode *, off_t);
+  void (*close)(struct vnode *bck);
 
-  struct  stat st;
-  lock_t  lock;
+  struct stat st;
+  lock_t lock;
   int64_t refcount;
 };
 
 struct handle {
-  struct vfs_ent* file;
+  struct vfs_ent *file;
   union {
-    vec_t(struct dirent*)* dirents;
-    struct vnode* node;
+    vec_t(struct dirent *) * dirents;
+    struct vnode *node;
   };
 
   uint32_t flags;
@@ -113,8 +111,11 @@ struct handle {
 };
 
 struct process;
-struct vnode* create_resource(size_t extra_bytes);
-struct handle* handle_open(struct process* proc, const char* path, int flags, int creat_mode);
-struct handle* handle_clone(struct handle* parent);
+struct vnode *create_resource(size_t extra_bytes);
+struct handle *handle_open(struct process *proc,
+                           const char *path,
+                           int flags,
+                           int creat_mode);
+struct handle *handle_clone(struct handle *parent);
 
-#endif // FS_BACKING_H
+#endif  // FS_BACKING_H
