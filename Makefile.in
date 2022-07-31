@@ -1,0 +1,125 @@
+# Import in variables from autoconf
+override CC := @KERNEL_CC@
+override LD := @KERNEL_LD@
+override ARCH := @ARCH@
+override SCDIR := @srcdir@/src
+override CFLAGS := @CFLAGS@
+override BUILD_DIR := @BUILDDIR@
+override SOURCE_DIR := @srcdir@
+
+# Silent by default
+ifeq ($(V),)
+.SILENT:
+endif
+
+# Gather the kernel cflags/sources
+override kern_SOURCES := $(SCDIR)/kern/init.c
+override KCFLAGS := $(CFLAGS)                  \
+                    -std=gnu11                 \
+                    -ffreestanding             \
+                    -fpic                      \
+                    -Wno-attributes            \
+                    -MMD                       \
+                    -mno-red-zone              \
+		    -I @srcdir@/include        \
+                    -fno-omit-frame-pointer
+override KLINKFLAGS := -nostdlib
+
+# Make arch-specific modifications
+ifeq ($(ARCH),aarch64)
+	override KCFLAGS += -mgeneral-regs-only
+	override KLINKFLAGS += -zmax-page-size=0x10000
+	override CLANG_TARGET := aarch64-unknown-none-elf
+else ifeq ($(ARCH), x86_64)
+	override KCFLAGS += -mno-80387                 \
+                            -mno-mmx                   \
+                            -mno-3dnow                 \
+                            -mno-sse                   \
+                            -mno-sse2
+	override KLINKFLAGS += -zmax-page-size=0x1000
+	override CLANG_TARGET := x86_64-unknown-none-elf
+endif
+
+
+# Add special case for clang
+ifeq ($(CC),clang)
+	override KCFLAGS += -target $(CLANG_TARGET)
+endif
+
+# Build artifacts
+override KERNEL  := $(BUILD_DIR)/nxkern
+override IMAGE   := $(BUILD_DIR)/ninex.hdd
+override OBJECTS := $(addprefix $(BUILD_DIR), $(patsubst %.c, %.o, $(kern_SOURCES:$(SOURCE_DIR)%=%)))
+
+# Finally, the actual build targets
+all: $(KERNEL)
+
+$(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
+	@printf "\tCC %s\n" $<
+	mkdir -p $(@D)
+	$(CC) $(KCFLAGS) -o $@ -c $<
+
+$(KERNEL): $(OBJECTS)
+	@printf "\tCCLD %s\n" $@
+	mkdir -p $(@D)
+	$(LD) $(KLINKFLAGS) -T @srcdir@/arch/$(ARCH)/kernel.ld -o $@ $<
+
+$(IMAGE): $(KERNEL) $(SOURCE_DIR)/root/limine.cfg
+	rm -f $(IMAGE)
+	dd if=/dev/zero bs=1M count=0 seek=64 of=$(IMAGE)
+	parted -s $(IMAGE) mklabel gpt
+	parted -s $(IMAGE) mkpart ESP fat32 2048s 100%
+	parted -s $(IMAGE) set 1 esp on
+	@srcdir@/3rdparty/limine/limine-deploy $(IMAGE)
+	sudo losetup -f >lpdev
+	sudo losetup -Pf $(IMAGE)
+	sudo mkfs.fat -F 32 `cat lpdev`p1
+	mkdir -p mountdir
+	sudo mount `cat lpdev`p1 mountdir
+	sudo mkdir -p mountdir/EFI/BOOT
+	sudo mkdir -p mountdir/boot
+	sudo cp $(KERNEL) $(SOURCE_DIR)/root/limine.cfg mountdir/boot/
+	sudo cp @srcdir@/3rdparty/limine/limine.sys mountdir/
+	sudo cp @srcdir@/3rdparty/limine/BOOTX64.EFI mountdir/EFI/BOOT/
+	sudo cp $(SOURCE_DIR)/3rdparty/Sabaton/BOOTAA64.efi mountdir/EFI/BOOT/
+	sudo cp mountdir/boot/nxkern mountdir/kernel.elf
+	sync
+	sudo umount mountdir
+	sudo losetup -d `cat lpdev`
+	sudo rm -rf lpdev mountdir
+
+# Header dependencies
+override HEADER_DEPS := $(addprefix $(BUILD_DIR), $(patsubst %.c, %.d, $(kern_SOURCES:$(SOURCE_DIR)%=%)))
+-include $(HEADER_DEPS)
+
+# Miscellaneous Targets
+.PHONY: clean distclean maintainer-clean
+clean: 
+	rm -f $(KERNEL) $(OBJECTS) $(HEADER_DEPS)
+
+distclean: clean
+	rm -f $(BUILD_DIR)/config.* $(IMAGE) $(BUILD_DIR)/Makefile
+
+maintainer-clean: distclean
+	rm -rf $(SOURCE_DIR)/3rdparty $(SOURCE_DIR)/build-aux configure *'~' 
+	rm -rf $(SOURCE_DIR)/install-sh $(SOURCE_DIR)/autom4te*
+
+# Run Targets
+.PHONY: run run-kvm
+
+override QEMU_FLAGS += -smp `nproc` -m 1G -drive file=$(IMAGE),if=none,id=nvmdev -device nvme,serial=fa01fa02,drive=nvmdev
+
+ifeq ($(ARCH), aarch64)
+	override QEMU_FLAGS += -smp 8 -M virt -bios $(SOURCE_DIR)/3rdparty/OVMF/AA64/OVMF.fd
+	override QEMU_FLAGS += -device ramfb -device qemu-xhci -device usb-kbd -cpu cortex-a72
+else ifeq ($(ARCH), x86_64)
+	override QEMU_FLAGS += -M q35 -cpu qemu64 -bios $(SOURCE_DIR)/3rdparty/OVMF/X64/OVMF.fd 
+	override QEMU_FLAGS += -smp `nproc` -debugcon stdio
+endif
+
+run: $(IMAGE)
+	qemu-system-$(ARCH) $(QEMU_FLAGS)	
+
+run-kvm: $(IMAGE)
+	qemu-system-$(ARCH) --enable-kvm $(QEMU_FLAGS)
+
