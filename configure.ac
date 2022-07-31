@@ -1,4 +1,4 @@
-AC_INIT(9x, 0.1.0, https://github.com/cleanbaja/9x/issues, ninex)
+AC_INIT(9x, m4_esyscmd(./version.sh), https://github.com/cleanbaja/9x/issues, ninex)
 AC_CONFIG_AUX_DIR([build-aux])
 AC_PREREQ(2.69)
 
