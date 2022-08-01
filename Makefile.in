@@ -6,6 +6,7 @@ override SCDIR := @srcdir@/src
 override CFLAGS := @CFLAGS@
 override BUILD_DIR := @BUILDDIR@
 override SOURCE_DIR := @srcdir@
+override VERSION := @PACKAGE_VERSION@
 
 # Silent by default
 ifeq ($(V),)
@@ -93,7 +94,7 @@ override HEADER_DEPS := $(addprefix $(BUILD_DIR), $(patsubst %.c, %.d, $(kern_SO
 -include $(HEADER_DEPS)
 
 # Miscellaneous Targets
-.PHONY: clean distclean maintainer-clean
+.PHONY: clean distclean maintainer-clean dist install install-strip
 clean: 
 	rm -f $(KERNEL) $(OBJECTS) $(HEADER_DEPS)
 
@@ -104,13 +105,33 @@ maintainer-clean: distclean
 	rm -rf $(SOURCE_DIR)/3rdparty $(SOURCE_DIR)/build-aux configure *'~' 
 	rm -rf $(SOURCE_DIR)/install-sh $(SOURCE_DIR)/autom4te*
 
+dist:
+	rm -rf "ninex-$(VERSION)"
+	mkdir -p "ninex-$(VERSION)"
+	cp -r @srcdir@/.git "ninex-$(VERSION)"/
+	cd "ninex-$(VERSION)" && git checkout .
+	cd "ninex-$(VERSION)" && ./bootstrap
+	cd "ninex-$(VERSION)" && echo $(VERSION) >.version
+	rm -rf "ninex-$(VERSION)/.git"
+	rm -rf "ninex-$(VERSION)/autom4te.cache"
+	tar -zcf $(BUILD_DIR)/"ninex-$(VERSION).tar.gz" "ninex-$(VERSION)"
+	rm -rf "ninex-$(VERSION)"
+
+install:
+	@INSTALL@ -d "$(DESTDIR)/boot"
+	@INSTALL@ $(KERNEL) "$(DESTDIR)/boot"
+
+install-strip:
+	@INSTALL@ -d "$(DESTDIR)/boot"
+	@INSTALL@ -s $(KERNEL) "$(DESTDIR)/boot"
+
 # Run Targets
 .PHONY: run run-kvm
 
 override QEMU_FLAGS += -smp `nproc` -m 1G -drive file=$(IMAGE),if=none,id=nvmdev -device nvme,serial=fa01fa02,drive=nvmdev
 
 ifeq ($(ARCH), aarch64)
-	override QEMU_FLAGS += -smp 8 -M virt -bios $(SOURCE_DIR)/3rdparty/OVMF/AA64/OVMF.fd
+	override QEMU_FLAGS += -smp 8 -M virt -bios $(SOURCE_DIR)/3rdparty/OVMF/AA64/OVMF.fd -serial stdio
 	override QEMU_FLAGS += -device ramfb -device qemu-xhci -device usb-kbd -cpu cortex-a72
 else ifeq ($(ARCH), x86_64)
 	override QEMU_FLAGS += -M q35 -cpu qemu64 -bios $(SOURCE_DIR)/3rdparty/OVMF/X64/OVMF.fd 
