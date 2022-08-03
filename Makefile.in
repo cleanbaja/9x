@@ -31,6 +31,9 @@ ifeq ($(ARCH),aarch64)
 	override KCFLAGS += -mgeneral-regs-only
 	override KLINKFLAGS += -zmax-page-size=0x10000
 	override CLANG_TARGET := aarch64-unknown-none-elf
+
+	override asm_SOURCES := $(SCDIR)/arch/aarch64/stubs.S
+	override kern_SOURCES += $(SCDIR)/arch/aarch64/trap.c
 else ifeq ($(ARCH), x86_64)
 	override KCFLAGS += -mno-80387                 \
                             -mno-mmx                   \
@@ -39,6 +42,8 @@ else ifeq ($(ARCH), x86_64)
                             -mno-sse2
 	override KLINKFLAGS += -zmax-page-size=0x1000
 	override CLANG_TARGET := x86_64-unknown-none-elf
+	
+	override asm_SOURCES := $(SCDIR)/arch/x86_64/trap_stubs.S
 endif
 
 
@@ -51,6 +56,7 @@ endif
 override KERNEL  := $(BUILD_DIR)/nxkern
 override IMAGE   := $(BUILD_DIR)/ninex.hdd
 override OBJECTS := $(addprefix $(BUILD_DIR), $(patsubst %.c, %.o, $(kern_SOURCES:$(SOURCE_DIR)%=%)))
+override OBJECTS += $(addprefix $(BUILD_DIR), $(patsubst %.S, %.o, $(asm_SOURCES:$(SOURCE_DIR)%=%)))
 
 # Finally, the actual build targets
 all: $(KERNEL)
@@ -60,10 +66,15 @@ $(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
 	mkdir -p $(@D)
 	$(CC) $(KCFLAGS) -o $@ -c $<
 
+$(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.S
+	@printf "\tASM %s\n" $<
+	mkdir -p $(@D)
+	$(CC) $(KCFLAGS) -o $@ -c $<
+
 $(KERNEL): $(OBJECTS)
 	@printf "\tCCLD %s\n" $@
 	mkdir -p $(@D)
-	$(LD) $(KLINKFLAGS) -T @srcdir@/arch/$(ARCH)/kernel.ld -o $@ $<
+	$(LD) $(KLINKFLAGS) -T $(SCDIR)/arch/$(ARCH)/kernel.ld -o $@ $(OBJECTS)
 
 $(IMAGE): $(KERNEL) $(SOURCE_DIR)/root/limine.cfg
 	rm -f $(IMAGE)
@@ -91,6 +102,7 @@ $(IMAGE): $(KERNEL) $(SOURCE_DIR)/root/limine.cfg
 
 # Header dependencies
 override HEADER_DEPS := $(addprefix $(BUILD_DIR), $(patsubst %.c, %.d, $(kern_SOURCES:$(SOURCE_DIR)%=%)))
+override HEADER_DEPS := $(addprefix $(BUILD_DIR), $(patsubst %.S, %.d, $(asm_SOURCES:$(SOURCE_DIR)%=%)))
 -include $(HEADER_DEPS)
 
 # Miscellaneous Targets

@@ -2,6 +2,7 @@
  * SPDX-License-Identifier: Apache-2.0 */
 
 #include <misc/stivale2.h>
+#include <arch/trap.h>
 #include <stddef.h>
 
 static struct stivale2_header_tag_framebuffer fbuf_tag = {
@@ -53,6 +54,9 @@ void memset32(void *ptr, uint32_t val, int len) {
 
 __attribute__((noreturn)) void kern_entry(struct stivale2_struct* info) {
   bootinfo = info;
+
+  // Initialize the lower CPU architecture
+  trap_init();
 
   // Paint a nice green backdrop.
   struct stivale2_struct_tag_framebuffer* fbtag = stivale2_get_tag(STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
