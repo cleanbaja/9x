@@ -58,9 +58,9 @@ __attribute__((noreturn)) void kern_entry(struct stivale2_struct* info) {
   // Initialize the lower CPU architecture
   trap_init();
 
-  // Paint a nice green backdrop.
+  // Paint a nice blue backdrop.
   struct stivale2_struct_tag_framebuffer* fbtag = stivale2_get_tag(STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
-  memset32((void*)fbtag->framebuffer_addr, 0x50C878, fbtag->framebuffer_pitch * fbtag->framebuffer_height);
+  memset32((void*)fbtag->framebuffer_addr, 0x4169e1, fbtag->framebuffer_pitch * fbtag->framebuffer_height);
 
   // Halt for now...
   for (;;) {

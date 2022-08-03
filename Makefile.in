@@ -43,7 +43,8 @@ else ifeq ($(ARCH), x86_64)
 	override KLINKFLAGS += -zmax-page-size=0x1000
 	override CLANG_TARGET := x86_64-unknown-none-elf
 	
-	override asm_SOURCES := $(SCDIR)/arch/x86_64/trap_stubs.S
+	override asm_SOURCES := $(SCDIR)/arch/x86_64/stubs.S
+	override kern_SOURCES += $(SCDIR)/arch/x86_64/trap.c
 endif
 
 
@@ -102,7 +103,7 @@ $(IMAGE): $(KERNEL) $(SOURCE_DIR)/root/limine.cfg
 
 # Header dependencies
 override HEADER_DEPS := $(addprefix $(BUILD_DIR), $(patsubst %.c, %.d, $(kern_SOURCES:$(SOURCE_DIR)%=%)))
-override HEADER_DEPS := $(addprefix $(BUILD_DIR), $(patsubst %.S, %.d, $(asm_SOURCES:$(SOURCE_DIR)%=%)))
+override HEADER_DEPS += $(addprefix $(BUILD_DIR), $(patsubst %.S, %.d, $(asm_SOURCES:$(SOURCE_DIR)%=%)))
 -include $(HEADER_DEPS)
 
 # Miscellaneous Targets
