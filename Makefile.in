@@ -14,7 +14,10 @@ ifeq ($(V),)
 endif
 
 # Gather the kernel cflags/sources
-override kern_SOURCES := $(SCDIR)/kern/init.c
+override kern_SOURCES := $(SCDIR)/kern/init.c \
+                         $(SCDIR)/lib/print.c \
+                         $(SCDIR)/lib/libc.c
+
 override KCFLAGS := $(CFLAGS)                  \
                     -std=gnu11                 \
                     -ffreestanding             \
@@ -144,8 +147,8 @@ install-strip:
 override QEMU_FLAGS += -smp `nproc` -m 1G -drive file=$(IMAGE),if=none,id=nvmdev -device nvme,serial=fa01fa02,drive=nvmdev
 
 ifeq ($(ARCH), aarch64)
-	override QEMU_FLAGS += -smp 8 -M virt -bios $(SOURCE_DIR)/3rdparty/OVMF/AA64/OVMF.fd -serial stdio
-	override QEMU_FLAGS += -device ramfb -device qemu-xhci -device usb-kbd -cpu cortex-a72
+	override QEMU_FLAGS += -smp 8 -M virt -serial stdio -device ramfb -cpu cortex-a72 -kernel $(KERNEL)
+	override QEMU_FLAGS += -drive if=pflash,format=raw,file=$(SOURCE_DIR)/3rdparty/Sabaton/Sabaton_virt_aarch64.elf.bin,readonly=on
 else ifeq ($(ARCH), x86_64)
 	override QEMU_FLAGS += -M q35 -cpu qemu64 -bios $(SOURCE_DIR)/3rdparty/OVMF/X64/OVMF.fd 
 	override QEMU_FLAGS += -smp `nproc` -debugcon stdio

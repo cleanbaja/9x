@@ -1,4 +1,5 @@
 #include <arch/trap.h>
+#include <lib/print.h>
 
 #define GDT_KERN_CODE 0x00af9b000000ffff
 #define GDT_KERN_DATA 0x00af93000000ffff
@@ -83,7 +84,68 @@ void trap_init() {
   asm volatile ("lidt %0" :: "m"(idt_table_pointer));
 }
 
+/*
+ * A list of execption messages stolen from the osdev wiki
+ * NOTE: I removed some execptions that were obsolete
+ */
+static char* names[] = { 
+  [0] = "Division by Zero",
+  [1] = "Debug",
+  [2] = "Non Maskable Interrupt",
+  [3] = "Breakpoint",
+  [4] = "Overflow",
+  [5] = "Out of Bounds",
+  [6] = "Invalid Opcode",
+  [8] = "Double Fault",
+  [10] = "Invalid TSS",
+  [11] = "Segment not present",
+  [12] = "Stack Exception",
+  [13] = "General Protection fault",
+  [14] = "Page fault",
+  [16] = "x87 Floating Point Exception",
+  [17] = "Alignment check",
+  [18] = "Machine check",
+  [19] = "SIMD Floating Point Exception",
+  [20] = "Virtualization Exception",
+  [29] = "Reserved",
+  [30] = "Security Exception"
+};
+
+void trap_dump_frame(struct cpu_regs* regs) {
+  kprint("Exception #%d (%s)\n", regs->int_no, names[regs->int_no]);
+  kprint("    Error Code: 0x%08lx, RIP: 0x%08lx, RSP: 0x%08lx\n",
+      regs->ec,
+      regs->rip,
+      regs->rsp);
+  kprint("    RAX: 0x%08lx, RBX: 0x%08lx, RCX: 0x%08lx, RDX: 0x%08lx\n",
+      regs->rax,
+      regs->rbx,
+      regs->rcx,
+      regs->rbx);
+  kprint("    RSI: 0x%08lx, RDI: 0x%08lx, RSP: 0x%08lx, RBP: 0x%08lx\n",
+      regs->rsi,
+      regs->rdi,
+      regs->rsp,
+      regs->rbp);
+  kprint("    R8:  0x%08lx, R9:  0x%08lx, R10: 0x%08lx, R11: 0x%08lx\n",
+      regs->r8,
+      regs->r9,
+      regs->r10,
+      regs->r11);
+  kprint("    R12: 0x%08lx, R12: 0x%08lx, R13: 0x%08lx, R14: 0x%08lx\n",
+      regs->r12,
+      regs->r13,
+      regs->r13,
+      regs->r14);
+  kprint("    R15: 0x%08lx, CS:  0x%08lx, SS:  0x%08lx\n\n",
+      regs->r15,
+      regs->cs,
+      regs->ss);
+}
+
 void handle_trap(struct cpu_regs* context) {
+  trap_dump_frame(context);
+
   // Halt for now
   for (;;) {
     asm volatile ("cli; hlt");

@@ -41,7 +41,7 @@
 .macro make_exc_handler type
 common_handler_\type:
   // Create enough space on the stack for the frame
-  sub sp, sp, #1024
+  sub sp, sp, #288
 
   // Save all registers 
   pushall
@@ -50,13 +50,15 @@ common_handler_\type:
   mrs x1, sp_el0
   str x1, [sp, #248] 
 
-  // Save PSTATE, Type and ELR (faulting IP)
+  // Save PSTATE, Type, ELR (faulting IP) and ESR
   mrs x1, spsr_el1
   str x1, [sp, #256]
   mrs x1, elr_el1
   str x1, [sp, #264]
   mov x1, \type
   str x1, [sp, #272]
+  mrs x1, esr_el1
+  str x1, [sp, #280]
 
   mov x1, xzr
   mov x0, sp
@@ -76,7 +78,7 @@ common_handler_\type:
 
   // Restore all registers, clean up the stack and away we go
   popall
-  add sp, sp, #1024
+  add sp, sp, #288
   eret
 .endm
 

@@ -353,6 +353,21 @@ struct stivale2_struct_tag_mmio32_uart {
     uint64_t addr;
 };
 
+/* Defined below is a undocumented UART tag provided
+ * by certain aarch64 bootloaders, primarily Sabaton.
+ * 
+ * This tag provides us with a more complete UART interface...
+ */
+#define STIVALE2_STRUCT_TAG_MMIO32_UART_STATUS 0xF77485DBFEB260F9
+
+struct stivale2_struct_tag_mmio32_uart_status {
+    struct stivale2_tag tag;
+    uint64_t addr;
+    uint64_t status;
+    uint32_t mask;
+    uint32_t value;
+};
+
 #define STIVALE2_STRUCT_TAG_DTB 0xabb29bd49a2833fa
 
 struct stivale2_struct_tag_dtb {

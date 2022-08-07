@@ -3,6 +3,7 @@
 
 #include <misc/stivale2.h>
 #include <arch/trap.h>
+#include <lib/print.h>
 #include <stddef.h>
 
 static struct stivale2_header_tag_framebuffer fbuf_tag = {
@@ -56,11 +57,18 @@ __attribute__((noreturn)) void kern_entry(struct stivale2_struct* info) {
   bootinfo = info;
 
   // Initialize the lower CPU architecture
+  print_init();
   trap_init();
 
+  kprint("welcome to ninex!\n");
+  kprint("Bootloader: %s [%s]\n", info->bootloader_brand, info->bootloader_version);
+ 
   // Paint a nice blue backdrop.
   struct stivale2_struct_tag_framebuffer* fbtag = stivale2_get_tag(STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
   memset32((void*)fbtag->framebuffer_addr, 0x4169e1, fbtag->framebuffer_pitch * fbtag->framebuffer_height);
+  
+  // Test assertions
+  assert(1 == 2);
 
   // Halt for now...
   for (;;) {
