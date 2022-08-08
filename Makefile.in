@@ -1,5 +1,6 @@
 # Import in variables from autoconf
 override CC := @KERNEL_CC@
+override NCC := @CC@
 override LD := @KERNEL_LD@
 override ARCH := @ARCH@
 override SCDIR := @srcdir@/src

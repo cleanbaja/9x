@@ -1,18 +1,22 @@
 AC_INIT(9x, m4_esyscmd(./version.sh), https://github.com/cleanbaja/9x/issues, ninex)
+AC_CONFIG_SRCDIR([LICENSE.md])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_PREREQ(2.69)
+
+# Build Arch
+m4_define([DEFAULT_ARCH], [x86_64])
+AC_ARG_VAR(ARCH, [Target Architecture @<:@]DEFAULT_ARCH[@:>@])
+test "x$ARCH" = "x" && ARCH="DEFAULT_ARCH"
 
 # Build Variables
 BUILDDIR="$(pwd -P)"
 AC_SUBST(BUILDDIR, [$BUILDDIR])
-AC_ARG_VAR(ARCH, [Target CPU Architecture [x86_64]])
 AC_ARG_VAR(CFLAGS, [C Compiler Flags [-O2 -g]])
-AC_ARG_VAR(KERNEL_CC, [Kernel C Compiler])
-AC_ARG_VAR(KERNEL_LD, [Kernel Object Linker])
+AC_ARG_VAR(KERNEL_CC, [Kernel C Compiler [clang]])
+AC_ARG_VAR(KERNEL_LD, [Kernel ELF Linker [ld.lld]])
 
 # Defaults
-test "x$ARCH" = "x" && ARCH='x86_64'
-test "x$CFLAGS" = "x" && CFLAGS='-O2 -pipe -g'
+test "x$CFLAGS" = "x" && CFLAGS='-O2 -g'
 test "x$KERNEL_CC" = "x" && KERNEL_CC='clang'
 test "x$KERNEL_LD" = "x" && KERNEL_LD='ld.lld'
 

@@ -10,7 +10,7 @@ static struct print_sink sinks[MAX_PRINT_SINKS];
 // BOCHS/QEMU debugcon output
 #ifdef __x86_64__
 static void debugcon_write(char* str, size_t len) {
-  asm ("rep outsb" :: "S"(str), "d"(0xE9), "c"(len));
+  asm volatile ("rep outsb" : "+S"(str), "+c"(len) : "d"(0xE9) : "memory"); 
 }
 
 static bool debugcon_init() {

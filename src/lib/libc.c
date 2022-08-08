@@ -12,7 +12,7 @@ size_t strlen(const char* str) {
 void memcpy(void* dest, const void* src, size_t len) {
 #ifdef __x86_64__
   // Use ASM instructions, since they're faster
-  asm ("rep movsb" :: "S"(src), "D"(dest), "c"(len));
+  asm volatile ("rep movsb" : "+S"(src), "+D"(dest), "+c"(len) :: "memory");
 #else
   const uint8_t* s = (const uint8_t*)src;
   uint8_t* d = (uint8_t*)dest;
@@ -25,8 +25,7 @@ void memcpy(void* dest, const void* src, size_t len) {
 
 void memset(void* dest, const uint8_t val, size_t len) {
 #ifdef __x86_64__
-  // Use ASM instructions, since they're faster
-  asm ("rep stosb" :: "D"(dest), "a"(val), "c"(len));
+  asm volatile ("rep stosb" : "+D"(dest), "+c"(len) : "a"(val) : "memory");
 #else
   uint8_t* d = (uint8_t*)dest;
 
