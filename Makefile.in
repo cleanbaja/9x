@@ -1,6 +1,5 @@
 # Import in variables from autoconf
 override CC := @KERNEL_CC@
-override NCC := @CC@
 override LD := @KERNEL_LD@
 override ARCH := @ARCH@
 override SCDIR := @srcdir@/src
@@ -52,9 +51,12 @@ else ifeq ($(ARCH), x86_64)
 endif
 
 
-# Add special case for clang
+# Add special case for clang/hardened builds
 ifeq ($(CC),clang)
 	override KCFLAGS += -target $(CLANG_TARGET)
+endif
+ifeq (@SECURE_BUILD@,yes)
+	override KCFLAGS += -DSECURE_BUILD=1
 endif
 
 # Build artifacts

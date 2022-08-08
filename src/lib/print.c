@@ -1,5 +1,6 @@
 #include <lib/print.h>
 #include <lib/libc.h>
+#include <lib/lock.h>
 
 #define NANOPRINTF_IMPLEMENTATION
 #include <misc/nanoprintf.h>
@@ -99,6 +100,9 @@ void print_init() {
 
 char buf[512] = {0};
 void kprint(const char* fmt, ...) {
+  static lock_t log_lock = SPINLOCK_INIT;
+  spinlock(&log_lock);
+
   va_list va;
   va_start(va, fmt);
   int len = npf_vsnprintf(buf, 512, fmt, va);
@@ -110,5 +114,6 @@ void kprint(const char* fmt, ...) {
   } 
 
   memset(buf, 0, 512);
+  spinrelease(&log_lock);
 }
 

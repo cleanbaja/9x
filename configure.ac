@@ -3,10 +3,11 @@ AC_CONFIG_SRCDIR([LICENSE.md])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_PREREQ(2.69)
 
-# Build Arch
-m4_define([DEFAULT_ARCH], [x86_64])
-AC_ARG_VAR(ARCH, [Target Architecture @<:@]DEFAULT_ARCH[@:>@])
-test "x$ARCH" = "x" && ARCH="DEFAULT_ARCH"
+# Hardened Builds
+AC_ARG_ENABLE(secure-kernel,
+    AS_HELP_STRING([--enable-secure-kernel], [enables kernel security features]),
+    SECURE_BUILD="$enableval")
+AC_SUBST(SECURE_BUILD, [$SECURE_BUILD])
 
 # Build Variables
 BUILDDIR="$(pwd -P)"
@@ -19,6 +20,11 @@ AC_ARG_VAR(KERNEL_LD, [Kernel ELF Linker [ld.lld]])
 test "x$CFLAGS" = "x" && CFLAGS='-O2 -g'
 test "x$KERNEL_CC" = "x" && KERNEL_CC='clang'
 test "x$KERNEL_LD" = "x" && KERNEL_LD='ld.lld'
+
+# Build Arch
+m4_define([DEFAULT_ARCH], [x86_64])
+AC_ARG_VAR(ARCH, [Target Architecture @<:@]DEFAULT_ARCH[@:>@])
+test "x$ARCH" = "x" && ARCH="DEFAULT_ARCH"
 
 # Build Tools
 AC_PROG_INSTALL
