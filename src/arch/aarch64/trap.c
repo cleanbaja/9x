@@ -1,5 +1,6 @@
 #include <arch/trap.h>
 #include <lib/print.h>
+#include <lib/panic.h>
 
 // TODO(cleanbaja): use a percpu stack instead
 char __stack[0x10000] = {0};
@@ -13,9 +14,10 @@ void trap_init() {
   asm volatile ("msr vbar_el1, %0" :: "r"(vector_table));
 }
 
+__attribute__((no_sanitize("undefined")))
 void trap_dump_frame(struct cpu_regs* regs) {
   // TODO(cleanbaja): create names table for aarch64
-  kprint("Exception #%d (Unknown)\n", regs->ec);
+  kprint("Exception #%d (IRQ/FIQ/SError/Synch):\n", regs->ec);
 
   for (int i = 0; i < 28; i += 4) {
     kprint("\tX%d: 0x%08lx, X%d: 0x%08lx, X%d: 0x%08lx, X%d: 0x%08lx\n",
@@ -36,11 +38,6 @@ void trap_dump_frame(struct cpu_regs* regs) {
 
 
 void handle_trap(struct cpu_regs* context) {
-  trap_dump_frame(context);
-
-  // Halt for now
-  for (;;) {
-    asm volatile ("msr DAIFSet, #15; wfi");
-  }
+  panic(context, NULL);
 }
 

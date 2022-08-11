@@ -2,8 +2,8 @@
  * SPDX-License-Identifier: Apache-2.0 */
 
 #include <misc/stivale2.h>
-#include <arch/trap.h>
 #include <lib/print.h>
+#include <lib/panic.h>
 #include <lib/lock.h>
 #include <stddef.h>
 

@@ -16,6 +16,7 @@ endif
 # Gather the kernel cflags/sources
 override kern_SOURCES := $(SCDIR)/kern/init.c \
                          $(SCDIR)/lib/print.c \
+                         $(SCDIR)/lib/panic.c \
                          $(SCDIR)/lib/libc.c
 
 override KCFLAGS := $(CFLAGS)                  \
@@ -26,6 +27,7 @@ override KCFLAGS := $(CFLAGS)                  \
                     -MMD                       \
                     -mno-red-zone              \
 		    -I @srcdir@/include        \
+		    -I $(BUILD_DIR)/.tmpinc    \
                     -fno-omit-frame-pointer
 override KLINKFLAGS := -nostdlib
 
@@ -56,7 +58,7 @@ ifeq ($(CC),clang)
 	override KCFLAGS += -target $(CLANG_TARGET)
 endif
 ifeq (@SECURE_BUILD@,yes)
-	override KCFLAGS += -DSECURE_BUILD=1
+	override KCFLAGS += -DSECURE_BUILD=1 -fsanitize=undefined
 endif
 
 # Build artifacts
@@ -119,6 +121,7 @@ clean:
 
 distclean: clean
 	rm -f $(BUILD_DIR)/config.* $(IMAGE) $(BUILD_DIR)/Makefile
+	rm -rf $(BUILD_DIR)/.tmpinc
 
 maintainer-clean: distclean
 	rm -rf $(SOURCE_DIR)/3rdparty $(SOURCE_DIR)/build-aux configure *'~' 

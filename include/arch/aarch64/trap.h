@@ -9,4 +9,4 @@ struct cpu_regs {
 }; 
 
 void trap_init();
-
+void trap_dump_frame(struct cpu_regs* regs);

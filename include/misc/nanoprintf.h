@@ -651,7 +651,8 @@ int npf_bin_len(npf_uint_t u) {
 }
 #endif
 
-void npf_bufputc(int c, void *ctx) {
+void __attribute__((no_sanitize("undefined"))) 
+npf_bufputc(int c, void *ctx) {
   npf_bufputc_ctx_t *bpc = (npf_bufputc_ctx_t *)ctx;
   if (bpc->cur < bpc->len) { bpc->dst[bpc->cur++] = (char)c; }
 }
@@ -664,7 +665,8 @@ typedef struct npf_cnt_putc_ctx {
   int n;
 } npf_cnt_putc_ctx_t;
 
-static void npf_putc_cnt(int c, void *ctx) {
+static __attribute__((no_sanitize("undefined"))) 
+void npf_putc_cnt(int c, void *ctx) {
   npf_cnt_putc_ctx_t *pc_cnt = (npf_cnt_putc_ctx_t *)ctx;
   ++pc_cnt->n;
   pc_cnt->pc(c, pc_cnt->ctx); // sibling-call optimization

@@ -1,5 +1,6 @@
 #include <arch/trap.h>
 #include <lib/print.h>
+#include <lib/panic.h>
 
 #define GDT_KERN_CODE 0x00af9b000000ffff
 #define GDT_KERN_DATA 0x00af93000000ffff
@@ -144,11 +145,6 @@ void trap_dump_frame(struct cpu_regs* regs) {
 }
 
 void handle_trap(struct cpu_regs* context) {
-  trap_dump_frame(context);
-
-  // Halt for now
-  for (;;) {
-    asm volatile ("cli; hlt");
-  }
+  panic(context, NULL);
 }
 

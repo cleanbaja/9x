@@ -16,10 +16,3 @@ void print_init();
 int  print_register_sink(struct print_sink bck);
 void print_disable(int spot);
 
-#define assert(expr) ({                                                        \
-  if ( !(expr) ) {                                                             \
-    kprint("ASSERTION \"" #expr "\" FAILED AT %s:%d!\n", __FILE__, __LINE__);  \
-    __builtin_trap();                                                          \
-  }                                                                            \
-})
-

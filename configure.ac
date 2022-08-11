@@ -12,12 +12,12 @@ AC_SUBST(SECURE_BUILD, [$SECURE_BUILD])
 # Build Variables
 BUILDDIR="$(pwd -P)"
 AC_SUBST(BUILDDIR, [$BUILDDIR])
-AC_ARG_VAR(CFLAGS, [C Compiler Flags [-O2 -g]])
+AC_ARG_VAR(CFLAGS, [C Compiler Flags [-Os -pipe -g]])
 AC_ARG_VAR(KERNEL_CC, [Kernel C Compiler [clang]])
 AC_ARG_VAR(KERNEL_LD, [Kernel ELF Linker [ld.lld]])
 
 # Defaults
-test "x$CFLAGS" = "x" && CFLAGS='-O2 -g'
+test "x$CFLAGS" = "x" && CFLAGS='-Os -pipe -g'
 test "x$KERNEL_CC" = "x" && KERNEL_CC='clang'
 test "x$KERNEL_LD" = "x" && KERNEL_LD='ld.lld'
 
@@ -47,6 +47,12 @@ if ! test "x$NASM_LOCATED" = "xyes"; then
     AC_MSG_ERROR([NASM (Netwide Assembler) is not present on this system, please install before running!])
 fi
 
+# Link the arch-specific include dir into .tmpinc
+cur_src_dir=`readlink -f $srcdir`
+rm -rf $BUILDDIR/.tmpinc && mkdir $BUILDDIR/.tmpinc
+ln -sf $cur_src_dir/include/arch/$ARCH $BUILDDIR/.tmpinc/arch
+
+# Finally, finish up configuration
 AC_PREFIX_DEFAULT()
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT

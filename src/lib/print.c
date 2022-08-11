@@ -98,7 +98,7 @@ void print_init() {
 #endif
 }
 
-char buf[512] = {0};
+static char buf[512] = {0};
 void kprint(const char* fmt, ...) {
   static lock_t log_lock = SPINLOCK_INIT;
   spinlock(&log_lock);
