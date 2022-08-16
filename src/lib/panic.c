@@ -19,10 +19,8 @@ static void do_stacktrace(struct cpu_regs* context) {
   if (context) {
 #ifdef __x86_64__
     frame = (struct stack_frame*)context->rbp;
-    kprint("frame is 0x%lx, pc is 0x%lx\n", frame, frame->pc);
 #else
     frame = (struct stack_frame*)context->x[29];
-    kprint("frame is 0x%lx, pc is 0x%lx\n", frame, frame->pc);
 #endif
   }
 

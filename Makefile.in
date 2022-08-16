@@ -14,10 +14,11 @@ ifeq ($(V),)
 endif
 
 # Gather the kernel cflags/sources
-override kern_SOURCES := $(SCDIR)/kern/init.c \
-                         $(SCDIR)/lib/print.c \
-                         $(SCDIR)/lib/panic.c \
-                         $(SCDIR)/lib/libc.c
+override kern_SOURCES := $(SCDIR)/kern/init.c   \
+                         $(SCDIR)/lib/print.c   \
+                         $(SCDIR)/lib/panic.c   \
+                         $(SCDIR)/lib/libc.c    \
+			 $(SCDIR)/dev/console.c
 
 override KCFLAGS := $(CFLAGS)                  \
                     -std=gnu11                 \

@@ -5,6 +5,7 @@
 #include <lib/print.h>
 #include <lib/panic.h>
 #include <lib/lock.h>
+#include <dev/console.h>
 #include <stddef.h>
 
 static struct stivale2_header_tag_framebuffer fbuf_tag = {
@@ -46,27 +47,17 @@ void *stivale2_get_tag(uint64_t id) {
     }
 }
 
-void memset32(void *ptr, uint32_t val, int len) {
-  uint32_t *real_ptr = (uint32_t *)ptr;
-
-  for (int i = 0; i < (len / 4); i++) {
-    real_ptr[i] = val;
-  }
-}
-
 __attribute__((noreturn)) void kern_entry(struct stivale2_struct* info) {
   bootinfo = info;
 
-  // Initialize the lower CPU architecture
+  // Initialize outputs and traps
   print_init();
   trap_init();
+  console_init();
 
   kprint("welcome to ninex!\n");
-  kprint("Bootloader: %s [%s]\n", info->bootloader_brand, info->bootloader_version);
-
-  // Paint a nice blue backdrop.
-  struct stivale2_struct_tag_framebuffer* fbtag = stivale2_get_tag(STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
-  memset32((void*)fbtag->framebuffer_addr, 0x4169e1, fbtag->framebuffer_pitch * fbtag->framebuffer_height);
+  kprint("Bootloader: Sabaton [%s]\n", info->bootloader_version);
+  kprint("Board: QEMU Virt\n");
   
   // Test assertions
   assert(1 == 2);
