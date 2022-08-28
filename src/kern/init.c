@@ -4,9 +4,12 @@
 #include <misc/stivale2.h>
 #include <lib/print.h>
 #include <lib/panic.h>
+#include <lib/cmdline.h>
 #include <lib/lock.h>
 #include <dev/console.h>
-#include <stddef.h>
+
+static struct stivale2_struct* bootinfo = NULL;
+extern char __kern_stack_top[];
 
 static struct stivale2_header_tag_framebuffer fbuf_tag = {
     .tag = {
@@ -19,15 +22,13 @@ static struct stivale2_header_tag_framebuffer fbuf_tag = {
     .framebuffer_bpp = 0
 };
 
-static struct stivale2_struct* bootinfo = NULL;
-extern char __kern_stack_top[];
 __attribute__((section(".stivale2hdr"),
                used)) static struct stivale2_header hdr = {
     .entry_point = 0,
     .stack = (uintptr_t)__kern_stack_top,
     .tags = (uintptr_t)&fbuf_tag,
 
-    // Use Higher-Half pointers, don't panic when lowmem isn't available
+    // Use higher-half pointers, don't panic when lowmem isn't available
     .flags = (1 << 1) | (1 << 4)
 };
 
@@ -56,13 +57,13 @@ __attribute__((noreturn)) void kern_entry(struct stivale2_struct* info) {
   console_init();
 
   kprint("welcome to ninex!\n");
-  kprint("Bootloader: Sabaton [%s]\n", info->bootloader_version);
-  kprint("Board: QEMU Virt\n");
+  kprint("Bootloader: %s [%s]\n", info->bootloader_brand, info->bootloader_version);
   
-  // Test assertions
-  assert(1 == 2);
+  // Load the kernel command line
+  struct stivale2_struct_tag_cmdline* ctag = stivale2_get_tag(STIVALE2_STRUCT_TAG_CMDLINE_ID);
+  if (ctag) cmdline_load((const char*)ctag->cmdline);
 
-  // Halt for now...
+  // Call it quits for now...
   for (;;) {
 #if defined (__x86_64__)
     asm volatile ("cli; hlt");

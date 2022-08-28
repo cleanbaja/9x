@@ -144,8 +144,10 @@ static struct print_sink console_sink = {
 };
 
 void console_init() {
-  // Setup the global context
   fbtag = stivale2_get_tag(STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
+  fnt = (psf2_font_t*)sun12x22;
+  
+  // Setup the global context
   g_ctx.buffer = (volatile uint32_t*)fbtag->framebuffer_addr;
   g_ctx.pitch  = fbtag->framebuffer_pitch;
   g_ctx.height = fbtag->framebuffer_height;
@@ -163,15 +165,14 @@ void console_init() {
   // |                        |
   // |           10%          |
   // --------------------------
-  g_ctx.x_off = (g_ctx.width / fnt->width) / 10; 
+  g_ctx.x_off = (g_ctx.width / fnt->width) / 14; 
   g_ctx.x_lim = (g_ctx.width / fnt->width) - g_ctx.x_off;
-  g_ctx.y_off = ((g_ctx.height / fnt->height) / 10) + 1;
+  g_ctx.y_off = ((g_ctx.height / fnt->height) / 15) + 1;
   g_ctx.y_lim = (g_ctx.height / fnt->height) - (g_ctx.y_off - 1);
   g_ctx.cursor_x = g_ctx.x_off;
   g_ctx.cursor_y = g_ctx.y_off;
 
-  // Then setup the font and other things
-  fnt = (psf2_font_t*)sun12x22;
+  // Finally, draw the canvas
   print_register_sink(console_sink);
   draw_canvas(&g_ctx);
 }
