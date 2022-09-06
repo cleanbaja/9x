@@ -14,12 +14,14 @@ ifeq ($(V),)
 endif
 
 # Gather the kernel cflags/sources
-override kern_SOURCES := $(SCDIR)/kern/init.c   \
-                         $(SCDIR)/lib/print.c   \
-                         $(SCDIR)/lib/panic.c   \
-                         $(SCDIR)/lib/libc.c    \
-                         $(SCDIR)/lib/cmdline.c \
-			 $(SCDIR)/dev/console.c
+override kern_SOURCES := $(SCDIR)/kern/init.c    \
+                         $(SCDIR)/lib/print.c    \
+                         $(SCDIR)/lib/panic.c    \
+                         $(SCDIR)/lib/libc.c     \
+                         $(SCDIR)/lib/cmdline.c  \
+			 $(SCDIR)/dev/console.c  \
+                         $(SCDIR)/lvm/lvm_init.c \
+                         $(SCDIR)/lvm/lvm_page.c
 
 override KCFLAGS := $(CFLAGS)                  \
                     -std=gnu11                 \
@@ -31,6 +33,7 @@ override KCFLAGS := $(CFLAGS)                  \
 		    -I @srcdir@/include        \
 		    -I $(BUILD_DIR)/.tmpinc    \
                     -fno-omit-frame-pointer
+
 override KLINKFLAGS := -nostdlib
 
 # Make arch-specific modifications
@@ -53,7 +56,6 @@ else ifeq ($(ARCH), x86_64)
 	override asm_SOURCES := $(SCDIR)/arch/x86_64/stubs.S
 	override kern_SOURCES += $(SCDIR)/arch/x86_64/trap.c
 endif
-
 
 # Add special case for clang/hardened builds
 ifeq ($(CC),clang)
@@ -152,14 +154,13 @@ install-strip:
 # Run Targets
 .PHONY: run run-kvm
 
-override QEMU_FLAGS += -smp `nproc` -m 1G -drive file=$(IMAGE),if=none,id=nvmdev -device nvme,serial=fa01fa02,drive=nvmdev
+override QEMU_FLAGS ?= -m 1G -hda $(IMAGE)
 
 ifeq ($(ARCH), aarch64)
 	override QEMU_FLAGS += -smp 8 -M virt -serial stdio -device ramfb -cpu cortex-a72 -kernel $(KERNEL)
 	override QEMU_FLAGS += -drive if=pflash,format=raw,file=$(SOURCE_DIR)/3rdparty/Sabaton/Sabaton_virt_aarch64.elf.bin,readonly=on
 else ifeq ($(ARCH), x86_64)
-	override QEMU_FLAGS += -M q35 -cpu qemu64,+rdtscp -bios $(SOURCE_DIR)/3rdparty/OVMF/X64/OVMF.fd 
-	override QEMU_FLAGS += -smp `nproc` -debugcon stdio
+	override QEMU_FLAGS += -M q35 -cpu qemu64,+rdtscp -smp `nproc` -debugcon stdio
 endif
 
 run: $(IMAGE)

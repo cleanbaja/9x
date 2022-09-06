@@ -1,0 +1,7 @@
+#pragma once
+
+#define LVM_PAGE_SIZE   4096
+#define LVM_HIGHER_HALF 0xFFFF800000000000
+#define LVM_PFNDB_BASE  0xFFFFE90000000000
+
+void lvm_init();

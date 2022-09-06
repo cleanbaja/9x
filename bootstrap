@@ -10,21 +10,13 @@ srcdir=`dirname "$0"`
 test -z "$srcdir" && srcdir=.
 cd "$srcdir"
 
-# Grab Sabaton/Limine/OVMF
-mkdir -p 3rdparty/OVMF/AA64
-mkdir -p 3rdparty/OVMF/X64
-curl -L https://efi.akeo.ie/OVMF/OVMF-AA64.zip > 3rdparty/OVMF/AA64.zip
-curl -L https://efi.akeo.ie/OVMF/OVMF-X64.zip > 3rdparty/OVMF/X64.zip
-unzip 3rdparty/OVMF/AA64.zip -d 3rdparty/OVMF/AA64
-unzip 3rdparty/OVMF/X64.zip -d 3rdparty/OVMF/X64
-rm 3rdparty/OVMF/AA64.zip 3rdparty/OVMF/X64.zip
-
+# Grab Sabaton/Limine
 mkdir -p 3rdparty/Sabaton
-curl -L https://github.com/FlorenceOS/Sabaton/releases/download/rel1/446d75a972abe576ae34994559fb31ce34d634f4.zip > 3rdparty/Sabaton/sb.zip
+curl -L https://hub.fastgit.xyz/FlorenceOS/Sabaton/releases/download/rel1/446d75a972abe576ae34994559fb31ce34d634f4.zip > 3rdparty/Sabaton/sb.zip
 unzip 3rdparty/Sabaton/sb.zip -d 3rdparty/Sabaton
 rm 3rdparty/Sabaton/sb.zip
 
-git clone --depth 1 --branch v3.0-branch-binary https://github.com/limine-bootloader/limine 3rdparty/limine
+git clone --depth 1 --branch v3.0-branch-binary https://hub.fastgit.xyz/limine-bootloader/limine 3rdparty/limine
 make -C 3rdparty/limine
 
 automake_libdir="$(automake --print-libdir)"

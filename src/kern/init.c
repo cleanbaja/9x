@@ -7,6 +7,7 @@
 #include <lib/cmdline.h>
 #include <lib/lock.h>
 #include <dev/console.h>
+#include <lvm/lvm.h>
 
 static struct stivale2_struct* bootinfo = NULL;
 extern char __kern_stack_top[];
@@ -62,6 +63,8 @@ __attribute__((noreturn)) void kern_entry(struct stivale2_struct* info) {
   // Load the kernel command line
   struct stivale2_struct_tag_cmdline* ctag = stivale2_get_tag(STIVALE2_STRUCT_TAG_CMDLINE_ID);
   if (ctag) cmdline_load((const char*)ctag->cmdline);
+
+  lvm_init();
 
   // Call it quits for now...
   for (;;) {
