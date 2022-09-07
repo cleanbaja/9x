@@ -1,15 +1,9 @@
 # Ninex
-**NOTE: I have given up on ninex for various reasons, such as the degrading code
-quality, bugs on real hardware, and the fact that multiple kernel components weren't
-planned out properly, resulting in a poor implmentation. With that said, I plan on
-giving ninex a do-over once I find the energy, time and knowledge to properly write a
-operating system kernel. Till then, Ninex will remain in a dormant state...**
 
-9x, as the description says, is my attempt at writing a Unix clone in C, with the primary goal of running dash (the shell).
-It has somewhat met that goal, currently being capable of somewhat running dash, although the `fork` syscall is heavily broken at the moment
-As for building the kernel, you got 2 choices...
-  - [CrecentOS](https://github.com/cleanbaja/CrecentOS), a reference operating system that uses 9x
-  - Manually building the kernel using autoconf/automake (which I recommend)
+9x is a lightweight (and hooby) unix clone with the primary goal of running dash (the shell).
+It has somewhat met that goal, currently being capable of somewhat running dash, although the `fork` syscall is heavily broken at the moment.
+The kernel supports many advanced x86_64 features, such as 5-level paging, AVX-512, TCE (Translation Cache Extensions) and SMEP/SMAP, while
+supporting a SunOS style VM, which implements a HAT layer, and virual memory segments/address spaces.
 
 ## Building
 
@@ -22,6 +16,14 @@ make -j `nproc`
 To build a disk image which you can flash to a USB drive, run this...
 ```
 make ninex.hdd
+```
+
+Or to run in QEMU, run the following command
+```
+make run
+
+# uses KVM (much faster than TCG, which is used by default)
+make run-kvm
 ```
 
 There really isn't much documentation at the moment, but feel free to email me with any questions at <cleanbaja@protonmail.com>.
