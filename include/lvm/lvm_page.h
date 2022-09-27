@@ -84,8 +84,8 @@ STAILQ_HEAD(pagelist, lvm_page);
 struct lvm_page* lvm_palloc(bool zero_mem);
 struct lvm_page* lvm_find_page(uintptr_t addr);
 void lvm_pfree(struct lvm_page* pg);
-
+   
+extern struct lvm_page *lvm_pfndb;
 extern struct pagelist modified_list;
 extern struct pagelist zero_list;
-extern struct lvm_page *lvm_pfndb;
 extern uint64_t lvm_pagecount;

@@ -1,5 +1,6 @@
 #include <lvm/lvm.h>
 #include <lvm/lvm_page.h>
+#include <lvm/lvm_space.h>
 #include <lib/cmdline.h>
 #include <lib/libc.h>
 #include <lib/panic.h>
@@ -56,12 +57,12 @@ static void create_pfndb(struct stivale2_struct_tag_memmap *mm_tag) {
 
       for (size_t i = 0; i < entry.length; i += LVM_PAGE_SIZE) {
           *cur_page = (struct lvm_page) {
-            .page_frame = ((entry.base + i) >> 12),
-	    .type = LVM_PAGE_UNUSED
-	  };
+              .page_frame = ((entry.base + i) >> 12),
+              .type = LVM_PAGE_UNUSED
+          };
 
           STAILQ_INSERT_TAIL(&modified_list, cur_page, link);
-	  cur_page++;
+          cur_page++;
       }
   }
 
@@ -89,11 +90,14 @@ void lvm_init() {
   assert(lvm_pagecount > 8192);
 
   // Zero out a few pages for the inital mapping later
-  for (int i = 0; i < 512; i++) {
+  for (int i = 0; i < 1024; i++) {
     struct lvm_page *dirty_page = STAILQ_FIRST(&modified_list);
     STAILQ_REMOVE_HEAD(&modified_list, link);
 
     memset((void*)((dirty_page->page_frame << 12) + LVM_HIGHER_HALF), 0, 4096);
     STAILQ_INSERT_TAIL(&zero_list, dirty_page, link);
   }
+
+  // Setup arch-specifc structures and paging registers
+  pmap_init();
 }
