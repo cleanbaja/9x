@@ -23,6 +23,7 @@ static inline uint64_t encode_pat_type(int flags) {
     // the BIOS override our mappings (via MTRRs), which is better since
     // BIOS devs often know what's better for the system than 9x
     case LVM_CACHE_NONE:
+    case LVM_CACHE_DEVICE:
       bits = (1ull << 4) | (1ull << 3); // PAT3
       break;
 

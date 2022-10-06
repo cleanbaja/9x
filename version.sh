@@ -15,7 +15,7 @@ fi
 
 GIT_COMMIT_HASH=`git rev-parse --short HEAD`
 GIT_TAG=`git describe --abbrev=0 --tags 2>/dev/null`
-OUTFILE="/proc/self/fd/0"
+OUTFILE="/dev/stdout"
 GIT_HAS_TAG=$?
 
 while [[ $# -gt 0 ]]; do

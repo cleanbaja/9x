@@ -20,7 +20,7 @@ enum lvm_cache_flags {
   LVM_CACHE_DEFAULT,
   LVM_CACHE_WC,
   LVM_CACHE_DEVICE,
-  LVM_CACHE_NONE = LVM_CACHE_DEVICE,
+  LVM_CACHE_NONE
 };
 
 struct lvm_space {
