@@ -111,8 +111,7 @@ $(IMAGE): $(KERNEL) $(SOURCE_DIR)/root/limine.cfg
 	sudo cp $(KERNEL) $(SOURCE_DIR)/root/limine.cfg mountdir/boot/
 	sudo cp @srcdir@/3rdparty/limine/limine.sys mountdir/
 	sudo cp @srcdir@/3rdparty/limine/BOOTX64.EFI mountdir/EFI/BOOT/
-	sudo cp $(SOURCE_DIR)/3rdparty/Sabaton/BOOTAA64.efi mountdir/EFI/BOOT/
-	sudo cp mountdir/boot/nxkern mountdir/kernel.elf
+	sudo cp @srcdir@/3rdparty/limine/BOOTAA64.EFI mountdir/EFI/BOOT/
 	sync
 	sudo umount mountdir
 	sudo losetup -d `cat lpdev`
@@ -162,10 +161,11 @@ install-strip:
 override QEMU_FLAGS ?= -m 1G -hda $(IMAGE)
 
 ifeq ($(ARCH), aarch64)
-	override QEMU_FLAGS += -smp 8 -M virt -serial stdio -device ramfb -cpu cortex-a72 -kernel $(KERNEL)
-	override QEMU_FLAGS += -drive if=pflash,format=raw,file=$(SOURCE_DIR)/3rdparty/Sabaton/Sabaton_virt_aarch64.elf.bin,readonly=on
+	override QEMU_FLAGS += -smp 8 -M virt -serial stdio -device ramfb -cpu cortex-a72 -device qemu-xhci
+	override QEMU_FLAGS += -bios $(SOURCE_DIR)/3rdparty/OVMF_AA64/OVMF.fd -device usb-kbd
 else ifeq ($(ARCH), x86_64)
-	override QEMU_FLAGS += -M q35 -cpu qemu64,+rdtscp -smp `nproc` -debugcon stdio
+	override QEMU_FLAGS += -M q35 -cpu qemu64,+rdtscp -smp `nproc` 
+	override QEMU_FLAGS += -bios $(SOURCE_DIR)/3rdparty/OVMF_X64/OVMF.fd -debugcon stdio
 endif
 
 run: $(IMAGE)

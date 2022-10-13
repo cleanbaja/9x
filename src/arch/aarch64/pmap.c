@@ -2,9 +2,14 @@
 #include <arch/cpu.h>
 #include <lvm/lvm_space.h>
 #include <lvm/lvm_page.h>
-#include <misc/stivale2.h>
+#include <misc/limine.h>
 #include <lib/panic.h>
 
+extern void lvm_setup_kspace();
+volatile static struct limine_hhdm_request hhdm_req = {
+  .id = LIMINE_HHDM_REQUEST,
+  .revision = 0
+};
 
 static inline uint64_t encode_mair_type(int flags) {
   int type = flags >> 16;
@@ -113,66 +118,49 @@ void pmap_remove(struct pmap* p, uintptr_t virt) {
 }
 
 void pmap_load(struct pmap* p) {
-  // ttbr1 should never be reloaded, so don't even bother.
-  // instead, reload only ttbr0...
-  asm volatile ("dsb st; msr ttbr0_el1, %0; dsb sy; isb" :: "r"(p->ttbr[0] | p->asid));
+  // ttbr1 should never be reloaded, so don't even bother...
+  // instead, reload only ttbr0
+  asm volatile (
+    "dsb st;\n\t"
+    "msr ttbr0_el1, %0;\n\t"
+    "dsb sy; isb\n\t" 
+    :: "r"(p->ttbr[0] | p->asid)
+  );
 }
 
 void pmap_init() {
   // Run some sanity checks, to make sure platform is good...
-  struct stivale2_struct_tag_memmap *mm_tag = stivale2_get_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID);
-  int default_flags = LVM_PERM_READ | LVM_TYPE_GLOBAL;
   uint64_t id_mmfr0 = cpu_read_sysreg(id_aa64mmfr0_el1);
-  uint64_t pa_bits = (id_mmfr0 & 0xF) > 5 ? 5 : (id_mmfr0 & 0xF);
+  uint64_t fb_attr = ((cpu_read_sysreg(mair_el1) >> 8) & 0xFF);;
+  uint64_t pa_bits = id_mmfr0 & 0xF;
+  assert(hhdm_req.response->offset == 0xFFFF800000000000);
 
-  if (id_mmfr0 & (15 << 28))
+  // Certain systems (such as QEMU) map the framebuffer as 0xFF, even 
+  // though it's device memory, so override it here...
+  fb_attr = (fb_attr == 0xFF) ? 0b00001100 : 0xFF;
+  
+  if (((id_mmfr0 >> 28) & 0b1111) == 0b1111)
     panic(NULL, "pmap: CPU doesn't support 4KB translation granules\n");
-  else if ((id_mmfr0 & 15) < 1)
-    panic(NULL, "pmap: CPU doesn't support 48-bit physical addresses (max is %u)\n", (id_mmfr0 & 15));
+  else if ((id_mmfr0 & 0xF) < 1)
+    panic(NULL, "pmap: CPU doesn't support 48-bit physical addresses (max is %u)\n", (id_mmfr0 & 0xF));
   else if (!(id_mmfr0 & (1 << 5)))
     panic(NULL, "pmap: CPU doesn't support 16-bit ASIDs (only support 8-bit ASIDs)\n");
 
   // Setup the kernel space, and map initial memory
   kspace.p.ttbr[1] = LVM_ALLOC_PAGE(true, LVM_PAGE_SYSTEM);
   kspace.p.ttbr[0] = LVM_ALLOC_PAGE(true, LVM_PAGE_SYSTEM);
-  lvm_map_page(&kspace, 0xffffffff80000000, 0, 0x80000000, default_flags | LVM_PERM_EXEC);
-  lvm_map_page(&kspace, LVM_HIGHER_HALF, 0, 0x100000000, default_flags | LVM_PERM_WRITE);
-  
-  for (int i = 0; i < mm_tag->entries; i++) {
-      struct stivale2_mmap_entry entry = mm_tag->memmap[i];
-      if ((entry.base + entry.length) < 0x100000000)
-        continue;
-      else if (entry.base < 0x100000000)
-        entry.base = 0x100000000;
-
-      switch (entry.type) {
-      case STIVALE2_MMAP_USABLE:
-        lvm_map_page(&kspace, LVM_HIGHER_HALF+entry.base, entry.base, entry.length,
-          default_flags | LVM_PERM_WRITE);
-        break;
-      
-      case STIVALE2_MMAP_FRAMEBUFFER:
-        lvm_map_page(&kspace, LVM_HIGHER_HALF+entry.base, entry.base, entry.length, 
-          default_flags | LVM_CACHE_TYPE(LVM_CACHE_WC));
-        break;
-      
-      default:
-        lvm_map_page(&kspace, LVM_HIGHER_HALF+entry.base, entry.base, entry.length, 
-          default_flags | LVM_CACHE_TYPE(LVM_CACHE_NONE));
-        break;
-    }
-  }
-
+  lvm_setup_kspace();
   cpu_write_sysreg(ttbr1_el1, kspace.p.ttbr[1]);
   lvm_space_load(&kspace);
 
   // Setup MAIR (caching stuff)
   uint64_t mair = 
     (0b11111111 << 0) | // Normal, Write-back RW-Allocate non-transient
-    (0b00001100 << 8) | // Device, GRE (aka Write-Combining)
+    (fb_attr    << 8) | // Framebuffer Memory, (not always write-combining)
     (0b00000000 << 16)| // Device, nGnRnE (aka uncachable)
     (0b00000100 << 24); // Normal, Uncachable (aka device memory)
 
+  // Setup TCR (paging control)
   uint64_t tcr =
     (16 << 0)    | // T0SZ=16
     (16 << 16)   | // T1SZ=16
@@ -182,12 +170,10 @@ void pmap_init() {
     (1 << 24)    | // TTBR1 Inner WB RW-Allocate
     (1 << 26)    | // TTBR1 Outer WB RW-Allocate
     (2 << 28)    | // TTBR1 Inner shareable
-    (2 << 30)    | // TTBR1 4K granule
+    (2ull << 30) | // TTBR1 4K granule
     (1ull << 36) | // 16-bit ASIDs
     ((uint64_t)pa_bits << 32); // 48-bit intermediate address
 
   cpu_write_sysreg(mair_el1, mair);
   cpu_write_sysreg(tcr_el1, tcr);
-
-  // TODO: set MAIR to a valid value
 }

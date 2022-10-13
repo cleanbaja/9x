@@ -2,13 +2,18 @@
 #include <arch/cpu.h>
 #include <lvm/lvm_space.h>
 #include <lvm/lvm_page.h>
-#include <misc/stivale2.h>
-#include <stdbool.h>
-#include <stddef.h>
+#include <lib/panic.h>
+#include <misc/limine.h>
 
 #define KERNEL_VMA_5LV 0xFF00000000000000
 #define KERNEL_VMA_4LV 0xFFFF800000000000
-uintptr_t kernel_vma = KERNEL_VMA_4LV;
+uintptr_t kernel_vma = 0;
+
+extern void lvm_setup_kspace();
+volatile static struct limine_hhdm_request hhdm_req = {
+  .id = LIMINE_HHDM_REQUEST,
+  .revision = 0
+};
 
 static inline uint64_t encode_pat_type(int flags) {
   int type = flags >> 16;
@@ -130,39 +135,13 @@ void pmap_load(struct pmap* p) {
 
 void pmap_init() {
   // Setup the kernel space, and map initial memory
-  struct stivale2_struct_tag_memmap *mm_tag = stivale2_get_tag(STIVALE2_STRUCT_TAG_MEMMAP_ID);
-  int default_flags = LVM_PERM_READ | LVM_TYPE_GLOBAL;
   kspace.p.root = LVM_ALLOC_PAGE(true, LVM_PAGE_SYSTEM);
+  kernel_vma = hhdm_req.response->offset;
+  assert(kernel_vma == KERNEL_VMA_4LV || kernel_vma == KERNEL_VMA_5LV);
 
-  lvm_map_page(&kspace, 0xffffffff80000000, 0, 0x80000000, default_flags | LVM_PERM_EXEC);
-  lvm_map_page(&kspace, LVM_HIGHER_HALF, 0, 0x100000000, default_flags | LVM_PERM_WRITE);
-  
-  for (int i = 0; i < mm_tag->entries; i++) {
-      struct stivale2_mmap_entry entry = mm_tag->memmap[i];
-      if ((entry.base + entry.length) < 0x100000000)
-        continue;
-      else if (entry.base < 0x100000000)
-        entry.base = 0x100000000;
-
-      switch (entry.type) {
-      case STIVALE2_MMAP_USABLE:
-        lvm_map_page(&kspace, LVM_HIGHER_HALF+entry.base, entry.base, entry.length,
-          default_flags | LVM_PERM_WRITE);
-        break;
-      
-      case STIVALE2_MMAP_FRAMEBUFFER:
-        lvm_map_page(&kspace, LVM_HIGHER_HALF+entry.base, entry.base, entry.length, 
-          default_flags | LVM_CACHE_TYPE(LVM_CACHE_WC));
-        break;
-      
-      default:
-        lvm_map_page(&kspace, LVM_HIGHER_HALF+entry.base, entry.base, entry.length, 
-          default_flags | LVM_CACHE_TYPE(LVM_CACHE_NONE));
-        break;
-    }
-  }
-
+  lvm_setup_kspace();
   lvm_space_load(&kspace);
+  for(;;);
 
   // Set PAT1 to Write-Combining (for the framebuffer)
   uint64_t pat = cpu_rdmsr(AMD64_PAT);

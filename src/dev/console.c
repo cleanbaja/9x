@@ -1,5 +1,5 @@
 #include <dev/console.h>
-#include <misc/stivale2.h>
+#include <misc/limine.h>
 #include <lib/print.h>
 
 struct terminal_ctx {
@@ -18,8 +18,12 @@ struct terminal_ctx {
     ".incbin \"root/" #name ".psfu\"\n" \
   );
 
+volatile static struct limine_framebuffer_request fb_req = {
+  .id = LIMINE_FRAMEBUFFER_REQUEST,
+  .revision = 0
+};
+
 static struct terminal_ctx g_ctx;
-static struct stivale2_struct_tag_framebuffer* fbtag;
 static psf2_font_t* fnt;
 CREATE_FONT(sun12x22);
 
@@ -32,14 +36,16 @@ static void memset32(void *ptr, uint32_t val, int len) {
 }
 
 static inline uint32_t blend(int red, int green, int blue) {
-  size_t r_mask = (1 << fbtag->red_mask_size) - 1;
-  size_t g_mask = (1 << fbtag->green_mask_size) - 1;
-  size_t b_mask = (1 << fbtag->blue_mask_size) - 1;
+  struct limine_framebuffer* fb = fb_req.response->framebuffers[0];
+
+  size_t r_mask = (1 << fb->red_mask_size) - 1;
+  size_t g_mask = (1 << fb->green_mask_size) - 1;
+  size_t b_mask = (1 << fb->blue_mask_size) - 1;
 
   uint32_t pixel = 0;
-  pixel |= (red & r_mask) << fbtag->red_mask_shift;
-  pixel |= (green & g_mask) << fbtag->green_mask_shift;
-  pixel |= (blue & b_mask) << fbtag->blue_mask_shift;
+  pixel |= (red & r_mask) << fb->red_mask_shift;
+  pixel |= (green & g_mask) << fb->green_mask_shift;
+  pixel |= (blue & b_mask) << fb->blue_mask_shift;
 
   return pixel;
 }
@@ -144,14 +150,14 @@ static struct print_sink console_sink = {
 };
 
 void console_init() {
-  fbtag = stivale2_get_tag(STIVALE2_STRUCT_TAG_FRAMEBUFFER_ID);
+  struct limine_framebuffer* fb = fb_req.response->framebuffers[0];
   fnt = (psf2_font_t*)sun12x22;
   
   // Setup the global context
-  g_ctx.buffer = (volatile uint32_t*)fbtag->framebuffer_addr;
-  g_ctx.pitch  = fbtag->framebuffer_pitch;
-  g_ctx.height = fbtag->framebuffer_height;
-  g_ctx.width  = fbtag->framebuffer_width;
+  g_ctx.buffer = (volatile uint32_t*)fb->address;
+  g_ctx.pitch  = fb->pitch;
+  g_ctx.height = fb->height;
+  g_ctx.width  = fb->width;
   g_ctx.fg_color = blend(10, 10, 10);
   g_ctx.bg_color = blend(255, 255, 255);
   

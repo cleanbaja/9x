@@ -1,14 +1,18 @@
 #include <arch/trap.h>
 #include <lib/print.h>
 #include <lib/panic.h>
+#include <arch/pmap.h>
 
 // TODO(cleanbaja): use a percpu stack instead
-char __stack[0x10000] = {0};
+static char exc_stack[0x10000] = {0};
 extern uintptr_t vector_table[];
 
 void trap_init() {
   // Set the stack pointer for exceptions
-  asm volatile ("msr SPSel, 1; mov sp, %0; msr SPSel, 0;" :: "r"((uintptr_t)__stack + 0x10000));
+  uintptr_t limine_stack = 0;
+  asm volatile ("mov %0, sp" : "=r"(limine_stack));
+  asm volatile ("mov sp, %0" :: "r"(limine_stack + LVM_HIGHER_HALF));
+  asm volatile ("msr SPSel, 1; mov sp, %0; msr SPSel, 0;" :: "r"((uintptr_t)exc_stack + 0x10000));
 
   // Load VBAR_EL1 with our vector table
   asm volatile ("msr vbar_el1, %0" :: "r"(vector_table));

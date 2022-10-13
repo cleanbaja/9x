@@ -1,7 +1,7 @@
 /* src/kern/init.c - Kernel Initialization Routines
  * SPDX-License-Identifier: Apache-2.0 */
 
-#include <misc/stivale2.h>
+#include <misc/limine.h>
 #include <lib/print.h>
 #include <lib/panic.h>
 #include <lib/cmdline.h>
@@ -10,60 +10,28 @@
 #include <lvm/lvm.h>
 #include <arch/cpu.h>
 
-static struct stivale2_struct* bootinfo = NULL;
-extern char __kern_stack_top[];
-
-static struct stivale2_header_tag_framebuffer fbuf_tag = {
-    .tag = {
-        .identifier = STIVALE2_HEADER_TAG_FRAMEBUFFER_ID,
-        .next = 0
-    },
-
-    .framebuffer_width = 0,
-    .framebuffer_height = 0,
-    .framebuffer_bpp = 0
+volatile static struct limine_bootloader_info_request info_req = {
+  .id = LIMINE_BOOTLOADER_INFO_REQUEST,
+  .revision = 0
 };
 
-__attribute__((section(".stivale2hdr"),
-               used)) static struct stivale2_header hdr = {
-    .entry_point = 0,
-    .stack = (uintptr_t)__kern_stack_top,
-    .tags = (uintptr_t)&fbuf_tag,
-
-    // Use higher-half pointers, don't panic when lowmem isn't available
-    .flags = (1 << 1) | (1 << 4)
+volatile static struct limine_kernel_file_request kfile_req = {
+  .id = LIMINE_KERNEL_FILE_REQUEST,
+  .revision = 0
 };
 
-void *stivale2_get_tag(uint64_t id) {
-    struct stivale2_tag *current_tag = (struct stivale2_tag *)bootinfo->tags;
-    for (;;) {
-        if (current_tag == NULL) {
-            return NULL;
-        }
-
-        if (current_tag->identifier == id) {
-            return current_tag;
-        }
-
-        // Get a pointer to the next tag in the linked list and repeat.
-        current_tag = (struct stivale2_tag *)current_tag->next;
-    }
-}
-
-__attribute__((noreturn)) void kern_entry(struct stivale2_struct* info) {
-  bootinfo = info;
-
+__attribute__((noreturn)) void kern_entry(void) {
   // Initialize outputs and traps
   print_init();
   trap_init();
   console_init();
 
   kprint("welcome to ninex!\n");
-  kprint("Bootloader: %s [%s]\n", info->bootloader_brand, info->bootloader_version);
+  kprint("Bootloader: %s [%s]\n", info_req.response->name, info_req.response->version);
   
   // Load the kernel command line
-  struct stivale2_struct_tag_cmdline* ctag = stivale2_get_tag(STIVALE2_STRUCT_TAG_CMDLINE_ID);
-  if (ctag) cmdline_load((const char*)ctag->cmdline);
+  char* cmdline_raw = kfile_req.response->kernel_file->cmdline;
+  if (cmdline_raw) cmdline_load(cmdline_raw);
 
   cpu_init();
   lvm_init();

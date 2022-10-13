@@ -10,7 +10,7 @@ PHDRS {
 }
 
 SECTIONS {
-    . = 0xFFFFFFFF80200000;
+    . = 0xFFFFFFFF80400000;
 
     .text : {
         *(.text .text.*)
@@ -18,11 +18,6 @@ SECTIONS {
 
     . = ALIGN(64K);
     . += 64K;
-
-    /* Keep this section, since the spec requires it! */
-    .stivale2hdr : {
-        KEEP(*(.stivale2hdr))
-    } :rodata
 
     .rodata : {
         *(.rodata .rodata.*)
@@ -51,11 +46,6 @@ SECTIONS {
     .bss : {
         *(.bss .bss.*)
         *(COMMON)
-
-        /* Reserve a 16 KB stack for kernel startup */
-        . = ALIGN(16);
-        . += 4K * 16;
-        __kern_stack_top = .;
     } :data
 
     /* DWARF section definitions from GNU binutils */
