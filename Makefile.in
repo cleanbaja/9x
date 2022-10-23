@@ -18,10 +18,12 @@ override kern_SOURCES := $(SCDIR)/kern/init.c     \
                          $(SCDIR)/lib/print.c     \
                          $(SCDIR)/lib/panic.c     \
                          $(SCDIR)/lib/libc.c      \
+                         $(SCDIR)/lib/tlsf.c      \
                          $(SCDIR)/lib/cmdline.c   \
                          $(SCDIR)/dev/console.c   \
                          $(SCDIR)/lvm/lvm_init.c  \
                          $(SCDIR)/lvm/lvm_page.c  \
+                         $(SCDIR)/lvm/lvm_alloc.c \
                          $(SCDIR)/lvm/lvm_space.c
 
 override KCFLAGS := $(CFLAGS)                  \

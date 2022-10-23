@@ -3,14 +3,12 @@
 #include <lvm/lvm_space.h>
 #include <lvm/lvm_page.h>
 #include <lib/panic.h>
-#include <misc/limine.h>
 
 #define KERNEL_VMA_5LV 0xFF00000000000000
 #define KERNEL_VMA_4LV 0xFFFF800000000000
-uintptr_t kernel_vma = 0;
 
 extern void lvm_setup_kspace();
-volatile static struct limine_hhdm_request hhdm_req = {
+volatile struct limine_hhdm_request hhdm_req = {
   .id = LIMINE_HHDM_REQUEST,
   .revision = 0
 };
@@ -70,7 +68,7 @@ void pmap_insert(struct pmap* p, uintptr_t virt, uintptr_t phys, int flags) {
   if (flags & LVM_TYPE_GLOBAL)
     pte |= PTE_G;
 
-  if (kernel_vma == KERNEL_VMA_5LV)
+  if (LVM_HIGHER_HALF == KERNEL_VMA_5LV)
     root = iterate_level(root, indices[0], true);
 
   root = iterate_level(root, indices[1], true);
@@ -102,7 +100,7 @@ void pmap_remove(struct pmap* p, uintptr_t virt) {
     return; /* Huge page */          \
   }
 
-  if (kernel_vma == KERNEL_VMA_5LV) {
+  if (LVM_HIGHER_HALF == KERNEL_VMA_5LV) {
     root = iterate_level(root, indices[0], false);
     if (root == NULL)
       return;
@@ -134,14 +132,14 @@ void pmap_load(struct pmap* p) {
 }
 
 void pmap_init() {
-  // Setup the kernel space, and map initial memory
-  kspace.p.root = LVM_ALLOC_PAGE(true, LVM_PAGE_SYSTEM);
-  kernel_vma = hhdm_req.response->offset;
-  assert(kernel_vma == KERNEL_VMA_4LV || kernel_vma == KERNEL_VMA_5LV);
+  // Make sure the higher half isn't shifted
+  assert(LVM_HIGHER_HALF == KERNEL_VMA_4LV
+      || LVM_HIGHER_HALF == KERNEL_VMA_5LV);
 
+  // Setup the kernel space, map initial memory and reload
+  kspace.p.root = LVM_ALLOC_PAGE(true, LVM_PAGE_SYSTEM);
   lvm_setup_kspace();
   lvm_space_load(&kspace);
-  for(;;);
 
   // Set PAT1 to Write-Combining (for the framebuffer)
   uint64_t pat = cpu_rdmsr(AMD64_PAT);

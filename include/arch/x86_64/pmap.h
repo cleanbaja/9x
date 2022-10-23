@@ -1,10 +1,10 @@
 #pragma once
 
-#include <stdint.h>
+#include <misc/limine.h>
 
 #define LVM_PAGE_SIZE   0x1000
 #define LVM_HUGE_FACTOR 512
-#define LVM_HIGHER_HALF kernel_vma
+#define LVM_HIGHER_HALF hhdm_req.response->offset
 
 #define PTE_P  (1ull << 0)
 #define PTE_W  (1ull << 1)
@@ -28,4 +28,4 @@ void pmap_remove(struct pmap* p, uintptr_t virt);
 void pmap_load(struct pmap* p);
 void pmap_init();
 
-extern uintptr_t kernel_vma;
+extern volatile struct limine_hhdm_request hhdm_req;

@@ -5,6 +5,7 @@
 #include <lib/libc.h>
 #include <lib/panic.h>
 #include <lib/print.h>
+#include <lib/tlsf.h>
 #include <misc/limine.h>
 
 static char* mem_types[] = {
@@ -18,7 +19,7 @@ static char* mem_types[] = {
   [LIMINE_MEMMAP_FRAMEBUFFER] = "framebuffer"
 };
 
-volatile struct limine_memmap_request mm_req = {
+volatile static struct limine_memmap_request mm_req = {
   .id = LIMINE_MEMMAP_REQUEST,
   .revision = 0
 };
@@ -37,6 +38,8 @@ static void create_pfndb(struct limine_memmap_response *mm_resp) {
   for (int i = 0; i < mm_resp->entry_count; i++) {
       struct limine_memmap_entry entry = *mm_resp->entries[i];
       if (entry.type != LIMINE_MEMMAP_USABLE)
+        continue;
+      if ((entry.base+entry.length) < 0x400000)
         continue;
 
       total_freemem += entry.length;
@@ -64,6 +67,8 @@ static void create_pfndb(struct limine_memmap_response *mm_resp) {
       struct limine_memmap_entry entry = *mm_resp->entries[i];
       if (entry.type != LIMINE_MEMMAP_USABLE)
         continue;
+      if ((entry.base+entry.length) < 0x400000)
+        continue;
 
       for (size_t i = 0; i < entry.length; i += LVM_PAGE_SIZE) {
           *cur_page = (struct lvm_page) {
@@ -76,28 +81,27 @@ static void create_pfndb(struct limine_memmap_response *mm_resp) {
       }
   }
 
-  kprint("lvm: pfndb @ 0x%lx, contains %u pages, occupies %u MB\n", 
-    (uintptr_t)lvm_pfndb - LVM_HIGHER_HALF, 
-    lvm_pagecount, 
+  kprint("lvm: pfndb contains %u pages, occupies %u MB\n",
+    lvm_pagecount,
     pfndb_len / 1024 / 1024);
 }
 
 void lvm_setup_kspace() {
   struct limine_memmap_response *mm_resp = mm_req.response;
   uintptr_t kernel_vbase = kaddr_req.response->virtual_base;
-	uintptr_t kernel_pbase = kaddr_req.response->physical_base;
+  uintptr_t kernel_pbase = kaddr_req.response->physical_base;
   int default_flags = LVM_PERM_READ | LVM_TYPE_GLOBAL | LVM_PERM_WRITE;
 
   lvm_map_page(&kspace, kernel_vbase, kernel_pbase, 0x400 * 0x1000, default_flags | LVM_PERM_EXEC);
   lvm_map_page(&kspace, LVM_HIGHER_HALF, 0, 0x800ull * 0x200000ull, default_flags);
 
-	for(uint64_t i = 0; i < mm_resp->entry_count; i++) {
+  for(uint64_t i = 0; i < mm_resp->entry_count; i++) {
     struct limine_memmap_entry entry = *mm_resp->entries[i];
-		uint64_t aligned_base = (entry.base / 0x200000) * 0x200000;
-		
-    lvm_map_page(&kspace, aligned_base + LVM_HIGHER_HALF, aligned_base, 
+    uint64_t aligned_base = (entry.base / 0x200000) * 0x200000;
+
+    lvm_map_page(&kspace, aligned_base + LVM_HIGHER_HALF, aligned_base,
       ALIGN_DOWN(entry.length, 0x200000), default_flags | LVM_PERM_WRITE);
-	}
+  }
 }
 
 void lvm_init() {
@@ -105,7 +109,7 @@ void lvm_init() {
 
   if ((mm_resp->entry_count < 8) || cmdline_get_bool("verbose", false)) {
     kprint("lvm: dumping %d memmap entries:\n", mm_resp->entry_count);
-    
+
     for (int i = 0; i < mm_resp->entry_count; i++) {
       struct limine_memmap_entry entry = *mm_resp->entries[i];
       kprint("    (0x%016lx-0x%016lx) %s\n", 
@@ -122,10 +126,13 @@ void lvm_init() {
     struct lvm_page *dirty_page = STAILQ_FIRST(&modified_list);
     STAILQ_REMOVE_HEAD(&modified_list, link);
 
-    memset((void*)((dirty_page->page_frame << 12) + LVM_HIGHER_HALF), 0, 4096);
+    memset((void*)((dirty_page->page_frame << 12) + LVM_HIGHER_HALF), 0, LVM_PAGE_SIZE);
     STAILQ_INSERT_TAIL(&zero_list, dirty_page, link);
   }
 
   // Setup arch-specifc structures and paging registers
   pmap_init();
+
+  // Finally, set up kernel memory allocator
+  tlsf_init();
 }

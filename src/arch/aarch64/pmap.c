@@ -6,7 +6,7 @@
 #include <lib/panic.h>
 
 extern void lvm_setup_kspace();
-volatile static struct limine_hhdm_request hhdm_req = {
+volatile struct limine_hhdm_request hhdm_req = {
   .id = LIMINE_HHDM_REQUEST,
   .revision = 0
 };
@@ -17,7 +17,7 @@ static inline uint64_t encode_mair_type(int flags) {
 
   switch (type) {
     case LVM_CACHE_WC:
-      bits = (1 << 2) | PTE_OSH;  
+      bits = (1 << 2) | PTE_OSH;
       break;
 
     case LVM_CACHE_NONE:
@@ -52,7 +52,7 @@ void pmap_insert(struct pmap* p, uintptr_t virt, uintptr_t phys, int flags) {
   uintptr_t pte = PTE_P | PTE_AF | PTE_TBL;
   bool top_half = virt & (1ull << 63);
   uintptr_t *root = (uintptr_t*)((uintptr_t)p->ttbr[top_half] + LVM_HIGHER_HALF);
-  
+
   uint64_t indices[] = {
 #define INDEX(shift) ((virt & ((uint64_t)0x1ff << shift)) >> shift)
     INDEX(39), INDEX(30), INDEX(21), INDEX(12)
@@ -67,8 +67,8 @@ void pmap_insert(struct pmap* p, uintptr_t virt, uintptr_t phys, int flags) {
     pte |= PTE_NG;
   if (flags & LVM_TYPE_USER)
     pte |= PTE_U;
-  
-  // since aarch64 doesn't have a hardware feature 
+
+  // since aarch64 doesn't have a hardware feature
   // like x86_64's SMEP, emulate it using the NX bits
   if (top_half)
     pte |= PTE_UXN;
@@ -110,7 +110,7 @@ void pmap_remove(struct pmap* p, uintptr_t virt) {
 
   root = iterate_level(root, indices[1], false);
   CHECK_PTE(root, indices[2]);
-  
+
   root = iterate_level(root, indices[2], false);
   CHECK_PTE(root, indices[3]);
 
@@ -138,7 +138,7 @@ void pmap_init() {
   // Certain systems (such as QEMU) map the framebuffer as 0xFF, even 
   // though it's device memory, so override it here...
   fb_attr = (fb_attr == 0xFF) ? 0b00001100 : 0xFF;
-  
+
   if (((id_mmfr0 >> 28) & 0b1111) == 0b1111)
     panic(NULL, "pmap: CPU doesn't support 4KB translation granules\n");
   else if ((id_mmfr0 & 0xF) < 1)

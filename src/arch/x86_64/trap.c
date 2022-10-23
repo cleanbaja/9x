@@ -1,6 +1,7 @@
 #include <arch/trap.h>
 #include <lib/print.h>
 #include <lib/panic.h>
+#include <lvm/lvm_space.h>
 
 #define GDT_KERN_CODE 0x00af9b000000ffff
 #define GDT_KERN_DATA 0x00af93000000ffff
@@ -138,13 +139,29 @@ void trap_dump_frame(struct cpu_regs* regs) {
       regs->r13,
       regs->r13,
       regs->r14);
-  kprint("    R15: 0x%08lx, CS:  0x%08lx, SS:  0x%08lx\n\n",
+  kprint("    CR2: 0x%08lx, R15: 0x%08lx, CS:  0x%08lx, SS:  0x%08lx\n\n",
+      cpu_read_cr2(),
       regs->r15,
       regs->cs,
       regs->ss);
 }
 
 void handle_trap(struct cpu_regs* context) {
+  // Handle page faults
+  if (context->int_no == 14) {
+    enum lvm_fault_flags vf = LVM_FAULT_NONE;
+    if (context->ec & (1 << 0))
+      vf |= LVM_FAULT_PROTECTION;
+    if (context->ec & (1 << 4))
+      vf |= LVM_FAULT_EXEC;
+    if (context->ec & (1 << 1))
+      vf |= LVM_FAULT_WRITE;
+
+    uintptr_t address = cpu_read_cr2();
+    if (lvm_fault(&kspace, address, vf))
+      return;
+  }
+
   panic(context, NULL);
 }
 
