@@ -5,7 +5,7 @@
 // All architectures supported by 9x should support atomic instructions
 #include <stdatomic.h>
 
-#ifdef SECURE_BUILD
+#ifdef SANITIZE_LOCKS
 typedef struct {
   volatile uint32_t lock_bits;
   atomic_ulong waiters;
@@ -20,7 +20,7 @@ typedef volatile uint32_t lock_t;
 #endif
 
 static inline void spinlock(lock_t* lck) {
-#ifdef SECURE_BUILD
+#ifdef SANITIZE_LOCKS
   if (lck->cpu == cpunum())
     __builtin_trap();
 
@@ -42,7 +42,7 @@ static inline void spinlock(lock_t* lck) {
 }
 
 static inline void spinrelease(lock_t* lck) {
-#ifdef SECURE_BUILD
+#ifdef SANITIZE_LOCKS
   if (lck->cpu != cpunum())
     __builtin_trap();
   else

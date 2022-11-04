@@ -14,6 +14,7 @@ struct terminal_ctx {
   extern char name[];                   \
   asm (                                 \
     ".global " #name "\n"               \
+    ".align 16\n"                       \
     #name ":\n\t"                       \
     ".incbin \"root/" #name ".psfu\"\n" \
   );

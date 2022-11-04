@@ -36,7 +36,7 @@ void lvm_unmap_page(struct lvm_space* s, uintptr_t virt, size_t size) {
 
   if ((virt % (LVM_PAGE_SIZE*LVM_HUGE_FACTOR)) == 0)
     inc_size *= LVM_HUGE_FACTOR;
-  
+
   for (size_t i = 0; i < size; i += inc_size)
     pmap_remove(&s->p, virt+i);
 

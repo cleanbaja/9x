@@ -3,7 +3,6 @@
 #include <lib/print.h>
 #include <limits.h>
 #include <lib/libc.h>
-#include <misc/asan.h>
 
 /*
  * Architecture-specific bit manipulation routines
@@ -989,6 +988,7 @@ tlsf_t *tlsf_create(void *mem)
 		return NULL;
 	}
 
+	ASAN_UNPOISON_MEMORY_REGION(mem, sizeof(tlsf_t));
 	control_construct(tlsf_cast(tlsf_t *, mem));
 
 	return tlsf_cast(tlsf_t *, mem);
@@ -996,6 +996,7 @@ tlsf_t *tlsf_create(void *mem)
 
 tlsf_t *tlsf_create_with_pool(void *mem, size_t bytes)
 {
+	ASAN_UNPOISON_MEMORY_REGION(mem, sizeof(tlsf_t));
 	tlsf_t *tlsf = tlsf_create(mem);
 	tlsf_add_pool(tlsf, (char *)mem + tlsf_size(), bytes - tlsf_size());
 	return tlsf;
@@ -1159,7 +1160,7 @@ void *tlsf_realloc(tlsf_t *tlsf, void *ptr, size_t size)
 			if (p != NULL) {
 				const size_t minsize = tlsf_min(cursize, size);
 				// this needs to be an uninstrumented memcpy, so it doesn't trigger poisoning
-#ifdef KASAN
+#if 0
 				void* __memcpy(void* restrict dest, const void* restrict src, size_t n);
 				__memcpy(p, ptr, minsize);
 #else

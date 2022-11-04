@@ -133,6 +133,9 @@ void lvm_init() {
   // Setup arch-specifc structures and paging registers
   pmap_init();
 
-  // Finally, set up kernel memory allocator
+  // Finally, set up the kernel memory allocator
+#ifdef KASAN
+  lvm_setup_kasan();
+#endif
   tlsf_init();
 }

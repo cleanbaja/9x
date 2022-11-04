@@ -97,4 +97,20 @@ void tlsf_init();
 };
 #endif
 
+#ifndef KASAN
+
+#define ASAN_POISON_MEMORY_REGION(addr, size)
+#define ASAN_UNPOISON_MEMORY_REGION(addr, size)
+#define ASAN_NO_SANITIZE_ADDRESS
+
+#else
+
+#include <lvm/lvm.h>
+
+#define ASAN_POISON_MEMORY_REGION(addr, size) kasan_poison_shadow((uintptr_t)addr, size, 0xFF)
+#define ASAN_UNPOISON_MEMORY_REGION(addr, size) kasan_unpoison_shadow((uintptr_t)addr, size)
+#define ASAN_NO_SANITIZE_ADDRESS __attribute__((no_sanitize_address))
+
+#endif
+
 #endif /* TLSF_H */

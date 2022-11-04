@@ -1,4 +1,6 @@
 #include <lvm/lvm.h>
+#include <lvm/lvm_space.h>
+#include <lvm/lvm_page.h>
 #include <lib/tlsf.h>
 #include <lib/lock.h>
 #include <lib/libc.h>

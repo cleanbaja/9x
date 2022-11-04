@@ -15,6 +15,7 @@ endif
 
 # Gather the kernel cflags/sources
 override kern_SOURCES := $(SCDIR)/kern/init.c     \
+                         $(SCDIR)/kern/kasan.c    \
                          $(SCDIR)/lib/print.c     \
                          $(SCDIR)/lib/panic.c     \
                          $(SCDIR)/lib/libc.c      \
@@ -41,35 +42,30 @@ override KLINKFLAGS := -nostdlib
 
 # Make arch-specific modifications
 ifeq ($(ARCH),aarch64)
-	override KCFLAGS += -mgeneral-regs-only
-	override KLINKFLAGS += -zmax-page-size=0x10000
-	override CLANG_TARGET := aarch64-unknown-none-elf
+        override KCFLAGS += -mgeneral-regs-only
+        override KLINKFLAGS += -zmax-page-size=0x10000
 
-	override asm_SOURCES := $(SCDIR)/arch/aarch64/stubs.S
-	override kern_SOURCES += $(SCDIR)/arch/aarch64/trap.c \
+        override asm_SOURCES  := $(SCDIR)/arch/aarch64/stubs.S
+        override kern_SOURCES += $(SCDIR)/arch/aarch64/trap.c \
                                  $(SCDIR)/arch/aarch64/pmap.c \
                                  $(SCDIR)/arch/aarch64/cpu.c
 else ifeq ($(ARCH), x86_64)
-	override KCFLAGS += -mno-80387                 \
+        override KCFLAGS += -mno-80387                 \
                             -mno-mmx                   \
                             -mno-3dnow                 \
                             -mno-sse                   \
                             -mno-sse2
-	override KLINKFLAGS += -zmax-page-size=0x1000
-	override CLANG_TARGET := x86_64-unknown-none-elf
-	
-	override asm_SOURCES := $(SCDIR)/arch/x86_64/stubs.S
-	override kern_SOURCES += $(SCDIR)/arch/x86_64/trap.c \
+        override KLINKFLAGS += -zmax-page-size=0x1000
+
+        override asm_SOURCES  := $(SCDIR)/arch/x86_64/stubs.S
+        override kern_SOURCES += $(SCDIR)/arch/x86_64/trap.c \
                                  $(SCDIR)/arch/x86_64/pmap.c \
                                  $(SCDIR)/arch/x86_64/cpu.c
 endif
 
-# Add special case for clang/hardened builds
+# Add special case for clang builds
 ifeq ($(CC),clang)
-	override KCFLAGS += -target $(CLANG_TARGET)
-endif
-ifeq (@SECURE_BUILD@,yes)
-	override KCFLAGS += -DSECURE_BUILD=1 -fsanitize=undefined
+        override KCFLAGS += -target $(ARCH)-pc-none-elf
 endif
 
 # Build artifacts
@@ -171,7 +167,7 @@ else ifeq ($(ARCH), x86_64)
 endif
 
 run: $(IMAGE)
-	qemu-system-$(ARCH) $(QEMU_FLAGS)	
+	qemu-system-$(ARCH) $(QEMU_FLAGS)
 
 run-kvm: $(IMAGE)
 	qemu-system-$(ARCH) --enable-kvm $(QEMU_FLAGS)

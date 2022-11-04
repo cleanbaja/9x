@@ -68,7 +68,7 @@ halt:
   }
 }
 
-#ifdef SECURE_BUILD
+#ifdef UBSAN
 
 /***********************
  *    Ubsan Support    *
