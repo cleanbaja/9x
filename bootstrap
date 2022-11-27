@@ -10,14 +10,10 @@ srcdir=`dirname "$0"`
 test -z "$srcdir" && srcdir=.
 cd "$srcdir"
 
-git clone --depth 1 --branch v4.x-branch-binary https://hub.fastgit.xyz/limine-bootloader/limine 3rdparty/limine
-make -C 3rdparty/limine
-
 mkdir -p 3rdparty/OVMF_AA64
 cd 3rdparty/OVMF_AA64 
 curl -o OVMF-AA64.zip https://efi.akeo.ie/OVMF/OVMF-AA64.zip && unzip OVMF-AA64.zip
 cd ../../
-
 
 mkdir -p 3rdparty/OVMF_X64
 cd 3rdparty/OVMF_X64

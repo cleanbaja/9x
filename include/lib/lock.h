@@ -25,19 +25,29 @@ static inline void spinlock(lock_t* lck) {
     __builtin_trap();
 
   lck->waiters++;
-  while (__sync_lock_test_and_set(&lck->lock_bits, 1) != 0)
-    cpu_pause();
-  
+  for (;;) {
+    if (!__sync_lock_test_and_set(lck, 1))
+      break;
+
+    while (__sync_add_and_fetch(lck, 0))
+      cpu_pause();
+  }
+
   // To make sure loads/stores to the spinlock structure
   // don't cause any race conditions, don't move any loads
   // and stores past this point...
   __sync_synchronize();
-  
+
   lck->waiters--;
   lck->cpu = cpunum();
 #else
-  while (__sync_lock_test_and_set(lck, 1) != 0)
-    cpu_pause();
+  for (;;) {
+    if (!__sync_lock_test_and_set(lck, 1))
+      break;
+
+    while (__sync_add_and_fetch(lck, 0))
+      cpu_pause();
+  }
 #endif
 }
 

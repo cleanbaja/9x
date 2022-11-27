@@ -6,7 +6,7 @@ override SCDIR := @srcdir@/src
 override CFLAGS := @CFLAGS@
 override BUILD_DIR := @BUILDDIR@
 override SOURCE_DIR := @srcdir@
-override VERSION := @PACKAGE_VERSION@
+override TARBALL_NAME := ninex-$(shell date '+%Y%m%d')
 
 # Silent by default
 ifeq ($(V),)
@@ -93,27 +93,7 @@ $(KERNEL): $(OBJECTS)
 	$(LD) $(KLINKFLAGS) -T $(SCDIR)/arch/$(ARCH)/kernel.ld -o $@ $(OBJECTS)
 
 $(IMAGE): $(KERNEL) $(SOURCE_DIR)/root/limine.cfg
-	rm -f $(IMAGE)
-	dd if=/dev/zero bs=1M count=0 seek=64 of=$(IMAGE)
-	parted -s $(IMAGE) mklabel gpt
-	parted -s $(IMAGE) mkpart ESP fat32 2048s 100%
-	parted -s $(IMAGE) set 1 esp on
-	@srcdir@/3rdparty/limine/limine-deploy $(IMAGE)
-	sudo losetup -f >lpdev
-	sudo losetup -Pf $(IMAGE)
-	sudo mkfs.fat -F 32 `cat lpdev`p1
-	mkdir -p mountdir
-	sudo mount `cat lpdev`p1 mountdir
-	sudo mkdir -p mountdir/EFI/BOOT
-	sudo mkdir -p mountdir/boot
-	sudo cp $(KERNEL) $(SOURCE_DIR)/root/limine.cfg mountdir/boot/
-	sudo cp @srcdir@/3rdparty/limine/limine.sys mountdir/
-	sudo cp @srcdir@/3rdparty/limine/BOOTX64.EFI mountdir/EFI/BOOT/
-	sudo cp @srcdir@/3rdparty/limine/BOOTAA64.EFI mountdir/EFI/BOOT/
-	sync
-	sudo umount mountdir
-	sudo losetup -d `cat lpdev`
-	sudo rm -rf lpdev mountdir
+	LIMINE_DIR=$(SOURCE_DIR)/3rdparty/limine IMAGE_FILE=$(IMAGE) @srcdir@/scripts/image_tool.sh
 
 # Header dependencies
 override HEADER_DEPS := $(addprefix $(BUILD_DIR), $(patsubst %.c, %.d, $(kern_SOURCES:$(SOURCE_DIR)%=%)))
@@ -130,20 +110,20 @@ distclean: clean
 	rm -rf $(BUILD_DIR)/.tmpinc
 
 maintainer-clean: distclean
-	rm -rf $(SOURCE_DIR)/3rdparty $(SOURCE_DIR)/build-aux configure *'~' 
+	rm -rf $(SOURCE_DIR)/3rdparty $(SOURCE_DIR)/build-aux configure *'~'
 	rm -rf $(SOURCE_DIR)/install-sh $(SOURCE_DIR)/autom4te*
 
 dist:
-	rm -rf "ninex-$(VERSION)"
-	mkdir -p "ninex-$(VERSION)"
-	cp -r @srcdir@/.git "ninex-$(VERSION)"/
-	cd "ninex-$(VERSION)" && git checkout .
-	cd "ninex-$(VERSION)" && ./bootstrap
-	cd "ninex-$(VERSION)" && echo $(VERSION) >.version
-	rm -rf "ninex-$(VERSION)/.git"
-	rm -rf "ninex-$(VERSION)/autom4te.cache"
-	tar -zcf $(BUILD_DIR)/"ninex-$(VERSION).tar.gz" "ninex-$(VERSION)"
-	rm -rf "ninex-$(VERSION)"
+	rm -rf "$(TARBALL_NAME)"
+	mkdir -p "$(TARBALL_NAME)"
+	cp -r @srcdir@/.git "$(TARBALL_NAME)"/
+	cd "$(TARBALL_NAME)" && git checkout .
+	cd "$(TARBALL_NAME)" && ./bootstrap
+	cd "$(TARBALL_NAME)" && echo @PACKAGE_VERSION@ >.version
+	rm -rf "$(TARBALL_NAME)/.git"
+	rm -rf "$(TARBALL_NAME)/autom4te.cache"
+	tar -zcf $(BUILD_DIR)/"$(TARBALL_NAME).tar.gz" "$(TARBALL_NAME)"
+	rm -rf "$(TARBALL_NAME)"
 
 install:
 	@INSTALL@ -d "$(DESTDIR)/boot"
@@ -156,19 +136,17 @@ install-strip:
 # Run Targets
 .PHONY: run run-kvm
 
-override QEMU_FLAGS ?= -m 1G -hda $(IMAGE)
+override RUN_VM_FLAGS := -i $(IMAGE)
 
 ifeq ($(ARCH), aarch64)
-	override QEMU_FLAGS += -smp 8 -M virt -serial stdio -device ramfb -cpu cortex-a72 -device qemu-xhci
-	override QEMU_FLAGS += -bios $(SOURCE_DIR)/3rdparty/OVMF_AA64/OVMF.fd -device usb-kbd
+        override RUN_VM_FLAGS += -o $(SOURCE_DIR)/3rdparty/OVMF_AA64
 else ifeq ($(ARCH), x86_64)
-	override QEMU_FLAGS += -M q35 -cpu qemu64,+rdtscp -smp `nproc` 
-	override QEMU_FLAGS += -bios $(SOURCE_DIR)/3rdparty/OVMF_X64/OVMF.fd -debugcon stdio
+        override RUN_VM_FLAGS += -o $(SOURCE_DIR)/3rdparty/OVMF_X64
 endif
 
 run: $(IMAGE)
-	qemu-system-$(ARCH) $(QEMU_FLAGS)
+	QEMU_ARCH=$(ARCH) ./scripts/run_vm.sh $(RUN_VM_FLAGS)
 
 run-kvm: $(IMAGE)
-	qemu-system-$(ARCH) --enable-kvm $(QEMU_FLAGS)
+	QEMU_ARCH=$(ARCH) ./scripts/run_vm.sh -k $(RUN_VM_FLAGS)
 
