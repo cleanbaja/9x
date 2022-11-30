@@ -99,8 +99,11 @@ void lvm_setup_kspace() {
     struct limine_memmap_entry entry = *mm_resp->entries[i];
     uint64_t aligned_base = (entry.base / 0x200000) * 0x200000;
 
+    if ((entry.base + entry.length) < (0x800ull * 0x200000ull))
+      continue;
+
     lvm_map_page(&kspace, aligned_base + LVM_HIGHER_HALF, aligned_base,
-      ALIGN_DOWN(entry.length, 0x200000), default_flags | LVM_PERM_WRITE);
+      ALIGN_UP(entry.length, 0x200000), default_flags);
   }
 }
 

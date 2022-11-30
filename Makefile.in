@@ -16,12 +16,12 @@ endif
 # Gather the kernel cflags/sources
 override kern_SOURCES := $(SCDIR)/kern/init.c     \
                          $(SCDIR)/kern/kasan.c    \
+                         $(SCDIR)/kern/console.c  \
                          $(SCDIR)/lib/print.c     \
                          $(SCDIR)/lib/panic.c     \
                          $(SCDIR)/lib/libc.c      \
                          $(SCDIR)/lib/tlsf.c      \
                          $(SCDIR)/lib/cmdline.c   \
-                         $(SCDIR)/dev/console.c   \
                          $(SCDIR)/lvm/lvm_init.c  \
                          $(SCDIR)/lvm/lvm_page.c  \
                          $(SCDIR)/lvm/lvm_alloc.c \
@@ -139,9 +139,9 @@ install-strip:
 override RUN_VM_FLAGS := -i $(IMAGE)
 
 ifeq ($(ARCH), aarch64)
-        override RUN_VM_FLAGS += -o $(SOURCE_DIR)/3rdparty/OVMF_AA64
+	override RUN_VM_FLAGS += -o $(SOURCE_DIR)/3rdparty/OVMF_AA64
 else ifeq ($(ARCH), x86_64)
-        override RUN_VM_FLAGS += -o $(SOURCE_DIR)/3rdparty/OVMF_X64
+	override RUN_VM_FLAGS += -o $(SOURCE_DIR)/3rdparty/OVMF_X64
 endif
 
 run: $(IMAGE)

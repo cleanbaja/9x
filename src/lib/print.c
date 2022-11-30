@@ -14,15 +14,25 @@ static void debugcon_write(char* str, size_t len) {
   asm volatile ("rep outsb" : "+S"(str), "+c"(len) : "d"(0xE9) : "memory"); 
 }
 
-static bool debugcon_init() {
-  return true;
-}
+static bool debugcon_init() { return true; }
 
 static struct print_sink debugcon_sink = {
   .write = debugcon_write,
   .init  = debugcon_init
 };
 #endif
+
+// In-memory backlog logger
+static void backlog_write(char* str, size_t len) {
+  
+}
+
+static bool backlog_init() { return true; }
+
+static struct print_sink backlog_sink = {
+  .write = backlog_write,
+  .init  = backlog_init
+};
 
 // TODO: find a alternative to stivale2's uart tag
 
@@ -31,7 +41,7 @@ int print_register_sink(struct print_sink bck) {
     if (!sinks[i].active && !sinks[i].write) {
       if (!bck.init())
         return -1;
-      
+
       bck.active = true;
       sinks[i] = bck;
       return i;

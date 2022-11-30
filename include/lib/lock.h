@@ -26,10 +26,10 @@ static inline void spinlock(lock_t* lck) {
 
   lck->waiters++;
   for (;;) {
-    if (!__sync_lock_test_and_set(lck, 1))
+    if (!__sync_lock_test_and_set(&lck->lock_bits, 1))
       break;
 
-    while (__sync_add_and_fetch(lck, 0))
+    while (__sync_add_and_fetch(&lck->lock_bits, 0))
       cpu_pause();
   }
 
