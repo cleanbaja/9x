@@ -15,19 +15,11 @@ volatile static struct limine_bootloader_info_request info_req = {
   .revision = 0
 };
 
-volatile static struct limine_kernel_file_request kfile_req = {
-  .id = LIMINE_KERNEL_FILE_REQUEST,
-  .revision = 0
-};
-
 __attribute__((noreturn)) void kern_entry(void) {
-  // Initialize outputs and traps
+  // Setup the basics
   print_init();
   trap_init();
-
-  // Load the kernel command line
-  char* cmdline_raw = kfile_req.response->kernel_file->cmdline;
-  if (cmdline_raw) cmdline_load(cmdline_raw);
+  cmdline_init();
 
   cpu_init();
   lvm_init();

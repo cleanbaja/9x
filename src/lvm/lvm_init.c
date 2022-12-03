@@ -97,14 +97,25 @@ void lvm_setup_kspace() {
 
   for(uint64_t i = 0; i < mm_resp->entry_count; i++) {
     struct limine_memmap_entry entry = *mm_resp->entries[i];
-    uint64_t aligned_base = (entry.base / 0x200000) * 0x200000;
+    uint64_t aligned_base = ALIGN_DOWN(entry.base, 0x200000);
 
     if ((entry.base + entry.length) < (0x800ull * 0x200000ull))
       continue;
 
-    lvm_map_page(&kspace, aligned_base + LVM_HIGHER_HALF, aligned_base,
-      ALIGN_UP(entry.length, 0x200000), default_flags);
+    lvm_map_page(
+      &kspace, aligned_base + LVM_HIGHER_HALF,
+      aligned_base, ALIGN_UP(entry.length, 0x200000), default_flags
+    );
   }
+
+  // Map the pfndb now, since we removed it from the memmap earlier
+  uint64_t aligned_pfndb = ALIGN_DOWN((uintptr_t)lvm_pfndb, 0x200000) - LVM_HIGHER_HALF;
+  size_t pfndb_len = lvm_pagecount * sizeof(struct lvm_page);
+
+  lvm_map_page(
+    &kspace, aligned_pfndb + LVM_HIGHER_HALF, aligned_pfndb,
+    ALIGN_UP(pfndb_len, 0x200000), default_flags
+  );
 }
 
 void lvm_init() {

@@ -58,8 +58,8 @@ while iter=$(echo "$sanitizers,"|cut -d\, -f$idx) ; test -n "$iter"; do
       ;;
     kasan)
       CFLAGS="$CFLAGS -fasan-shadow-offset=0xdfffe00000000000 -fsanitize=kernel-address -DKASAN=1"
-      if ! test "$KERNEL_CC" = *"gcc"*; then
-         AC_MSG_ERROR(kasan currently only works with GCC!)
+      if ! echo "$KERNEL_CC" | grep "gcc" >/dev/null; then
+         AC_MSG_ERROR(kasan currently only works with GCC! [not $KERNEL_CC])
       fi
       ;;
     lksan)

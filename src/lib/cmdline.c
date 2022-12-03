@@ -1,15 +1,20 @@
 #include <lib/cmdline.h>
 #include <lib/libc.h>
+#include <misc/limine.h>
 #include <stddef.h>
 
 static char cmdline_data[CMDLINE_MAX_LEN];
 static uint32_t cmdline_size;
 static uint32_t cmdline_count;
 
+volatile static struct limine_kernel_file_request kfile_req = {
+  .id = LIMINE_KERNEL_FILE_REQUEST,
+  .revision = 0
+};
+
 void cmdline_load(const char* ptr) {
   // Command lines can be NULL sometimes...
   if (ptr == NULL) return;
-  
   unsigned i = cmdline_size;
   unsigned max = CMDLINE_MAX_LEN - 2;
   bool found_equal = false;
@@ -104,3 +109,9 @@ uint32_t cmdline_get_uint(const char* key, uint32_t wanted) {
   return value;
 }
 
+void cmdline_init() {
+  char* cmdline_raw = kfile_req.response->kernel_file->cmdline;
+  if (cmdline_raw != NULL) {
+    cmdline_load(cmdline_raw);
+  }
+}

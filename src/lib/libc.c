@@ -53,18 +53,6 @@ void memset(void* dest, const uint8_t val, size_t len) {
 }
 
 int memcmp(const void *ptr1, const void *ptr2, size_t len) {
-#ifdef __x86_64__
-  if (len == 0) return 0;
-
-  int result;
-  asm volatile (
-    "cld; rep cmpsb; setz %%al"
-    : "+S"(ptr1), "+D"(ptr2), "+c"(len), "=a"(result)
-    :: "memory"
-  );
-  return result;
-
-#else
   const uint8_t *data1 = (const uint8_t *)ptr1;
   const uint8_t *data2 = (const uint8_t *)ptr2;
 
@@ -75,7 +63,6 @@ int memcmp(const void *ptr1, const void *ptr2, size_t len) {
   }
 
   return 0;
-#endif
 }
 
 char *strchr(const char *s, int c) {
