@@ -1,52 +1,85 @@
-AC_INIT(9x, 1.0.0, https://github.com/cleanbaja/CrecentOS/issues, ninex)
-AC_COPYRIGHT([Copyright (c) 2022 cleanbaja, All Rights Reserved.])
+AC_INIT([9x],[m4_esyscmd(./version.sh)],[https://github.com/cleanbaja/9x/issues],[ninex])
+AC_CONFIG_SRCDIR([LICENSE.md])
+AC_CONFIG_AUX_DIR([build-aux])
+AC_PREREQ([2.71])
 
-# Search for the programs we need...
+# Build Variables
+BUILDDIR="$(pwd -P)"
+AC_SUBST(BUILDDIR, [$BUILDDIR])
+AC_ARG_VAR(CFLAGS, [C Compiler Flags [-Os -pipe -g]])
+AC_ARG_VAR(KERNEL_CC, [Kernel C Compiler [clang]])
+AC_ARG_VAR(KERNEL_LD, [Kernel ELF Linker [ld.lld]])
+
+# Defaults
+test "x$CFLAGS" = "x" && CFLAGS='-Os -pipe -g'
+test "x$KERNEL_CC" = "x" && KERNEL_CC='clang'
+test "x$KERNEL_LD" = "x" && KERNEL_LD='ld.lld'
+
+# Runtime sanitizers
+AC_ARG_WITH([sanitizers],
+  [AS_HELP_STRING([--with-sanitizers],[use runtime kernel sanitizers (ubsan, kasan and lksan)])],
+  [sanitizers=$withval], [sanitizers=""])
+
+# Build Arch
+m4_define([DEFAULT_ARCH], [x86_64])
+AC_ARG_VAR(ARCH, [Target Architecture @<:@]DEFAULT_ARCH[@:>@])
+test "x$ARCH" = "x" && ARCH="DEFAULT_ARCH"
+
+# Build Tools
 AC_PROG_INSTALL
+AC_CHECK_TOOL(CC_LOCATED, $KERNEL_CC, [yes])
+AC_CHECK_TOOL(LD_LOCATED, $KERNEL_LD, [yes])
+AC_CHECK_TOOL(AR_LOCATED, ar, [yes])
 AC_CHECK_PROG([NASM_LOCATED], [nasm], [yes])
+
+# Confirm tools are present
+if test "x$CC_LOCATED" = "xyes"; then
+    AC_MSG_ERROR([$KERNEL_CC (C Compiler) is not present on this system, please install before running!])
+fi
+if test "x$LD_LOCATED" = "xyes"; then
+    AC_MSG_ERROR([$KERNEL_LD (Object Linker) is not present on this system, please install before running!])
+fi
+if test "x$AR_LOCATED" = "xyes"; then
+    AC_MSG_ERROR([ar (Object Archiver) is not present on this system, please install before running!])
+fi
 if ! test "x$NASM_LOCATED" = "xyes"; then
     AC_MSG_ERROR([NASM (Netwide Assembler) is not present on this system, please install before running!])
 fi
 
-# Find the build dir, the current date, and export them all
-BUILDDIR="$(pwd -P)"
-CUR_DATE="$(date +'%b %d, %Y')"
-AC_SUBST(BUILDDIR, [$BUILDDIR])
-AC_SUBST(CONFIG_DATE, [$CUR_DATE])
-
-# Kernel features that can be enabled/disabled
-#----------------------------------------------#
-AC_ARG_ENABLE(earlyconsole,
-    AS_HELP_STRING([--disable-earlyconsole], [disables the use of the stivale2 terminal as a early logging output, required if not using limine]),
-    LIMINE_EARLYCONSOLE="$enableval")
-
-# If we're on aarch64, disable the LIMINE_EARLYCONSOLE, even if the flag isn't passed
-if test "x$ARCH" = "xaarch64"; then
-    LIMINE_EARLYCONSOLE=""
+# Apply the requested sanitizers
+if test "$sanitizers" = "all"; then
+    sanitizers="ubsan,kasan,lksan"
 fi
-if test "x$LIMINE_EARLYCONSOLE" = "xno"; then
-    LIMINE_EARLYCONSOLE=""
-else
-    LIMINE_EARLYCONSOLE="yes"
-fi
-AC_SUBST(LIMINE_EARLYCONSOLE, [$LIMINE_EARLYCONSOLE])
+idx=1
+while iter=$(echo "$sanitizers,"|cut -d\, -f$idx) ; test -n "$iter"; do
+  case $iter in
+    ubsan)
+      CFLAGS="$CFLAGS -fsanitize=undefined -DUBSAN=1"
+      ;;
+    kasan)
+      CFLAGS="$CFLAGS -fasan-shadow-offset=0xdfffe00000000000 -fsanitize=kernel-address -DKASAN=1"
+      if ! echo "$KERNEL_CC" | grep "gcc" >/dev/null; then
+         AC_MSG_ERROR(kasan currently only works with GCC! [not $KERNEL_CC])
+      fi
+      ;;
+    lksan)
+      CFLAGS="$CFLAGS -DSANITIZE_LOCKS=1"
+      ;;
+    *)
+      AC_MSG_ERROR(unknown sanitizer $iter!)
+      ;;
+  esac
 
-#----------------------------------------------#
+  idx=$((idx+1))
+done
 
-# Kernel arguments
-AC_ARG_VAR(ARCH, [Kernel CPU Architecture [x86_64]])
-AC_ARG_VAR(KERNEL_CFLAGS, [Kernel C Flags [-O2 -g]])
-AC_ARG_VAR(KERNEL_LDFLAGS, [Kernel Linker Flags [empty]])
-test "x$ARCH" = "x" && ARCH='x86_64'
-test "x$KERNEL_CFLAGS" = "x" && KERNEL_CFLAGS='-O2 -g'
-test "x$KERNEL_LDFLAGS" = "x" && KERNEL_LDFLAGS=' '
+# Link the arch-specific include dir into .tmpinc
+cur_src_dir=`readlink -f $srcdir`
+rm -rf $BUILDDIR/.tmpinc && mkdir $BUILDDIR/.tmpinc
+ln -sf $cur_src_dir/include/arch/$ARCH $BUILDDIR/.tmpinc/arch
 
-# Find the tools
-AC_CHECK_TOOL(CC, gcc, :)
-AC_CHECK_TOOL(LD, ld, :)
-AC_CHECK_TOOL(AR, ar, :)
-
-# Then finish the remaining parts of configuration
-AC_PREFIX_DEFAULT(/boot)
-AC_CONFIG_FILES(GNUmakefile config.h)
+# Finally, finish up configuration
+AC_PREFIX_DEFAULT()
+AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
+

@@ -1,0 +1,27 @@
+#!/bin/sh
+
+set -e
+
+# Ensure file names are sorted consistently across platforms.
+LC_ALL=C
+export LC_ALL
+
+srcdir=`dirname "$0"`
+test -z "$srcdir" && srcdir=.
+cd "$srcdir"
+
+mkdir -p 3rdparty/OVMF_AA64
+cd 3rdparty/OVMF_AA64 
+curl -o OVMF-AA64.zip https://efi.akeo.ie/OVMF/OVMF-AA64.zip && unzip OVMF-AA64.zip
+cd ../../
+
+mkdir -p 3rdparty/OVMF_X64
+cd 3rdparty/OVMF_X64
+curl -o OVMF-X64.zip https://efi.akeo.ie/OVMF/OVMF-X64.zip && unzip OVMF-X64.zip
+cd ../../
+
+automake_libdir="$(automake --print-libdir)"
+mkdir build-aux
+cp "${automake_libdir}/install-sh" ./build-aux
+
+autoconf

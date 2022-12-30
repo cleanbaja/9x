@@ -1,28 +1,29 @@
-#include <lib/builtin.h>
 #include <lib/cmdline.h>
-#include <lib/kcon.h>
-#include <stdbool.h>
+#include <lib/libc.h>
+#include <misc/limine.h>
+#include <stddef.h>
 
-#define CMDLINE_BUF_SZ 4096
-char __kernel_cmdline[CMDLINE_BUF_SZ];
-unsigned __kernel_cmdline_size;
-unsigned __kernel_cmdline_count;
+static char cmdline_data[CMDLINE_MAX_LEN];
+static uint32_t cmdline_size;
+static uint32_t cmdline_count;
 
-// Simple command-line parser I stole from zircon
-// https://fuchsia.googlesource.com/
-void cmdline_load(const char *data) {
-  unsigned i = __kernel_cmdline_size;
-  unsigned max = CMDLINE_BUF_SZ - 2;
+volatile static struct limine_kernel_file_request kfile_req = {
+  .id = LIMINE_KERNEL_FILE_REQUEST,
+  .revision = 0
+};
 
-  // Stivale2 can give us a NULL cmdline, so be ready...
-  if (data == NULL) return;
-
+void cmdline_load(const char* ptr) {
+  // Command lines can be NULL sometimes...
+  if (ptr == NULL) return;
+  unsigned i = cmdline_size;
+  unsigned max = CMDLINE_MAX_LEN - 2;
   bool found_equal = false;
+
   while (i < max) {
-    unsigned c = *data++;
+    unsigned c = *ptr++;
     if (c == 0) {
       if (found_equal) {  // last option was null delimited
-        ++__kernel_cmdline_count;
+        ++cmdline_count;
       }
       break;
     }
@@ -38,35 +39,36 @@ void cmdline_load(const char *data) {
     }
     if (c == ' ') {
       // spaces become \0's, but do not double up
-      if ((i == 0) || (__kernel_cmdline[i - 1] == 0)) {
+      if ((i == 0) || (cmdline_data[i - 1] == 0)) {
         continue;
       } else {
         if (!found_equal && i < max) {
-          __kernel_cmdline[i++] = '=';
+          cmdline_data[i++] = '=';
         }
         c = 0;
         found_equal = false;
-        ++__kernel_cmdline_count;
+        ++cmdline_count;
       }
     }
-    __kernel_cmdline[i++] = c;
+    cmdline_data[i++] = c;
   }
-  if (!found_equal && i > 0 && __kernel_cmdline[i - 1] != '\0' && i < max) {
-    __kernel_cmdline[i++] = '=';
-    ++__kernel_cmdline_count;
+
+  if (!found_equal && i > 0 && cmdline_data[i - 1] != '\0' && i < max) {
+    cmdline_data[i++] = '=';
+    ++cmdline_count;
   }
 
   // ensure a double-\0 terminator
-  __kernel_cmdline[i++] = 0;
-  __kernel_cmdline[i] = 0;
-  __kernel_cmdline_size = i;
+  cmdline_data[i++] = 0;
+  cmdline_data[i] = 0;
+  cmdline_size = i;
 }
 
-const char *cmdline_get(const char *key) {
-  if (!key) return __kernel_cmdline;
+char* cmdline_get(const char* key) {
+  if (!key) return cmdline_data;
 
   unsigned sz = strlen(key);
-  const char *ptr = __kernel_cmdline;
+  char *ptr = cmdline_data;
   for (;;) {
     if (!memcmp(ptr, key, sz) && (ptr[sz] == '=' || ptr[sz] == '\0')) {
       break;
@@ -83,9 +85,9 @@ const char *cmdline_get(const char *key) {
   return ptr;
 }
 
-bool cmdline_get_bool(const char *key, bool expected) {
+bool cmdline_get_bool(const char* key, bool wanted) {
   const char *value = cmdline_get(key);
-  if (value == NULL) return expected;
+  if (value == NULL) return wanted;
 
   if ((strcmp(value, "0") == 0) || (strcmp(value, "false") == 0) ||
       (strcmp(value, "off") == 0)) {
@@ -95,24 +97,21 @@ bool cmdline_get_bool(const char *key, bool expected) {
   return true;
 }
 
-uint32_t cmdline_get32(const char *key, uint32_t expected) {
-  const char *value_str = cmdline_get(key);
-  if (value_str == NULL || *value_str == '\0') return expected;
+uint32_t cmdline_get_uint(const char* key, uint32_t wanted) {
+  const char *value_raw = cmdline_get(key);
+  if (value_raw == NULL || *value_raw == '\0')
+      return wanted;
 
-  char *end;
-  long int value = strtol(value_str, &end, 0);
-  if (*end != '\0') return expected;
+  char *end = NULL;
+  long int value = strtol(value_raw, &end, 0);
+  if (*end != '\0') return wanted;
 
   return value;
 }
 
-uint64_t cmdline_get64(const char *key, uint64_t expected) {
-  const char *value_str = cmdline_get(key);
-  if (value_str == NULL || *value_str == '\0') return expected;
-
-  char *end;
-  long long value = strtoll(value_str, &end, 0);
-  if (*end != '\0') return expected;
-
-  return value;
+void cmdline_init() {
+  char* cmdline_raw = kfile_req.response->kernel_file->cmdline;
+  if (cmdline_raw != NULL) {
+    cmdline_load(cmdline_raw);
+  }
 }

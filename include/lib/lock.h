@@ -1,41 +1,70 @@
-#ifndef LIB_LOCK_H
-#define LIB_LOCK_H
+#pragma once
 
-#include <arch/asm.h>
+#include <arch/cpu.h>
 
-#define ATOMIC_READ(j) __atomic_load_n(j, __ATOMIC_SEQ_CST)
-#define ATOMIC_WRITE(ptr, j) __atomic_store_n(ptr, j, __ATOMIC_SEQ_CST)
-#define ATOMIC_INC(i) __sync_add_and_fetch((i), 1)
-#define ATOMIC_CAS(var, cond, write)                                     \
-  __atomic_compare_exchange_n(var, cond, write, false, __ATOMIC_SEQ_CST, \
-                              __ATOMIC_RELAXED)
+// All architectures supported by 9x should support atomic instructions
+#include <stdatomic.h>
 
-typedef volatile int lock_t;
-#define spinlock(x)                        \
-  while (__sync_lock_test_and_set(x, 1)) { \
-    asm("pause");                          \
+#ifdef SANITIZE_LOCKS
+typedef struct {
+  volatile uint32_t lock_bits;
+  atomic_ulong waiters;
+  int cpu;
+} lock_t;
+
+#define SPINLOCK_INIT {0, 0, -1}
+#else
+typedef volatile uint32_t lock_t;
+
+#define SPINLOCK_INIT 0
+#endif
+
+static inline void spinlock(lock_t* lck) {
+#ifdef SANITIZE_LOCKS
+  if (lck->cpu == cpunum())
+    __builtin_trap();
+
+  lck->waiters++;
+  for (;;) {
+    if (!__sync_lock_test_and_set(&lck->lock_bits, 1))
+      break;
+
+    while (__sync_add_and_fetch(&lck->lock_bits, 0))
+      cpu_pause();
   }
-#define trylock(x) __atomic_test_and_set(x, __ATOMIC_ACQUIRE)
-#define spinrelease(x) __atomic_clear(x, __ATOMIC_RELEASE)
 
-// Spinlocks, except they disable IRQs as well
-#define spinlock_irq(x)                                      \
-  ({                                                         \
-    if (asm_check_intr()) asm volatile("cli");               \
-                                                             \
-    while (__sync_lock_test_and_set(x, 1)) {                 \
-      if (asm_check_intr()) asm volatile("sti; pause; cli"); \
-      else                                                   \
-        asm volatile("pause");                               \
-    }                                                        \
-                                                             \
-    asm_check_intr();                                        \
-  })
+  // To make sure loads/stores to the spinlock structure
+  // don't cause any race conditions, don't move any loads
+  // and stores past this point...
+  __sync_synchronize();
 
-#define spinrelease_irq(x, irq)          \
-  ({                                     \
-    __atomic_clear(x, __ATOMIC_RELEASE); \
-    if (irq) asm volatile("sti");        \
-  })
+  lck->waiters--;
+  lck->cpu = cpunum();
+#else
+  for (;;) {
+    if (!__sync_lock_test_and_set(lck, 1))
+      break;
 
-#endif  // LIB_LOCK_H
+    while (__sync_add_and_fetch(lck, 0))
+      cpu_pause();
+  }
+#endif
+}
+
+static inline void spinrelease(lock_t* lck) {
+#ifdef SANITIZE_LOCKS
+  if (lck->cpu != cpunum())
+    __builtin_trap();
+  else
+    lck->cpu = -1;
+
+  // To make sure loads/stores to the spinlock structure
+  // don't cause any race conditions, don't move any loads
+  // and stores past this point...
+  __sync_synchronize();
+  
+  __sync_lock_release(&lck->lock_bits);
+#else
+  __sync_lock_release(lck);
+#endif
+}

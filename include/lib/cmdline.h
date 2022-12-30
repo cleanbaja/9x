@@ -1,16 +1,13 @@
-#ifndef LIB_CMDLINE_H
-#define LIB_CMDLINE_H
+#pragma once
 
-#include <stdbool.h>
 #include <stdint.h>
+#include <stdbool.h>
 
-// Loads a command line into the internal list, if the internal list wasn't
-// empty
-void cmdline_load(const char *str);
+#define CMDLINE_MAX_LEN 2048
 
-const char *cmdline_get(const char *key);
-uint32_t cmdline_get32(const char *key, uint32_t expected);
-uint64_t cmdline_get64(const char *key, uint64_t expected);
-bool cmdline_get_bool(const char *key, bool expected);
+void cmdline_load(const char* ptr);
+char* cmdline_get(const char* key);
+bool cmdline_get_bool(const char* key, bool wanted);
+uint32_t cmdline_get_uint(const char* key, uint32_t wanted);
 
-#endif  // LIB_CMDLINE_H
+void cmdline_init();

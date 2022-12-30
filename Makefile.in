@@ -1,0 +1,152 @@
+# Import in variables from autoconf
+override CC := @KERNEL_CC@
+override LD := @KERNEL_LD@
+override ARCH := @ARCH@
+override SCDIR := @srcdir@/src
+override CFLAGS := @CFLAGS@
+override BUILD_DIR := @BUILDDIR@
+override SOURCE_DIR := @srcdir@
+override TARBALL_NAME := ninex-$(shell date '+%Y%m%d')
+
+# Silent by default
+ifeq ($(V),)
+.SILENT:
+endif
+
+# Gather the kernel cflags/sources
+override kern_SOURCES := $(SCDIR)/kern/init.c     \
+                         $(SCDIR)/kern/kasan.c    \
+                         $(SCDIR)/kern/console.c  \
+                         $(SCDIR)/lib/print.c     \
+                         $(SCDIR)/lib/panic.c     \
+                         $(SCDIR)/lib/libc.c      \
+                         $(SCDIR)/lib/tlsf.c      \
+                         $(SCDIR)/lib/cmdline.c   \
+                         $(SCDIR)/lvm/lvm_init.c  \
+                         $(SCDIR)/lvm/lvm_page.c  \
+                         $(SCDIR)/lvm/lvm_alloc.c \
+                         $(SCDIR)/lvm/lvm_space.c
+
+override KCFLAGS := $(CFLAGS)                  \
+                    -std=gnu11                 \
+                    -ffreestanding             \
+                    -fpic                      \
+                    -Wno-attributes            \
+                    -MMD                       \
+                    -mno-red-zone              \
+                    -I @srcdir@/include        \
+                    -I $(BUILD_DIR)/.tmpinc    \
+                    -fno-omit-frame-pointer
+
+override KLINKFLAGS := -nostdlib
+
+# Make arch-specific modifications
+ifeq ($(ARCH),aarch64)
+        override KCFLAGS += -mgeneral-regs-only
+        override KLINKFLAGS += -zmax-page-size=0x10000
+
+        override asm_SOURCES  := $(SCDIR)/arch/aarch64/stubs.S
+        override kern_SOURCES += $(SCDIR)/arch/aarch64/trap.c \
+                                 $(SCDIR)/arch/aarch64/pmap.c \
+                                 $(SCDIR)/arch/aarch64/cpu.c
+else ifeq ($(ARCH), x86_64)
+        override KCFLAGS += -mno-80387                 \
+                            -mno-mmx                   \
+                            -mno-3dnow                 \
+                            -mno-sse                   \
+                            -mno-sse2
+        override KLINKFLAGS += -zmax-page-size=0x1000
+
+        override asm_SOURCES  := $(SCDIR)/arch/x86_64/stubs.S
+        override kern_SOURCES += $(SCDIR)/arch/x86_64/trap.c \
+                                 $(SCDIR)/arch/x86_64/pmap.c \
+                                 $(SCDIR)/arch/x86_64/cpu.c
+endif
+
+# Add special case for clang builds
+ifeq ($(CC),clang)
+        override KCFLAGS += -target $(ARCH)-pc-none-elf
+endif
+
+# Build artifacts
+override KERNEL  := $(BUILD_DIR)/nxkern
+override IMAGE   := $(BUILD_DIR)/ninex.hdd
+override OBJECTS := $(addprefix $(BUILD_DIR), $(patsubst %.c, %.o, $(kern_SOURCES:$(SOURCE_DIR)%=%)))
+override OBJECTS += $(addprefix $(BUILD_DIR), $(patsubst %.S, %.o, $(asm_SOURCES:$(SOURCE_DIR)%=%)))
+
+# Finally, the actual build targets
+all: $(KERNEL)
+
+$(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.c
+	@printf "\tCC %s\n" $<
+	mkdir -p $(@D)
+	$(CC) $(KCFLAGS) -o $@ -c $<
+
+$(BUILD_DIR)/%.o: $(SOURCE_DIR)/%.S
+	@printf "\tASM %s\n" $<
+	mkdir -p $(@D)
+	$(CC) $(KCFLAGS) -o $@ -c $<
+
+$(KERNEL): $(OBJECTS)
+	@printf "\tCCLD %s\n" $@
+	mkdir -p $(@D)
+	$(LD) $(KLINKFLAGS) -T $(SCDIR)/arch/$(ARCH)/kernel.ld -o $@ $(OBJECTS)
+
+$(IMAGE): $(KERNEL) $(SOURCE_DIR)/root/limine.cfg
+	LIMINE_DIR=$(SOURCE_DIR)/3rdparty/limine IMAGE_FILE=$(IMAGE) @srcdir@/scripts/image_tool.sh
+
+# Header dependencies
+override HEADER_DEPS := $(addprefix $(BUILD_DIR), $(patsubst %.c, %.d, $(kern_SOURCES:$(SOURCE_DIR)%=%)))
+override HEADER_DEPS += $(addprefix $(BUILD_DIR), $(patsubst %.S, %.d, $(asm_SOURCES:$(SOURCE_DIR)%=%)))
+-include $(HEADER_DEPS)
+
+# Miscellaneous Targets
+.PHONY: clean distclean maintainer-clean dist install install-strip
+clean: 
+	rm -f $(KERNEL) $(OBJECTS) $(HEADER_DEPS)
+
+distclean: clean
+	rm -f $(BUILD_DIR)/config.* $(IMAGE) $(BUILD_DIR)/Makefile
+	rm -rf $(BUILD_DIR)/.tmpinc
+
+maintainer-clean: distclean
+	rm -rf $(SOURCE_DIR)/3rdparty $(SOURCE_DIR)/build-aux configure *'~'
+	rm -rf $(SOURCE_DIR)/install-sh $(SOURCE_DIR)/autom4te*
+
+dist:
+	rm -rf "$(TARBALL_NAME)"
+	mkdir -p "$(TARBALL_NAME)"
+	cp -r @srcdir@/.git "$(TARBALL_NAME)"/
+	cd "$(TARBALL_NAME)" && git checkout .
+	cd "$(TARBALL_NAME)" && ./bootstrap
+	cd "$(TARBALL_NAME)" && echo @PACKAGE_VERSION@ >.version
+	rm -rf "$(TARBALL_NAME)/.git"
+	rm -rf "$(TARBALL_NAME)/autom4te.cache"
+	tar -zcf $(BUILD_DIR)/"$(TARBALL_NAME).tar.gz" "$(TARBALL_NAME)"
+	rm -rf "$(TARBALL_NAME)"
+
+install:
+	@INSTALL@ -d "$(DESTDIR)/boot"
+	@INSTALL@ $(KERNEL) "$(DESTDIR)/boot"
+
+install-strip:
+	@INSTALL@ -d "$(DESTDIR)/boot"
+	@INSTALL@ -s $(KERNEL) "$(DESTDIR)/boot"
+
+# Run Targets
+.PHONY: run run-kvm
+
+override RUN_VM_FLAGS := -i $(IMAGE)
+
+ifeq ($(ARCH), aarch64)
+	override RUN_VM_FLAGS += -o $(SOURCE_DIR)/3rdparty/OVMF_AA64
+else ifeq ($(ARCH), x86_64)
+	override RUN_VM_FLAGS += -o $(SOURCE_DIR)/3rdparty/OVMF_X64
+endif
+
+run: $(IMAGE)
+	QEMU_ARCH=$(ARCH) ./scripts/run_vm.sh $(RUN_VM_FLAGS)
+
+run-kvm: $(IMAGE)
+	QEMU_ARCH=$(ARCH) ./scripts/run_vm.sh -k $(RUN_VM_FLAGS)
+
